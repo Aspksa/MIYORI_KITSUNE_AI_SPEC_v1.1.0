@@ -319,7 +319,13 @@ def cli_auto_update() -> int:
         return 0
     try:
         result = apply_update()
-        print("[update] " + result.get("message", "Update check complete."))
+        if result.get("updated"):
+            print(
+                "[update] Обновление применено до запуска сервера. "
+                "Текущий запуск Miyori уже продолжится на новой версии."
+            )
+        else:
+            print("[update] " + result.get("message", "Локальный проект уже актуален."))
         return 0
     except UpdateError as exc:
         print(f"[update] skipped: {exc}")
