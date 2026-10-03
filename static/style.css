@@ -2410,3 +2410,211 @@ textarea::placeholder { color: #aaa2ba; }
   border-color: #dceee2;
   background: #f4fbf6;
 }
+
+
+/* 00.00.19 — account and updater sheets */
+body.sheet-open { overflow: hidden; }
+
+.settings-overlay[hidden] { display: none; }
+.settings-overlay {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(47,38,72,.26);
+  backdrop-filter: blur(8px);
+}
+.settings-sheet {
+  width: min(560px, 100%);
+  max-height: min(780px, calc(100vh - 40px));
+  overflow: hidden;
+  border: 1px solid #e4dcf3;
+  border-radius: 24px;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 30px 90px rgba(64,45,112,.22);
+}
+.settings-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #eee8f7;
+}
+.settings-sheet-head h3 {
+  margin: 3px 0 0;
+  color: #382e55;
+  font-size: 18px;
+}
+.sheet-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e6def3;
+  border-radius: 12px;
+  background: #faf8ff;
+  color: #806e9f;
+  font-size: 22px;
+  line-height: 1;
+}
+.settings-sheet-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 20px;
+  overflow-y: auto;
+  max-height: calc(100vh - 130px);
+}
+.sheet-note {
+  padding: 10px 12px;
+  border: 1px solid #e9e3f3;
+  border-radius: 12px;
+  background: #fbf9ff;
+  color: #786f8b;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.sheet-note code {
+  color: #674da9;
+  font-size: 9px;
+}
+.settings-form {
+  display: grid;
+  gap: 12px;
+}
+.settings-form label {
+  display: grid;
+  gap: 6px;
+}
+.settings-form label > span {
+  color: #514663;
+  font-size: 10px;
+  font-weight: 750;
+}
+.settings-form label > small {
+  color: #9b92aa;
+  font-size: 8px;
+}
+.settings-form input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #ded6ef;
+  border-radius: 12px;
+  outline: none;
+  background: #fff;
+  color: #413852;
+}
+.settings-form input:focus {
+  border-color: #a78be8;
+  box-shadow: 0 0 0 3px rgba(139,107,230,.10);
+}
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.primary-sheet-button,
+.secondary-sheet-button {
+  min-height: 38px;
+  padding: 0 13px;
+  border-radius: 11px;
+  font-size: 9px;
+  font-weight: 750;
+}
+.primary-sheet-button {
+  border: 1px solid #8062d8;
+  background: linear-gradient(145deg, #9575e8, #7959d4);
+  color: white;
+}
+.primary-sheet-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.secondary-sheet-button {
+  border: 1px solid #dfd6ef;
+  background: #faf8ff;
+  color: #69578f;
+}
+.sheet-result {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 9px;
+  line-height: 1.45;
+}
+.sheet-result.neutral {
+  border: 1px solid #e6e0ef;
+  background: #faf9fd;
+  color: #7e758d;
+}
+.sheet-result.working {
+  border: 1px solid #ded3f7;
+  background: #f4efff;
+  color: #7254c8;
+}
+.sheet-result.success {
+  border: 1px solid #d5eddc;
+  background: #f1faf4;
+  color: #2e8c52;
+}
+.sheet-result.warning {
+  border: 1px solid #f0dfb8;
+  background: #fff9eb;
+  color: #a87512;
+}
+.sheet-result.error {
+  border: 1px solid #f0d7d7;
+  background: #fff3f3;
+  color: #bf5353;
+}
+.repository-card {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid #e3dbf1;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f7f3ff, #ffffff);
+}
+.repository-card strong {
+  color: #43375f;
+  font-size: 10px;
+}
+.repository-card small {
+  color: #9a91a9;
+  font-size: 8px;
+}
+.update-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 8px;
+}
+.update-status-grid > div {
+  padding: 10px;
+  border: 1px solid #ebe5f4;
+  border-radius: 12px;
+  background: #fcfbff;
+}
+.update-status-grid span {
+  display: block;
+  margin-bottom: 4px;
+  color: #9c93aa;
+  font-size: 8px;
+}
+.update-status-grid strong {
+  display: block;
+  overflow: hidden;
+  color: #514664;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 620px) {
+  .settings-overlay { padding: 10px; }
+  .settings-sheet { border-radius: 18px; }
+  .update-status-grid { grid-template-columns: 1fr; }
+  .sheet-actions { justify-content: stretch; }
+  .sheet-actions button { flex: 1 1 auto; }
+}
