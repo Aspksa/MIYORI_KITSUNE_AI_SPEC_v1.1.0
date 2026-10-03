@@ -15,7 +15,7 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.10</span>
+            <span class="version-pill" id="versionText">00.00.11</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
@@ -55,10 +55,115 @@
           <h2 id="conversationTitle">Разговор с Миёри</h2>
         </div>
         <div class="header-actions">
-          <button id="toggleInspector" class="icon-action" type="button" title="Показать или скрыть панель" aria-label="Показать или скрыть панель">☷</button>
+          <button id="toggleConsole" class="icon-action" type="button" title="Открыть центр Миёри" aria-label="Открыть центр Миёри">◎</button>
           <button id="newChat" class="primary-soft" type="button">Новый разговор</button>
         </div>
       </header>
+
+      <section id="miyoriConsole" class="miyori-console collapsed">
+        <button id="consoleHeader" class="console-header" type="button">
+          <span class="console-symbol">◎</span>
+          <span class="console-title"><strong>Центр Миёри</strong><small>Контекст · Данные · Система</small></span>
+          <span id="consoleSummary" class="console-summary">готова</span>
+          <span class="console-chevron">⌄</span>
+        </button>
+
+        <div class="console-body">
+          <nav class="inspector-tabs console-tabs" aria-label="Разделы центра Миёри">
+            <button class="inspector-tab active" type="button" data-tab="context">Контекст</button>
+            <button class="inspector-tab" type="button" data-tab="data">Данные</button>
+            <button class="inspector-tab" type="button" data-tab="system">Система</button>
+          </nav>
+
+          <div class="console-pages">
+            <div class="inspector-page active" data-page="context">
+              <section class="module-card">
+                <div class="module-head">
+                  <div class="module-icon">◎</div>
+                  <div class="module-title"><span>Мозг</span><small>Рабочий план</small></div>
+                  <span id="brainState" class="state-chip ok">ready</span>
+                </div>
+                <div id="brainPlan" class="brain-plan empty-copy">План появится после запроса.</div>
+              </section>
+
+              <section class="module-card">
+                <div class="module-head">
+                  <div class="module-icon">⌘</div>
+                  <div class="module-title"><span>Agent Core</span><small>Автоматические действия</small></div>
+                  <span id="agentBudget" class="state-chip">0/3</span>
+                </div>
+                <div id="agentTrace" class="agent-trace empty-copy">Действий ещё не было.</div>
+              </section>
+
+              <section class="module-card">
+                <div class="module-head">
+                  <div class="module-icon">✦</div>
+                  <div class="module-title"><span>Память</span><small>Факты текущего проекта</small></div>
+                  <button id="refreshMemory" class="card-action" type="button">↻</button>
+                </div>
+                <input id="memorySearch" class="search-field" type="search" placeholder="Поиск в памяти…">
+                <div id="memoryList" class="memory-list"></div>
+              </section>
+            </div>
+
+            <div class="inspector-page" data-page="data">
+              <section class="module-card">
+                <div class="module-head">
+                  <div class="module-icon">▤</div>
+                  <div class="module-title"><span>Документы</span><small>Материалы проекта</small></div>
+                  <label class="card-action upload-label" title="Добавить документ">+
+                    <input id="documentInput" type="file" accept=".txt,.md,.markdown,.json" hidden>
+                  </label>
+                </div>
+                <input id="documentSearch" class="search-field" type="search" placeholder="Поиск по документам…">
+                <div id="documentList" class="document-list"></div>
+                <div id="documentSearchResults" class="document-results"></div>
+              </section>
+
+              <section class="module-card">
+                <div class="module-head">
+                  <div class="module-icon">◇</div>
+                  <div class="module-title"><span>Разрешения</span><small>Действия, ожидающие решения</small></div>
+                  <button id="refreshPermissions" class="card-action" type="button">↻</button>
+                </div>
+                <div id="permissionList" class="permission-list"></div>
+              </section>
+            </div>
+
+            <div class="inspector-page" data-page="system">
+              <section class="module-card">
+                <div class="module-head">
+                  <div class="module-icon">⟳</div>
+                  <div class="module-title"><span>Фоновые задачи</span><small>Очередь и выполнение</small></div>
+                  <button id="refreshTasks" class="card-action" type="button">↻</button>
+                </div>
+                <div class="quick-actions">
+                  <button id="runSelfCheckTask" class="compact-button" type="button">Самопроверка</button>
+                  <button id="runMemoryTask" class="compact-button" type="button">Консолидация памяти</button>
+                </div>
+                <div id="taskList" class="task-list"></div>
+              </section>
+
+              <section class="module-card">
+                <div class="module-head">
+                  <div class="module-icon">↗</div>
+                  <div class="module-title"><span>Развитие</span><small>Проверяемые метрики</small></div>
+                  <button id="runDevelopmentCheck" class="card-action" type="button">✓</button>
+                </div>
+                <div id="developmentStats" class="development-stats empty-copy">Нет данных.</div>
+              </section>
+
+              <section class="module-card compact-status-card">
+                <div class="module-head">
+                  <div class="module-icon">●</div>
+                  <div class="module-title"><span>Система</span><small>Cloud.ru · SQLite · локальный UI</small></div>
+                </div>
+                <div class="system-note">Интерфейс показывает только реальные состояния модулей и подтверждённые действия.</div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section id="messages" class="messages" aria-live="polite"></section>
 
@@ -74,109 +179,7 @@
       </footer>
     </main>
 
-    <aside class="inspector" id="inspector">
-      <div class="inspector-head">
-        <div>
-          <span class="section-caption">Центр управления</span>
-          <h3>Состояние Миёри</h3>
-        </div>
-        <span class="live-badge"><i></i> live</span>
-      </div>
 
-      <nav class="inspector-tabs" aria-label="Разделы панели">
-        <button class="inspector-tab active" type="button" data-tab="context">Контекст</button>
-        <button class="inspector-tab" type="button" data-tab="data">Данные</button>
-        <button class="inspector-tab" type="button" data-tab="system">Система</button>
-      </nav>
-
-      <div class="inspector-scroll">
-        <div class="inspector-page active" data-page="context">
-          <section class="module-card">
-            <div class="module-head">
-              <div class="module-icon">◎</div>
-              <div class="module-title"><span>Мозг</span><small>Рабочий план</small></div>
-              <span id="brainState" class="state-chip ok">ready</span>
-            </div>
-            <div id="brainPlan" class="brain-plan empty-copy">План появится после запроса.</div>
-          </section>
-
-          <section class="module-card">
-            <div class="module-head">
-              <div class="module-icon">⌘</div>
-              <div class="module-title"><span>Agent Core</span><small>Автоматические действия</small></div>
-              <span id="agentBudget" class="state-chip">0/3</span>
-            </div>
-            <div id="agentTrace" class="agent-trace empty-copy">Действий ещё не было.</div>
-          </section>
-
-          <section class="module-card">
-            <div class="module-head">
-              <div class="module-icon">✦</div>
-              <div class="module-title"><span>Память</span><small>Факты текущего проекта</small></div>
-              <button id="refreshMemory" class="card-action" type="button">↻</button>
-            </div>
-            <input id="memorySearch" class="search-field" type="search" placeholder="Поиск в памяти…">
-            <div id="memoryList" class="memory-list"></div>
-          </section>
-        </div>
-
-        <div class="inspector-page" data-page="data">
-          <section class="module-card">
-            <div class="module-head">
-              <div class="module-icon">▤</div>
-              <div class="module-title"><span>Документы</span><small>Материалы проекта</small></div>
-              <label class="card-action upload-label" title="Добавить документ">+
-                <input id="documentInput" type="file" accept=".txt,.md,.markdown,.json" hidden>
-              </label>
-            </div>
-            <input id="documentSearch" class="search-field" type="search" placeholder="Поиск по документам…">
-            <div id="documentList" class="document-list"></div>
-            <div id="documentSearchResults" class="document-results"></div>
-          </section>
-
-          <section class="module-card">
-            <div class="module-head">
-              <div class="module-icon">◇</div>
-              <div class="module-title"><span>Разрешения</span><small>Действия, ожидающие решения</small></div>
-              <button id="refreshPermissions" class="card-action" type="button">↻</button>
-            </div>
-            <div id="permissionList" class="permission-list"></div>
-          </section>
-        </div>
-
-        <div class="inspector-page" data-page="system">
-          <section class="module-card">
-            <div class="module-head">
-              <div class="module-icon">⟳</div>
-              <div class="module-title"><span>Фоновые задачи</span><small>Очередь и выполнение</small></div>
-              <button id="refreshTasks" class="card-action" type="button">↻</button>
-            </div>
-            <div class="quick-actions">
-              <button id="runSelfCheckTask" class="compact-button" type="button">Самопроверка</button>
-              <button id="runMemoryTask" class="compact-button" type="button">Консолидация памяти</button>
-            </div>
-            <div id="taskList" class="task-list"></div>
-          </section>
-
-          <section class="module-card">
-            <div class="module-head">
-              <div class="module-icon">↗</div>
-              <div class="module-title"><span>Развитие</span><small>Проверяемые метрики</small></div>
-              <button id="runDevelopmentCheck" class="card-action" type="button">✓</button>
-            </div>
-            <div id="developmentStats" class="development-stats empty-copy">Нет данных.</div>
-          </section>
-
-          <section class="module-card compact-status-card">
-            <div class="module-head">
-              <div class="module-icon">●</div>
-              <div class="module-title"><span>Система</span><small>Cloud.ru · SQLite · локальный UI</small></div>
-            </div>
-            <div class="system-note">Интерфейс показывает только реальные состояния модулей и подтверждённые действия.</div>
-          </section>
-        </div>
-      </div>
-    </aside>
   </div>
 
   <script src="/static/app.js"></script>
