@@ -93,6 +93,7 @@ def init_rag() -> dict:
                     dc.content, d.filename, d.id, dc.id, dc.chunk_index, d.project_id
                 FROM document_chunks dc
                 JOIN documents d ON d.id = dc.document_id
+                WHERE d.deleted_at IS NULL
                 """
             )
             count = conn.execute("SELECT COUNT(*) AS count FROM rag_document_fts").fetchone()["count"]

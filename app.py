@@ -31,6 +31,16 @@ from miyori.db import (
     init_db,
     add_document,
     create_document_folder,
+    find_document_by_sha,
+    get_document,
+    get_document_folder_parts,
+    list_deleted_documents,
+    list_deleted_document_folders,
+    mark_document_deleted,
+    mark_document_folder_deleted,
+    restore_document_record,
+    restore_document_folder_record,
+    update_document_storage_path,
     create_employee,
     create_counterparty,
     create_contract,
@@ -83,7 +93,24 @@ from miyori.agent import run_agent
 from miyori.background import register_background_handlers
 from miyori.brain import build_context
 from miyori.development import run_project_self_check
-from miyori.documents import chunk_text, decode_document, safe_filename, save_original, sha256_bytes
+from miyori.documents import (
+    MAX_FILE_BYTES,
+    chunk_text,
+    decode_document,
+    drive_relative_root,
+    ensure_drive_folder,
+    migrate_legacy_document,
+    move_document_to_trash,
+    move_folder_to_trash,
+    project_drive_dir,
+    resolve_data_path,
+    restore_document_from_trash,
+    restore_folder_from_trash,
+    safe_filename,
+    safe_folder_name,
+    save_original,
+    sha256_bytes,
+)
 from miyori.provider import ProviderError, chat
 from miyori.persona import persona_metadata
 from miyori.epistemic import (
@@ -120,10 +147,49 @@ from miyori.updater import (
 
 ROOT = Path(__file__).resolve().parent
 
+
+def _sync_project_drive(project_id: int) -> None:
+    """Создаёт физическое дерево Drive и переносит ссылки со старого хранилища."""
+    project_drive_dir(project_id)
+    for folder in list_document_folders(project_id):
+        try:
+            ensure_drive_folder(
+                project_id,
+                get_document_folder_parts(project_id, int(folder["id"])),
+            )
+        except (OSError, ValueError):
+            continue
+
+    for document in list_documents(project_id):
+        try:
+            folder_parts = get_document_folder_parts(
+                project_id,
+                document.get("folder_id"),
+            )
+            migrated = migrate_legacy_document(
+                project_id,
+                document["stored_path"],
+                document["filename"],
+                document["sha256"],
+                folder_parts,
+            )
+            if migrated != document["stored_path"]:
+                update_document_storage_path(
+                    project_id,
+                    int(document["id"]),
+                    migrated,
+                )
+        except (OSError, ValueError):
+            # Исходный путь остаётся в БД; данные не удаляются при неудачной миграции.
+            continue
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     init_epistemic_db()
+    for project in list_projects():
+        _sync_project_drive(int(project["id"]))
     init_rag()
     register_background_handlers()
     wake_worker()
@@ -133,7 +199,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.35", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.36", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -322,7 +388,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.35",
+        "version": "00.00.36",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -564,7 +630,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.35",
+        "project_version": "00.00.36",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -656,6 +722,7 @@ def project_create(request: ProjectCreateRequest) -> dict:
         project = create_project(request.name, kind=request.kind)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    _sync_project_drive(int(project["id"]))
     return {"project": project}
 
 
@@ -951,9 +1018,14 @@ def memory_replace(project_id: int, fact_id: int, request: MemoryReplaceRequest)
 def documents(project_id: int, folder_id: int | None = None) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
+    _sync_project_drive(project_id)
+    trashed_documents = list_deleted_documents(project_id)
+    trashed_folders = list_deleted_document_folders(project_id)
     return {
         "documents": list_documents(project_id, folder_id=folder_id),
         "folders": list_document_folders(project_id),
+        "storage_root": drive_relative_root(project_id),
+        "trash_count": len(trashed_documents) + len(trashed_folders),
     }
 
 
@@ -969,14 +1041,80 @@ def document_folder_create(project_id: int, request: DocumentFolderCreateRequest
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     try:
+        clean_name = safe_folder_name(request.name)
+        parent_parts = get_document_folder_parts(project_id, request.parent_id)
         folder = create_document_folder(
             project_id,
-            request.name,
+            clean_name,
             parent_id=request.parent_id,
         )
+        ensure_drive_folder(project_id, [*parent_parts, clean_name])
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Не удалось создать папку на диске: {exc}") from exc
     return {"folder": folder}
+
+
+@app.delete("/api/projects/{project_id}/document-folders/{folder_id}")
+def document_folder_delete(project_id: int, folder_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        parts = get_document_folder_parts(project_id, folder_id)
+        trash_path = move_folder_to_trash(project_id, parts, folder_id)
+        folder = mark_document_folder_deleted(project_id, folder_id, trash_path)
+        if not folder:
+            raise ValueError("Папка не найдена.")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Не удалось переместить папку в корзину: {exc}") from exc
+    init_rag()
+    return {
+        "ok": True,
+        "folder": folder,
+        "message": "Папка перемещена в корзину. Оригиналы сохранены на диске.",
+    }
+
+
+@app.post("/api/projects/{project_id}/document-folders/{folder_id}/restore")
+def document_folder_restore(project_id: int, folder_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    folder = next(
+        (item for item in list_deleted_document_folders(project_id) if int(item["id"]) == folder_id),
+        None,
+    )
+    if not folder:
+        raise HTTPException(status_code=404, detail="Папка не найдена в корзине.")
+
+    try:
+        parent_parts: list[str] = []
+        parent_id = folder.get("parent_id")
+        if parent_id is not None:
+            try:
+                parent_parts = get_document_folder_parts(project_id, int(parent_id))
+            except ValueError as exc:
+                raise ValueError(
+                    "Сначала восстановите родительскую папку."
+                ) from exc
+        _, restored_name = restore_folder_from_trash(
+            project_id,
+            folder["trash_path"],
+            parent_parts,
+            folder["name"],
+        )
+        restored = restore_document_folder_record(
+            project_id,
+            folder_id,
+            restored_name=restored_name,
+        )
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    init_rag()
+    return {"ok": True, "folder": restored}
 
 
 @app.post("/api/projects/{project_id}/documents")
@@ -991,39 +1129,166 @@ async def document_upload(
     filename = safe_filename(file.filename or "document.txt")
     data = await file.read()
 
+    if len(data) > MAX_FILE_BYTES:
+        raise HTTPException(status_code=422, detail="Файл слишком большой. Текущий лимит — 25 МБ.")
+
     try:
-        text = decode_document(filename, data)
-        chunks = chunk_text(text)
+        folder_parts = get_document_folder_parts(project_id, folder_id)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    if not chunks:
-        raise HTTPException(status_code=422, detail="В документе нет текста для усвоения.")
+    chunks: list[str] = []
+    index_warning: str | None = None
+    try:
+        text = decode_document(filename, data)
+        chunks = chunk_text(text)
+        if not chunks:
+            index_warning = "В файле нет извлекаемого текста для базы знаний."
+    except ValueError as exc:
+        # Miyori Drive хранит оригинал даже если формат пока нельзя индексировать.
+        index_warning = str(exc)
 
     digest = sha256_bytes(data)
-    stored_path = save_original(project_id, filename, data, digest)
-    document = add_document(
-        project_id=project_id,
-        filename=filename,
-        stored_path=stored_path,
-        mime_type=file.content_type,
-        sha256=digest,
-        size_bytes=len(data),
-        chunks=chunks,
-        folder_id=folder_id,
-    )
+    existing = find_document_by_sha(project_id, digest, include_deleted=True)
+    if existing and not existing.get("deleted_at"):
+        return {
+            "document": existing,
+            "chunk_count": existing.get("chunk_count", len(chunks)),
+            "duplicate": True,
+            "message": "Этот оригинал уже хранится в проекте.",
+        }
+
+    try:
+        stored_path = save_original(
+            project_id,
+            filename,
+            data,
+            digest,
+            folder_parts,
+        )
+        document = add_document(
+            project_id=project_id,
+            filename=filename,
+            stored_path=stored_path,
+            mime_type=file.content_type,
+            sha256=digest,
+            size_bytes=len(data),
+            chunks=chunks,
+            folder_id=folder_id,
+        )
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     init_rag()
     return {
         "document": document,
         "chunk_count": len(chunks),
+        "duplicate": False,
+        "indexed": bool(chunks),
+        "index_warning": index_warning,
+        "message": (
+            "Оригинал сохранён в Miyori Drive и добавлен в базу знаний."
+            if chunks else
+            "Оригинал сохранён в Miyori Drive. Файл пока не проиндексирован."
+        ),
     }
+
+
+@app.get("/api/projects/{project_id}/documents/trash")
+def document_trash(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {
+        "documents": list_deleted_documents(project_id),
+        "folders": list_deleted_document_folders(project_id),
+        "storage_root": drive_relative_root(project_id),
+    }
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/download")
+def document_download(project_id: int, document_id: int) -> FileResponse:
+    document = get_document(project_id, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        path = resolve_data_path(document["stored_path"])
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Оригинал документа отсутствует на диске.")
+    return FileResponse(
+        path,
+        media_type=document.get("mime_type") or "application/octet-stream",
+        filename=document["filename"],
+    )
+
+
+@app.delete("/api/projects/{project_id}/documents/{document_id}")
+def document_delete(project_id: int, document_id: int) -> dict:
+    document = get_document(project_id, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        trash_path = move_document_to_trash(
+            project_id,
+            document["stored_path"],
+            document["filename"],
+            document_id,
+        )
+        deleted = mark_document_deleted(project_id, document_id, trash_path)
+        if not deleted:
+            raise ValueError("Документ уже был удалён.")
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    init_rag()
+    return {
+        "ok": True,
+        "document": deleted,
+        "message": "Документ перемещён в корзину. Оригинал сохранён.",
+    }
+
+
+@app.post("/api/projects/{project_id}/documents/{document_id}/restore")
+def document_restore(project_id: int, document_id: int) -> dict:
+    document = get_document(project_id, document_id, include_deleted=True)
+    if not document or not document.get("deleted_at") or not document.get("trash_path"):
+        raise HTTPException(status_code=404, detail="Документ не найден в корзине.")
+
+    folder_id = document.get("folder_id")
+    try:
+        folder_parts = get_document_folder_parts(project_id, folder_id)
+    except ValueError:
+        folder_id = None
+        folder_parts = []
+
+    try:
+        stored_path = restore_document_from_trash(
+            project_id,
+            document["trash_path"],
+            document["filename"],
+            folder_parts,
+        )
+        restored = restore_document_record(
+            project_id,
+            document_id,
+            stored_path,
+            folder_id,
+        )
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    init_rag()
+    return {"ok": True, "document": restored}
 
 
 @app.get("/api/projects/{project_id}/documents/search")
 def document_search(project_id: int, q: str = "") -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
-    return {"chunks": search_document_chunks(project_id, q, limit=12)}
+    query = q.strip()
+    if not query:
+        return {"chunks": []}
+    return {"chunks": search_document_chunks(project_id, query, limit=20)}
 
 
 @app.get("/api/projects/{project_id}/rag")

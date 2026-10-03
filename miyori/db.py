@@ -216,6 +216,8 @@ def init_db() -> None:
                 parent_id INTEGER,
                 name TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                deleted_at TEXT,
+                trash_path TEXT,
                 FOREIGN KEY(project_id) REFERENCES projects(id),
                 FOREIGN KEY(parent_id) REFERENCES document_folders(id) ON DELETE CASCADE
             );
@@ -230,6 +232,8 @@ def init_db() -> None:
                 sha256 TEXT NOT NULL,
                 size_bytes INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
+                deleted_at TEXT,
+                trash_path TEXT,
                 UNIQUE(project_id, sha256),
                 FOREIGN KEY(project_id) REFERENCES projects(id),
                 FOREIGN KEY(folder_id) REFERENCES document_folders(id) ON DELETE SET NULL
@@ -351,6 +355,19 @@ def init_db() -> None:
         }
         if "folder_id" not in document_columns:
             conn.execute("ALTER TABLE documents ADD COLUMN folder_id INTEGER")
+        if "deleted_at" not in document_columns:
+            conn.execute("ALTER TABLE documents ADD COLUMN deleted_at TEXT")
+        if "trash_path" not in document_columns:
+            conn.execute("ALTER TABLE documents ADD COLUMN trash_path TEXT")
+
+        document_folder_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(document_folders)").fetchall()
+        }
+        if "deleted_at" not in document_folder_columns:
+            conn.execute("ALTER TABLE document_folders ADD COLUMN deleted_at TEXT")
+        if "trash_path" not in document_folder_columns:
+            conn.execute("ALTER TABLE document_folders ADD COLUMN trash_path TEXT")
 
         conn.execute(
             "UPDATE projects SET kind = 'home' WHERE name = 'Личное'"
@@ -767,6 +784,7 @@ def find_document_folder(project_id: int, name: str) -> dict | None:
             SELECT id, project_id, parent_id, name, created_at
             FROM document_folders
             WHERE project_id = ? AND parent_id IS NULL AND name = ?
+              AND deleted_at IS NULL
             LIMIT 1
             """,
             (project_id, name),
@@ -1594,7 +1612,10 @@ def create_document_folder(
     with connect() as conn:
         if parent_id is not None:
             parent = conn.execute(
-                "SELECT id FROM document_folders WHERE id = ? AND project_id = ?",
+                """
+                SELECT id FROM document_folders
+                WHERE id = ? AND project_id = ? AND deleted_at IS NULL
+                """,
                 (parent_id, project_id),
             ).fetchone()
             if not parent:
@@ -1603,7 +1624,7 @@ def create_document_folder(
         duplicate = conn.execute(
             """
             SELECT id FROM document_folders
-            WHERE project_id = ? AND name = ?
+            WHERE project_id = ? AND name = ? AND deleted_at IS NULL
               AND ((parent_id IS NULL AND ? IS NULL) OR parent_id = ?)
             """,
             (project_id, clean, parent_id, parent_id),
@@ -1619,7 +1640,10 @@ def create_document_folder(
             (project_id, parent_id, clean, utc_now()),
         )
         row = conn.execute(
-            "SELECT id, project_id, parent_id, name, created_at FROM document_folders WHERE id = ?",
+            """
+            SELECT id, project_id, parent_id, name, created_at, deleted_at, trash_path
+            FROM document_folders WHERE id = ?
+            """,
             (cur.lastrowid,),
         ).fetchone()
     return dict(row)
@@ -1633,14 +1657,87 @@ def list_document_folders(project_id: int) -> list[dict]:
                 f.id, f.project_id, f.parent_id, f.name, f.created_at,
                 COUNT(d.id) AS document_count
             FROM document_folders f
-            LEFT JOIN documents d ON d.folder_id = f.id
-            WHERE f.project_id = ?
+            LEFT JOIN documents d ON d.folder_id = f.id AND d.deleted_at IS NULL
+            WHERE f.project_id = ? AND f.deleted_at IS NULL
             GROUP BY f.id
             ORDER BY f.parent_id IS NOT NULL, f.name COLLATE NOCASE
             """,
             (project_id,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_document_folder_parts(
+    project_id: int,
+    folder_id: int | None,
+    *,
+    include_deleted: bool = False,
+) -> list[str]:
+    if folder_id is None:
+        return []
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, parent_id, name, deleted_at
+            FROM document_folders WHERE project_id = ?
+            """,
+            (project_id,),
+        ).fetchall()
+
+    by_id = {int(row["id"]): dict(row) for row in rows}
+    current = by_id.get(int(folder_id))
+    if not current:
+        raise ValueError("Папка не найдена.")
+
+    parts: list[str] = []
+    seen: set[int] = set()
+    while current:
+        current_id = int(current["id"])
+        if current_id in seen:
+            raise ValueError("Обнаружен цикл в структуре папок.")
+        seen.add(current_id)
+        if current.get("deleted_at") and not include_deleted:
+            raise ValueError("Папка находится в корзине.")
+        parts.insert(0, str(current["name"]))
+        parent_id = current.get("parent_id")
+        current = by_id.get(int(parent_id)) if parent_id is not None else None
+    return parts
+
+
+def get_document(project_id: int, document_id: int, *, include_deleted: bool = False) -> dict | None:
+    where_deleted = "" if include_deleted else " AND d.deleted_at IS NULL"
+    with connect() as conn:
+        row = conn.execute(
+            f"""
+            SELECT d.id, d.project_id, d.folder_id, d.filename, d.stored_path,
+                   d.mime_type, d.sha256, d.size_bytes, d.created_at,
+                   d.deleted_at, d.trash_path, f.name AS folder_name,
+                   COUNT(c.id) AS chunk_count
+            FROM documents d
+            LEFT JOIN document_folders f ON f.id = d.folder_id
+            LEFT JOIN document_chunks c ON c.document_id = d.id
+            WHERE d.id = ? AND d.project_id = ?{where_deleted}
+            GROUP BY d.id
+            """,
+            (document_id, project_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def find_document_by_sha(project_id: int, sha256: str, *, include_deleted: bool = True) -> dict | None:
+    where_deleted = "" if include_deleted else " AND deleted_at IS NULL"
+    with connect() as conn:
+        row = conn.execute(
+            f"""
+            SELECT id, project_id, folder_id, filename, stored_path, mime_type,
+                   sha256, size_bytes, created_at, deleted_at, trash_path
+            FROM documents
+            WHERE project_id = ? AND sha256 = ?{where_deleted}
+            LIMIT 1
+            """,
+            (project_id, sha256),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def add_document(
@@ -1656,7 +1753,10 @@ def add_document(
     with connect() as conn:
         if folder_id is not None:
             folder = conn.execute(
-                "SELECT id FROM document_folders WHERE id = ? AND project_id = ?",
+                """
+                SELECT id FROM document_folders
+                WHERE id = ? AND project_id = ? AND deleted_at IS NULL
+                """,
                 (folder_id, project_id),
             ).fetchone()
             if not folder:
@@ -1664,13 +1764,37 @@ def add_document(
 
         existing = conn.execute(
             """
-            SELECT id, project_id, folder_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
+            SELECT id, project_id, folder_id, filename, stored_path, mime_type,
+                   sha256, size_bytes, created_at, deleted_at, trash_path
             FROM documents WHERE project_id = ? AND sha256 = ?
             """,
             (project_id, sha256),
         ).fetchone()
         if existing:
-            return dict(existing)
+            existing_dict = dict(existing)
+            if existing_dict.get("deleted_at"):
+                conn.execute(
+                    """
+                    UPDATE documents
+                    SET folder_id = ?, filename = ?, stored_path = ?, mime_type = ?,
+                        size_bytes = ?, deleted_at = NULL, trash_path = NULL
+                    WHERE id = ? AND project_id = ?
+                    """,
+                    (
+                        folder_id, filename, stored_path, mime_type, size_bytes,
+                        existing_dict["id"], project_id,
+                    ),
+                )
+                row = conn.execute(
+                    """
+                    SELECT id, project_id, folder_id, filename, stored_path, mime_type,
+                           sha256, size_bytes, created_at, deleted_at, trash_path
+                    FROM documents WHERE id = ?
+                    """,
+                    (existing_dict["id"],),
+                ).fetchone()
+                return dict(row)
+            return existing_dict
 
         cur = conn.execute(
             """
@@ -1696,7 +1820,8 @@ def add_document(
 
         row = conn.execute(
             """
-            SELECT id, project_id, folder_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
+            SELECT id, project_id, folder_id, filename, stored_path, mime_type,
+                   sha256, size_bytes, created_at, deleted_at, trash_path
             FROM documents WHERE id = ?
             """,
             (document_id,),
@@ -1704,8 +1829,19 @@ def add_document(
     return dict(row)
 
 
+def update_document_storage_path(project_id: int, document_id: int, stored_path: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE documents SET stored_path = ?
+            WHERE id = ? AND project_id = ?
+            """,
+            (stored_path, document_id, project_id),
+        )
+
+
 def list_documents(project_id: int, folder_id: int | None = None) -> list[dict]:
-    where = "WHERE d.project_id = ?"
+    where = "WHERE d.project_id = ? AND d.deleted_at IS NULL"
     params: list[object] = [project_id]
     if folder_id is not None:
         where += " AND d.folder_id = ?"
@@ -1715,8 +1851,8 @@ def list_documents(project_id: int, folder_id: int | None = None) -> list[dict]:
         rows = conn.execute(
             f"""
             SELECT
-                d.id, d.folder_id, d.filename, d.mime_type, d.sha256, d.size_bytes, d.created_at,
-                f.name AS folder_name,
+                d.id, d.folder_id, d.filename, d.stored_path, d.mime_type,
+                d.sha256, d.size_bytes, d.created_at, f.name AS folder_name,
                 COUNT(c.id) AS chunk_count
             FROM documents d
             LEFT JOIN document_folders f ON f.id = d.folder_id
@@ -1730,6 +1866,287 @@ def list_documents(project_id: int, folder_id: int | None = None) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def list_deleted_documents(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT d.id, d.folder_id, d.filename, d.mime_type, d.sha256,
+                   d.size_bytes, d.created_at, d.deleted_at, d.trash_path,
+                   COUNT(c.id) AS chunk_count
+            FROM documents d
+            LEFT JOIN document_chunks c ON c.document_id = d.id
+            WHERE d.project_id = ? AND d.deleted_at IS NOT NULL
+              AND d.trash_path IS NOT NULL
+            GROUP BY d.id
+            ORDER BY d.deleted_at DESC
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_deleted_document_folders(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, parent_id, name, created_at, deleted_at, trash_path
+            FROM document_folders
+            WHERE project_id = ? AND deleted_at IS NOT NULL AND trash_path IS NOT NULL
+            ORDER BY deleted_at DESC
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def mark_document_deleted(project_id: int, document_id: int, trash_path: str) -> dict | None:
+    deleted_at = utc_now()
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE documents
+            SET deleted_at = ?, trash_path = ?
+            WHERE id = ? AND project_id = ? AND deleted_at IS NULL
+            """,
+            (deleted_at, trash_path, document_id, project_id),
+        )
+        if cur.rowcount != 1:
+            return None
+        row = conn.execute(
+            """
+            SELECT id, project_id, folder_id, filename, stored_path, mime_type,
+                   sha256, size_bytes, created_at, deleted_at, trash_path
+            FROM documents WHERE id = ?
+            """,
+            (document_id,),
+        ).fetchone()
+    return dict(row)
+
+
+def restore_document_record(
+    project_id: int,
+    document_id: int,
+    stored_path: str,
+    folder_id: int | None,
+) -> dict | None:
+    with connect() as conn:
+        if folder_id is not None:
+            folder = conn.execute(
+                """
+                SELECT id FROM document_folders
+                WHERE id = ? AND project_id = ? AND deleted_at IS NULL
+                """,
+                (folder_id, project_id),
+            ).fetchone()
+            if not folder:
+                folder_id = None
+
+        cur = conn.execute(
+            """
+            UPDATE documents
+            SET stored_path = ?, folder_id = ?, deleted_at = NULL, trash_path = NULL
+            WHERE id = ? AND project_id = ? AND deleted_at IS NOT NULL
+            """,
+            (stored_path, folder_id, document_id, project_id),
+        )
+        if cur.rowcount != 1:
+            return None
+        row = conn.execute(
+            """
+            SELECT id, project_id, folder_id, filename, stored_path, mime_type,
+                   sha256, size_bytes, created_at, deleted_at, trash_path
+            FROM documents WHERE id = ?
+            """,
+            (document_id,),
+        ).fetchone()
+    return dict(row)
+
+
+def _folder_descendants(rows: list[dict], root_id: int) -> list[int]:
+    children: dict[int | None, list[int]] = {}
+    for row in rows:
+        parent = row.get("parent_id")
+        children.setdefault(int(parent) if parent is not None else None, []).append(int(row["id"]))
+
+    result: list[int] = []
+    stack = [int(root_id)]
+    seen: set[int] = set()
+    while stack:
+        item = stack.pop()
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+        stack.extend(children.get(item, []))
+    return result
+
+
+def mark_document_folder_deleted(project_id: int, folder_id: int, trash_path: str) -> dict | None:
+    deleted_at = utc_now()
+    with connect() as conn:
+        root = conn.execute(
+            """
+            SELECT id, project_id, parent_id, name, created_at
+            FROM document_folders
+            WHERE id = ? AND project_id = ? AND deleted_at IS NULL
+            """,
+            (folder_id, project_id),
+        ).fetchone()
+        if not root:
+            return None
+
+        folder_rows = [
+            dict(row) for row in conn.execute(
+                """
+                SELECT id, parent_id FROM document_folders
+                WHERE project_id = ? AND deleted_at IS NULL
+                """,
+                (project_id,),
+            ).fetchall()
+        ]
+        folder_ids = _folder_descendants(folder_rows, folder_id)
+        placeholders = ",".join("?" for _ in folder_ids)
+
+        document_rows = conn.execute(
+            f"""
+            SELECT id FROM documents
+            WHERE project_id = ? AND deleted_at IS NULL
+              AND folder_id IN ({placeholders})
+            """,
+            [project_id, *folder_ids],
+        ).fetchall()
+        document_ids = [int(row["id"]) for row in document_rows]
+
+        conn.execute(
+            f"""
+            UPDATE document_folders SET deleted_at = ?
+            WHERE project_id = ? AND id IN ({placeholders}) AND deleted_at IS NULL
+            """,
+            [deleted_at, project_id, *folder_ids],
+        )
+        conn.execute(
+            """
+            UPDATE document_folders SET trash_path = ?
+            WHERE id = ? AND project_id = ?
+            """,
+            (trash_path, folder_id, project_id),
+        )
+        if document_ids:
+            doc_marks = ",".join("?" for _ in document_ids)
+            conn.execute(
+                f"""
+                UPDATE documents SET deleted_at = ?, trash_path = NULL
+                WHERE project_id = ? AND id IN ({doc_marks})
+                """,
+                [deleted_at, project_id, *document_ids],
+            )
+
+    result = dict(root)
+    result.update({
+        "deleted_at": deleted_at,
+        "trash_path": trash_path,
+        "folder_ids": folder_ids,
+        "document_ids": document_ids,
+    })
+    return result
+
+
+def restore_document_folder_record(
+    project_id: int,
+    folder_id: int,
+    *,
+    restored_name: str | None = None,
+) -> dict | None:
+    with connect() as conn:
+        root_row = conn.execute(
+            """
+            SELECT id, project_id, parent_id, name, created_at, deleted_at, trash_path
+            FROM document_folders
+            WHERE id = ? AND project_id = ? AND deleted_at IS NOT NULL
+            """,
+            (folder_id, project_id),
+        ).fetchone()
+        if not root_row:
+            return None
+        root = dict(root_row)
+        deleted_at = root["deleted_at"]
+
+        all_rows = [
+            dict(row) for row in conn.execute(
+                """
+                SELECT id, parent_id, deleted_at FROM document_folders
+                WHERE project_id = ?
+                """,
+                (project_id,),
+            ).fetchall()
+        ]
+        tree_ids = _folder_descendants(all_rows, folder_id)
+        restore_ids = [
+            item_id for item_id in tree_ids
+            if next((r for r in all_rows if int(r["id"]) == item_id), {}).get("deleted_at") == deleted_at
+        ]
+        placeholders = ",".join("?" for _ in restore_ids)
+
+        parent_id = root.get("parent_id")
+        if parent_id is not None:
+            parent = conn.execute(
+                """
+                SELECT id FROM document_folders
+                WHERE id = ? AND project_id = ? AND deleted_at IS NULL
+                """,
+                (parent_id, project_id),
+            ).fetchone()
+            if not parent:
+                parent_id = None
+
+        name = restored_name or root["name"]
+        duplicate = conn.execute(
+            """
+            SELECT id FROM document_folders
+            WHERE project_id = ? AND deleted_at IS NULL AND name = ?
+              AND ((parent_id IS NULL AND ? IS NULL) OR parent_id = ?)
+            LIMIT 1
+            """,
+            (project_id, name, parent_id, parent_id),
+        ).fetchone()
+        if duplicate:
+            name = f"{name} (восстановлено {folder_id})"
+
+        conn.execute(
+            f"""
+            UPDATE document_folders SET deleted_at = NULL
+            WHERE project_id = ? AND id IN ({placeholders}) AND deleted_at = ?
+            """,
+            [project_id, *restore_ids, deleted_at],
+        )
+        conn.execute(
+            """
+            UPDATE document_folders
+            SET name = ?, parent_id = ?, trash_path = NULL
+            WHERE id = ? AND project_id = ?
+            """,
+            (name, parent_id, folder_id, project_id),
+        )
+        if restore_ids:
+            conn.execute(
+                f"""
+                UPDATE documents SET deleted_at = NULL
+                WHERE project_id = ? AND folder_id IN ({placeholders})
+                  AND deleted_at = ? AND trash_path IS NULL
+                """,
+                [project_id, *restore_ids, deleted_at],
+            )
+
+        row = conn.execute(
+            """
+            SELECT id, project_id, parent_id, name, created_at, deleted_at, trash_path
+            FROM document_folders WHERE id = ?
+            """,
+            (folder_id,),
+        ).fetchone()
+    return dict(row)
+
+
 def search_document_chunks(project_id: int, query: str, limit: int = 6) -> list[dict]:
     query_tokens = _memory_tokens(query)
     with connect() as conn:
@@ -1740,7 +2157,7 @@ def search_document_chunks(project_id: int, query: str, limit: int = 6) -> list[
                 d.id AS document_id, d.filename
             FROM document_chunks c
             JOIN documents d ON d.id = c.document_id
-            WHERE d.project_id = ?
+            WHERE d.project_id = ? AND d.deleted_at IS NULL
             ORDER BY c.id DESC
             LIMIT 1000
             """,
@@ -1760,7 +2177,6 @@ def search_document_chunks(project_id: int, query: str, limit: int = 6) -> list[
 
     scored.sort(key=lambda item: item[0], reverse=True)
     return [row for _, row in scored[:limit]]
-
 
 
 def create_task(project_id: int, task_type: str, payload: dict) -> dict:
@@ -1909,7 +2325,7 @@ def development_snapshot(project_id: int) -> dict:
             (project_id,),
         ).fetchone()["n"]
         documents = conn.execute(
-            "SELECT COUNT(*) AS n FROM documents WHERE project_id = ?",
+            "SELECT COUNT(*) AS n FROM documents WHERE project_id = ? AND deleted_at IS NULL",
             (project_id,),
         ).fetchone()["n"]
         document_chunks = conn.execute(
@@ -1917,7 +2333,7 @@ def development_snapshot(project_id: int) -> dict:
             SELECT COUNT(*) AS n
             FROM document_chunks c
             JOIN documents d ON d.id = c.document_id
-            WHERE d.project_id = ?
+            WHERE d.project_id = ? AND d.deleted_at IS NULL
             """,
             (project_id,),
         ).fetchone()["n"]
