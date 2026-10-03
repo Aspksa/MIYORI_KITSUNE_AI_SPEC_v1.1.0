@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .portable_updater import PortableUpdateError, apply as apply_portable_update, status as portable_status
+from .system_settings import load_system_settings
 
 ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_REPO = "Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0"
@@ -36,8 +37,9 @@ def _env_setting(name: str, default: str) -> str:
 
 
 DEFAULT_BRANCH = _env_setting("MIYORI_UPDATE_BRANCH", "main").strip() or "main"
-AUTO_UPDATE = _env_setting("MIYORI_AUTO_UPDATE", "1").strip().lower() not in {"0", "false", "no", "off"}
-INTERVAL_MINUTES = max(5, int(_env_setting("MIYORI_UPDATE_INTERVAL_MINUTES", "15")))
+_system_cfg = load_system_settings()["automation"]
+AUTO_UPDATE = bool(_system_cfg.get("auto_update", True))
+INTERVAL_MINUTES = max(5, int(_system_cfg.get("update_interval_minutes", 15)))
 _STATE_PATH = ROOT / "data" / "update_state.json"
 
 _monitor_lock = threading.Lock()
@@ -211,8 +213,16 @@ def local_status(*, fetch: bool = False) -> dict:
 
 def apply_update() -> dict:
     if not (ROOT / ".git").exists():
+        cfg = load_system_settings()["automation"]
+        if not cfg.get("allow_portable_update", True):
+            raise UpdateError("Portable update отключён в Настройках.")
         try:
-            result = apply_portable_update(ROOT, _STATE_PATH, DEFAULT_BRANCH)
+            result = apply_portable_update(
+                ROOT,
+                _STATE_PATH,
+                DEFAULT_BRANCH,
+                backup_enabled=bool(cfg.get("backup_before_update", True)),
+            )
             result["auto_update"] = AUTO_UPDATE
             result["interval_minutes"] = INTERVAL_MINUTES
             return result
