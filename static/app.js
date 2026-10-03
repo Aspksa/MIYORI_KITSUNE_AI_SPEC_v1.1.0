@@ -1745,6 +1745,15 @@ async function renderDocumentsWorkspace() {
             '<button id="driveListView" class="drive-view-button" type="button" title="Список">☷</button>' +
           '</div>' +
         '</div>' +
+        '<div class="drive-overview">' +
+          '<div><span>Файлы</span><strong id="driveStatFiles">0</strong></div>' +
+          '<div><span>Папки</span><strong id="driveStatFolders">0</strong></div>' +
+          '<div><span>Объём</span><strong id="driveStatStorage">0 Б</strong></div>' +
+          '<div><span>RAG</span><strong id="driveStatRag">0</strong></div>' +
+        '</div>' +
+        '<button id="driveDropzone" class="drive-dropzone" type="button">' +
+          '<span class="drive-drop-icon">⇧</span><div><strong>Перетащите файлы сюда</strong><small>PDF, Word, Excel, PowerPoint, TXT, Markdown, JSON · до 25 МБ</small></div>' +
+        '</button>' +
         '<section id="driveContent" class="drive-content">' +
           '<div id="driveFoldersSection" class="drive-section"><div class="drive-section-title"><strong>Папки</strong><span id="driveFolderCount"></span></div><div id="driveFolders" class="drive-folder-grid"></div></div>' +
           '<div id="driveFilesSection" class="drive-section"><div class="drive-section-title"><strong>Файлы</strong><span id="driveFileCount"></span></div><div id="driveFiles" class="drive-file-grid"></div></div>' +
@@ -1855,6 +1864,10 @@ async function renderDocumentsWorkspace() {
 
       const totalBytes = documents.reduce((sum, document) => sum + Number(document.size_bytes || 0), 0);
       el("driveStorageText").textContent = formatBytes(totalBytes) + " · " + documents.length + " файлов";
+      el("driveStatFiles").textContent = String(documents.length);
+      el("driveStatFolders").textContent = String(folders.length);
+      el("driveStatStorage").textContent = formatBytes(totalBytes);
+      el("driveStatRag").textContent = String(ragStatus.indexed_chunks || 0);
 
       const folderSection = el("driveFoldersSection");
       const filesSection = el("driveFilesSection");
@@ -1944,6 +1957,24 @@ async function renderDocumentsWorkspace() {
     await uploadFiles(event.target.files);
     event.target.value = "";
   };
+
+  const dropzone = el("driveDropzone");
+  dropzone.onclick = () => el("driveFileInput").click();
+  ["dragenter", "dragover"].forEach(eventName => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.add("dragging");
+    });
+  });
+  ["dragleave", "drop"].forEach(eventName => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.remove("dragging");
+    });
+  });
+  dropzone.addEventListener("drop", async (event) => {
+    await uploadFiles(event.dataTransfer?.files || []);
+  });
 
   el("driveNewFolderButton").onclick = async () => {
     const name = prompt("Название новой папки:");
