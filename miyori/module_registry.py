@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.31"
+PROJECT_VERSION = "00.00.32"
 
 MODULES = {
     "miyori_ai": {
@@ -23,7 +23,7 @@ MODULES = {
     },
     "settings": {
         "name": "Настройки",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "status": "active",
         "description": "Системные параметры Miyori и состояние локальных компонентов.",
     },
@@ -83,13 +83,39 @@ MODULES = {
     },
     "updater": {
         "name": "Обновление проекта",
-        "version": "1.2.0",
+        "version": "1.2.1",
         "status": "active",
         "description": "Git fast-forward и Portable ZIP updater с резервными копиями и проверкой GitHub.",
     },
 }
 
 RELEASES = [
+    {
+        "version": "00.00.32",
+        "title": "Системные настройки v0.4",
+        "summary": "Добавлены рабочие вкладки Общие, Система, Автоматизация и Диагностика.",
+        "modules": [
+            {
+                "key": "settings",
+                "version": "0.4.0",
+                "changes": [
+                    "Windows autostart, открытие браузера, тема, плотность интерфейса и стартовый экран.",
+                    "Системная информация: версия, установка, Python, SQLite, worker, дисковое пространство и data.",
+                    "Настройка background worker и политики GitHub/Portable updater.",
+                    "Self-check, версии модулей, экспорт диагностического JSON и очистка runtime/logs.",
+                ],
+            },
+            {
+                "key": "updater",
+                "version": "1.2.1",
+                "changes": [
+                    "Portable update теперь можно отключить.",
+                    "Резервные копии portable update управляются системной настройкой.",
+                    "Интервал и автообновление сохраняются через системные настройки.",
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.31",
         "title": "AI Center, версии модулей и сотрудники Примавтодор",
