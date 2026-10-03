@@ -778,7 +778,7 @@ function startNewChat() {
   brainPlan.innerHTML = '<span class="empty-copy">План появится после запроса.</span>';
   agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
   agentBudget.textContent = "0/3";
-  loadConversations();
+  Promise.all([loadConversations(), loadTools()]);
   input.focus();
 }
 
@@ -916,6 +916,7 @@ el("addProject").addEventListener("click", async () => {
     state.conversationId = null;
     await loadProjects();
     showWelcome();
+    await loadTools();
   } catch (error) {
     showError(error.message);
   }
