@@ -70,12 +70,12 @@ class MemoryReplaceRequest(BaseModel):
 
 class ToolExecuteRequest(BaseModel):
     name: str
-    arguments: dict = {}
+    arguments: dict = Field(default_factory=dict)
 
 
 class TaskCreateRequest(BaseModel):
     task_type: str = Field(pattern="^(self_check|memory_consolidation)$")
-    payload: dict = {}
+    payload: dict = Field(default_factory=dict)
 
 
 @app.on_event("startup")
