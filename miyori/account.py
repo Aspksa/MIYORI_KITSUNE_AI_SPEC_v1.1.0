@@ -106,7 +106,18 @@ async def list_cloudru_models(
     base = (base_url or settings.cloudru_base_url or _DEFAULT_BASE).strip().rstrip("/")
 
     if not key:
-        raise ValueError("Введите API-ключ Cloud.ru.")
+        return {
+            "ok": False,
+            "reason": "key_required",
+            "models_found": 0,
+            "models": [],
+            "chat_models": [],
+            "selected_model": settings.cloudru_model_id or None,
+            "selected_model_found": False,
+            "preferred_model_id": PREFERRED_CHAT_MODEL,
+            "preferred_model_available": False,
+            "message": "API-ключ Cloud.ru ещё не задан.",
+        }
 
     headers = {"Authorization": f"Bearer {key}"}
     url = f"{base}/models"
