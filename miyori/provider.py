@@ -20,6 +20,7 @@ async def chat(
     messages: list[dict[str, str]],
     memory_context: list[str] | None = None,
     document_context: list[dict] | None = None,
+    brain_plan: list[str] | None = None,
 ) -> str:
     if not settings.cloudru_api_key:
         raise ProviderError(
@@ -31,6 +32,14 @@ async def chat(
         )
 
     system_prompt = SYSTEM_PROMPT
+    if brain_plan:
+        plan_block = "\n".join(f"{index + 1}. {item}" for index, item in enumerate(brain_plan))
+        system_prompt += (
+            "\n\nРабочий план текущего запроса:\n"
+            f"{plan_block}\n"
+            "Это краткий операционный план. Не выдавай его за скрытые внутренние рассуждения; "
+            "используй как контроль последовательности и проверки результата."
+        )
     if memory_context:
         memory_block = "\n".join(f"- {item}" for item in memory_context)
         system_prompt += (
