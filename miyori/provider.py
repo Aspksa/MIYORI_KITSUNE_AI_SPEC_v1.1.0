@@ -7,7 +7,7 @@ import httpx
 from .config import settings
 from .persona import build_persona_context
 from .account import list_cloudru_models
-from .db import get_account_profile
+from .db import get_account_profile, get_ai_preferences
 
 
 SYSTEM_PROMPT = """Ты Миёри — личная AI-помощница с канонической художественной личностью из Persona Pack.
@@ -70,6 +70,21 @@ async def chat(
             f"- предпочтительное обращение: {address}\n"
             f"- язык интерфейса/общения: {language}\n"
             "Используй предпочтительное обращение владельца естественно и не подменяй его каноническим обращением Persona Pack."
+        )
+
+    ai_preferences = get_ai_preferences()
+    if ai_preferences:
+        system_prompt += (
+            "\n\nНАСТРОЙКИ MIYORI AI:\n"
+            f"- стиль общения: {ai_preferences.get('communication_style', 'balanced')}\n"
+            f"- уровень подробности: {ai_preferences.get('detail_level', 'normal')}\n"
+            f"- инициативность: {ai_preferences.get('initiative_level', 'medium')}\n"
+            f"- режим: {ai_preferences.get('operating_mode', 'personal')}\n"
+            f"- приоритет: {ai_preferences.get('priority_mode', 'accuracy')}\n"
+            f"- предлагать следующие шаги: {bool(ai_preferences.get('suggest_next_steps', 1))}\n"
+            f"- спрашивать перед предположением: {bool(ai_preferences.get('ask_before_assuming', 0))}\n"
+            f"- явно показывать неопределённость: {bool(ai_preferences.get('show_uncertainty', 1))}\n"
+            "Следуй этим пользовательским настройкам, если они не конфликтуют с безопасностью, точностью и явным запросом пользователя."
         )
 
     if brain_plan:
