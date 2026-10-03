@@ -60,11 +60,12 @@ from miyori.epistemic import (
     verify_claim,
 )
 from miyori.tasks import wake_worker
+from miyori.rag import init_rag, rag_status, retrieve as rag_retrieve
 from miyori.tools import execute_approved_request, execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.16")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.17")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -127,6 +128,7 @@ class EvidenceCreateRequest(BaseModel):
 def startup() -> None:
     init_db()
     init_epistemic_db()
+    init_rag()
     register_background_handlers()
     wake_worker()
 
@@ -140,7 +142,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.16",
+        "version": "00.00.17",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -148,6 +150,7 @@ def status() -> dict:
         ),
         "model_id": settings.cloudru_model_id or None,
         "storage": "SQLite",
+        "rag": rag_status(),
     }
 
 
@@ -264,6 +267,7 @@ async def document_upload(
         size_bytes=len(data),
         chunks=chunks,
     )
+    init_rag()
     return {
         "document": document,
         "chunk_count": len(chunks),
@@ -275,6 +279,20 @@ def document_search(project_id: int, q: str = "") -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     return {"chunks": search_document_chunks(project_id, q, limit=12)}
+
+
+@app.get("/api/projects/{project_id}/rag")
+def rag_search(project_id: int, q: str = "", limit: int = 8) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="Пустой RAG-запрос.")
+    result = rag_retrieve(
+        project_id,
+        q,
+        limit=max(1, min(limit, 20)),
+    )
+    return result.to_dict()
 
 
 @app.get("/api/projects/{project_id}/nexus")
@@ -587,15 +605,17 @@ async def send_message(request: ChatRequest) -> dict:
     context = recent_messages(conversation_id)
     brain = build_context(request.project_id, text)
     epistemic = trusted_claim_context(request.project_id, text, limit=6)
+    rag = rag_retrieve(request.project_id, text, limit=8)
     agent = run_agent(request.project_id, conversation_id, text)
     try:
         answer = await chat(
             context,
-            memory_context=brain.memory,
-            document_context=brain.documents,
+            memory_context=None,
+            document_context=None,
             brain_plan=brain.plan,
             tool_context=agent.tool_context,
-            epistemic_context=epistemic,
+            epistemic_context=None,
+            rag_context=rag.to_dict(),
         )
     except ProviderError as exc:
         raise HTTPException(
@@ -625,6 +645,7 @@ async def send_message(request: ChatRequest) -> dict:
                 for item in brain.documents
             ],
         },
+        "rag": rag.to_dict(),
         "epistemic": {
             "used_claims": [
                 {
