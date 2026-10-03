@@ -196,6 +196,32 @@ async function loadTools() {
       row.className = "tool-item";
       row.innerHTML = "<strong>" + escapeHtml(tool.name) + "</strong><small>" +
         escapeHtml(tool.description) + "</small>";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "mini-button";
+      button.textContent = "Запустить";
+      button.onclick = async () => {
+        let argumentsPayload = {};
+        if (tool.name === "project_memory_search" || tool.name === "project_document_search") {
+          const query = prompt("Что искать?");
+          if (!query || !query.trim()) return;
+          argumentsPayload = {query: query.trim()};
+        }
+        try {
+          const result = await api("/api/projects/" + state.projectId + "/tools/execute", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({name: tool.name, arguments: argumentsPayload})
+          });
+          const output = document.createElement("pre");
+          output.className = "tool-output";
+          output.textContent = JSON.stringify(result.result, null, 2);
+          row.appendChild(output);
+        } catch (error) {
+          showError(error.message);
+        }
+      };
+      row.appendChild(button);
       toolList.appendChild(row);
     }
   } catch (error) {
