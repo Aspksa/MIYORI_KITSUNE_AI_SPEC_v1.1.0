@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .db import development_snapshot, record_development_check
+from .rag import rag_status
 
 
 @dataclass
@@ -14,6 +15,8 @@ class CheckResult:
 
 def run_project_self_check(project_id: int) -> list[CheckResult]:
     snapshot = development_snapshot(project_id)
+    rag = rag_status()
+    rag_ok = (not rag["fts5"]) or rag["indexed_chunks"] == snapshot["document_chunks"]
     checks = [
         CheckResult(
             "memory_integrity",
@@ -24,6 +27,14 @@ def run_project_self_check(project_id: int) -> list[CheckResult]:
             "document_index",
             snapshot["documents"] >= 0 and snapshot["document_chunks"] >= 0,
             f"documents={snapshot['documents']}; chunks={snapshot['document_chunks']}",
+        ),
+        CheckResult(
+            "rag_index",
+            rag_ok,
+            (
+                f"mode={'fts5' if rag['fts5'] else 'lexical_fallback'}; "
+                f"indexed_chunks={rag['indexed_chunks']}; document_chunks={snapshot['document_chunks']}"
+            ),
         ),
         CheckResult(
             "task_health",
