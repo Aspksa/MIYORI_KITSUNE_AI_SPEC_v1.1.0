@@ -141,7 +141,7 @@ def _document_fts(project_id: int, query: str, limit: int = 20) -> list[RAGItem]
     for row in rows:
         items.append(
             RAGItem(
-                key=f"doc:{row['chunk_id']}",
+                key=f"doc:{row['filename']}:{row['chunk_index']}",
                 source_type="document",
                 title=row["filename"],
                 content=row["content"][:MAX_ITEM_CHARS],
@@ -162,10 +162,9 @@ def _document_lexical(project_id: int, query: str, limit: int = 20) -> list[RAGI
     rows = search_document_chunks(project_id, query, limit=limit)
     items = []
     for row in rows:
-        chunk_id = row.get("id") or f"{row.get('filename')}:{row.get('chunk_index')}"
         items.append(
             RAGItem(
-                key=f"doc:{chunk_id}",
+                key=f"doc:{row.get('filename')}:{row.get('chunk_index')}",
                 source_type="document",
                 title=row.get("filename") or "Документ",
                 content=str(row.get("content", ""))[:MAX_ITEM_CHARS],
@@ -183,18 +182,25 @@ def _document_lexical(project_id: int, query: str, limit: int = 20) -> list[RAGI
 
 def _memory(project_id: int, query: str, limit: int = 12) -> list[RAGItem]:
     rows = search_verified_memory(project_id, query, limit=limit)
-    return [
-        RAGItem(
-            key=f"memory:{row['id']}",
-            source_type="memory",
-            title="Подтверждённая память",
-            content=row["statement"][:MAX_ITEM_CHARS],
-            score=0.0,
-            locator=f"memory:{row['id']}",
-            metadata={"memory_id": row["id"], "observed_at": row.get("observed_at")},
+    query_tokens = set(_tokens(query))
+    items = []
+    for row in rows:
+        statement = row["statement"]
+        statement_tokens = set(_tokens(statement))
+        if query_tokens and not (query_tokens & statement_tokens):
+            continue
+        items.append(
+            RAGItem(
+                key=f"memory:{row['id']}",
+                source_type="memory",
+                title="Подтверждённая память",
+                content=statement[:MAX_ITEM_CHARS],
+                score=0.0,
+                locator=f"memory:{row['id']}",
+                metadata={"memory_id": row["id"], "observed_at": row.get("observed_at")},
+            )
         )
-        for row in rows
-    ]
+    return items
 
 
 def _knowledge(project_id: int, query: str, limit: int = 12) -> list[RAGItem]:
