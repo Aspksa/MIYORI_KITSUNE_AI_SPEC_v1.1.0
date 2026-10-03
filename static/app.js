@@ -33,6 +33,8 @@ const toggleConsole = el("toggleConsole");
 const aiStatusChip = el("aiStatusChip");
 const personaStatusChip = el("personaStatusChip");
 const personaStatusText = el("personaStatusText");
+const truthStatusChip = el("truthStatusChip");
+const truthStatusText = el("truthStatusText");
 const memoryStatusChip = el("memoryStatusChip");
 const dbStatusChip = el("dbStatusChip");
 const docsStatusChip = el("docsStatusChip");
@@ -170,6 +172,20 @@ async function loadNexus() {
     }
 
     const c = data.counts;
+    const truth = data.epistemic || {};
+    const truthClaims = truth.claims || {};
+    const verifiedTruth = (truthClaims.verified || 0) + (truthClaims.supported || 0);
+    const disputedTruth = (truthClaims.disputed || 0) + (truthClaims.rejected || 0);
+    if (truthStatusChip) {
+      truthStatusChip.textContent = disputedTruth ? "Есть споры" : (verifiedTruth ? "Проверено" : "Наблюдаю");
+      truthStatusChip.className = disputedTruth ? "soft-status warn" : (verifiedTruth ? "soft-status ok" : "soft-status neutral");
+    }
+    if (truthStatusText) {
+      truthStatusText.textContent =
+        "проверено " + verifiedTruth +
+        " · спорно " + disputedTruth +
+        " · источников " + (truth.sources || 0);
+    }
     if (memoryStatusChip) {
       memoryStatusChip.textContent = "Доступна";
       memoryStatusChip.className = "soft-status ok";
@@ -820,6 +836,13 @@ async function loadTools() {
     memoryJob.innerHTML = '<span class="chat-action-icon">✦</span><span><strong>Консолидация</strong><small>фоновая задача</small></span>';
     memoryJob.onclick = () => runChatBackgroundTask("memory_consolidation", "Консолидация памяти");
     chatActionBar.appendChild(memoryJob);
+
+    const truthJob = document.createElement("button");
+    truthJob.type = "button";
+    truthJob.className = "chat-action special";
+    truthJob.innerHTML = '<span class="chat-action-icon">⌕</span><span><strong>Ревизия знаний</strong><small>фоновая задача</small></span>';
+    truthJob.onclick = () => runChatBackgroundTask("epistemic_review", "Ревизия знаний");
+    chatActionBar.appendChild(truthJob);
   } catch (error) {
     chatActionBar.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + "</div>";
   }
