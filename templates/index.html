@@ -11,10 +11,7 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="mark">狐</div>
-        <div>
-          <h1>Миёри</h1>
-          <p>Miyori Kitsune AI</p>
-        </div>
+        <div><h1>Миёри</h1><p>Miyori Kitsune AI</p></div>
       </div>
 
       <div class="panel">
@@ -38,14 +35,7 @@
           <span class="eyebrow">Память</span>
           <button id="refreshMemory" class="text-button" type="button">Обновить</button>
         </div>
-        <div id="memoryList" class="memory-list"></div>
-      </div>
-
-      <div class="panel memory-panel">
-        <div class="panel-header">
-          <span class="eyebrow">Память</span>
-          <button id="refreshMemory" class="text-button" type="button">Обновить</button>
-        </div>
+        <input id="memorySearch" class="memory-search" type="search" placeholder="Поиск в памяти…">
         <div id="memoryList" class="memory-list"></div>
       </div>
 
@@ -60,11 +50,11 @@
 
       <div class="panel compact">
         <span class="eyebrow">Версия</span>
-        <strong id="versionText">00.00.03</strong>
+        <strong id="versionText">00.00.04</strong>
       </div>
 
       <div class="sidebar-note">
-        Проекты изолируют историю диалогов. Контекст выбранного проекта не смешивается с другими проектами.
+        Подтверждённая память ищется по смысловым словам текущего запроса. Устаревшие записи сохраняются в истории, но не передаются модели.
       </div>
     </aside>
 
@@ -88,7 +78,6 @@
       </footer>
     </main>
   </div>
-
   <script src="/static/app.js"></script>
 </body>
 </html>
