@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Miyori Kitsune AI</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">狐</div>
+        <div>
+          <h1>Миёри</h1>
+          <p>Miyori Kitsune AI</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <span class="eyebrow">Состояние</span>
+        <div class="status-line">
+          <span id="statusDot" class="dot"></span>
+          <span id="statusText">Проверяю…</span>
+        </div>
+        <div id="modelText" class="muted">Модель не выбрана</div>
+      </div>
+
+      <div class="panel compact">
+        <span class="eyebrow">Версия</span>
+        <strong>00.00.01</strong>
+      </div>
+
+      <div class="sidebar-note">
+        Ключ провайдера хранится только на локальном сервере приложения и не передаётся в браузер.
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Личная AI-помощница</span>
+          <h2>Разговор с Миёри</h2>
+        </div>
+        <button id="newChat" class="secondary" type="button">Новый разговор</button>
+      </header>
+
+      <section id="messages" class="messages" aria-live="polite">
+        <article class="message assistant">
+          <div class="avatar">狐</div>
+          <div class="bubble">
+            <strong>Миёри</strong>
+            <p>Здравствуйте, Господин. Я готова к первому запуску. После настройки Cloud.ru мы сможем проверить настоящий диалог.</p>
+          </div>
+        </article>
+      </section>
+
+      <footer class="composer-wrap">
+        <form id="chatForm" class="composer">
+          <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Напишите Миёри…" required></textarea>
+          <button id="sendButton" type="submit">Отправить</button>
+        </form>
+        <div id="errorBox" class="error" hidden></div>
+      </footer>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
