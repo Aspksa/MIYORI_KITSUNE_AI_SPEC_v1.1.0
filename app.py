@@ -16,7 +16,9 @@ from miyori.db import (
     conversation_messages,
     create_project,
     ensure_conversation,
+    decide_permission_request,
     get_agent_trace,
+    get_permission_request,
     get_project,
     init_db,
     add_document,
@@ -26,6 +28,7 @@ from miyori.db import (
     list_documents,
     list_projects,
     list_memory_facts,
+    list_permission_requests,
     list_tasks,
     maybe_capture_user_memory,
     recent_messages,
@@ -44,11 +47,11 @@ from miyori.development import run_project_self_check
 from miyori.documents import chunk_text, decode_document, safe_filename, save_original, sha256_bytes
 from miyori.provider import ProviderError, chat
 from miyori.tasks import wake_worker
-from miyori.tools import execute_tool, list_tools
+from miyori.tools import execute_approved_request, execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.07")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.08")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -80,6 +83,10 @@ class TaskCreateRequest(BaseModel):
     payload: dict = Field(default_factory=dict)
 
 
+class PermissionDecisionRequest(BaseModel):
+    approved: bool
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
@@ -96,7 +103,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.07",
+        "version": "00.00.08",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -247,6 +254,42 @@ def tool_execute(project_id: int, request: ToolExecuteRequest) -> dict:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/permissions")
+def permissions_list(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"requests": list_permission_requests(project_id)}
+
+
+@app.post("/api/projects/{project_id}/permissions/{request_id}/decision")
+def permission_decision(
+    project_id: int,
+    request_id: int,
+    request: PermissionDecisionRequest,
+) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+
+    decided = decide_permission_request(project_id, request_id, request.approved)
+    if not decided:
+        raise HTTPException(status_code=409, detail="Запрос уже обработан или не найден.")
+
+    if not request.approved:
+        return {"request": decided}
+
+    try:
+        execution = execute_approved_request(project_id, request_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return {
+        "request": get_permission_request(project_id, request_id),
+        "execution": execution,
+    }
 
 
 @app.get("/api/projects/{project_id}/tasks")
