@@ -195,10 +195,14 @@ async function loadMemory() {
     for (const fact of facts) {
       const card = document.createElement("div");
       card.className = "memory-item status-" + fact.status;
+      const conflictNote = fact.possible_conflict_ids?.length
+        ? '<div class="memory-conflict">Возможный конфликт: ' + fact.possible_conflict_ids.join(", ") + '</div>'
+        : "";
       card.innerHTML =
         '<div class="memory-statement">' + escapeHtml(fact.statement) + '</div>' +
-        '<div class="memory-meta"><span>' + escapeHtml(fact.status) + '</span>' +
-        '<span>' + escapeHtml(fact.source_kind || "source") + '</span></div>';
+        '<div class="memory-meta"><span>#' + fact.id + '</span><span>' + escapeHtml(fact.status) + '</span>' +
+        '<span>' + escapeHtml(fact.source_kind || "source") + '</span></div>' +
+        conflictNote;
       memoryActions(fact, card);
       memoryList.appendChild(card);
     }
