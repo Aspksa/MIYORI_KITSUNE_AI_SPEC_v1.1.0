@@ -1396,6 +1396,93 @@ function shortSha(value) {
   return text.length > 10 ? text.slice(0, 10) : text;
 }
 
+async function renderMiyoriAiWorkspace() {
+  showWorkspaceShell("ai", "Miyori Kitsune", "Miyori Kitsune AI", "Личность, поведение, память и автономность.");
+  try {
+    const [prefsData, status, modules] = await Promise.all([
+      api("/api/ai/preferences"),
+      api("/api/status"),
+      api("/api/modules")
+    ]);
+    const p = prefsData.preferences || {};
+    const aiVersion = (modules.modules || []).find(item => item.key === "miyori_ai")?.version || "—";
+
+    workspaceBody.innerHTML =
+      '<section class="ai-center">' +
+        '<div class="ai-center-hero">' +
+          '<div class="ai-center-orb">狐</div>' +
+          '<div><span>Персональный AI</span><h3>Miyori Kitsune</h3><p>Версия модуля <strong>v' + escapeHtml(aiVersion) + '</strong> · Persona ' +
+          escapeHtml(status.persona?.version || "—") + '</p></div>' +
+          '<button id="aiOpenChat" class="primary-sheet-button" type="button">Открыть чат</button>' +
+        '</div>' +
+        '<form id="aiPreferencesForm" class="ai-settings-grid">' +
+          '<section class="ai-settings-card"><strong>Личность и стиль</strong><small>Как Miyori общается и оформляет ответы.</small>' +
+            '<label><span>Стиль общения</span><select id="aiCommunicationStyle">' +
+              '<option value="balanced">Сбалансированный</option><option value="warm">Тёплый</option><option value="business">Деловой</option><option value="minimal">Минималистичный</option>' +
+            '</select></label>' +
+            '<label><span>Подробность</span><select id="aiDetailLevel"><option value="short">Кратко</option><option value="normal">Обычно</option><option value="detailed">Подробно</option></select></label>' +
+            '<label><span>Инициативность</span><select id="aiInitiativeLevel"><option value="low">Низкая</option><option value="medium">Средняя</option><option value="high">Высокая</option></select></label>' +
+          '</section>' +
+          '<section class="ai-settings-card"><strong>Режим работы</strong><small>Основной контекст поведения Miyori.</small>' +
+            '<label><span>Режим</span><select id="aiOperatingMode"><option value="personal">Личный помощник</option><option value="work">Рабочий помощник</option><option value="analyst">Аналитик</option><option value="research">Исследователь</option><option value="developer">Разработчик</option></select></label>' +
+            '<label><span>Приоритет</span><select id="aiPriorityMode"><option value="accuracy">Точность</option><option value="balanced">Баланс</option><option value="speed">Скорость</option></select></label>' +
+          '</section>' +
+          '<section class="ai-settings-card ai-switch-card"><strong>Контекст и память</strong><small>Какие источники Miyori использует автоматически.</small>' +
+            '<label class="ai-switch"><span><strong>RAG</strong><small>Документы и знания проекта</small></span><input id="aiUseRag" type="checkbox"></label>' +
+            '<label class="ai-switch"><span><strong>Подтверждённая память</strong><small>Verified memory проекта</small></span><input id="aiUseMemory" type="checkbox"></label>' +
+            '<label class="ai-switch"><span><strong>Показывать неопределённость</strong><small>Не скрывать границы знания</small></span><input id="aiShowUncertainty" type="checkbox"></label>' +
+          '</section>' +
+          '<section class="ai-settings-card ai-switch-card"><strong>Автономность</strong><small>Насколько активно Miyori продолжает работу сама.</small>' +
+            '<label class="ai-switch"><span><strong>Предлагать следующие шаги</strong><small>После выполненной задачи</small></span><input id="aiSuggestNext" type="checkbox"></label>' +
+            '<label class="ai-switch"><span><strong>Спрашивать перед предположением</strong><small>Если контекста недостаточно</small></span><input id="aiAskBeforeAssuming" type="checkbox"></label>' +
+          '</section>' +
+          '<div id="aiPreferencesResult" class="ai-settings-result"></div>' +
+          '<div class="sheet-actions ai-settings-actions"><button class="primary-sheet-button" type="submit">Сохранить настройки AI</button></div>' +
+        '</form>' +
+      '</section>';
+
+    el("aiCommunicationStyle").value = p.communication_style || "balanced";
+    el("aiDetailLevel").value = p.detail_level || "normal";
+    el("aiInitiativeLevel").value = p.initiative_level || "medium";
+    el("aiOperatingMode").value = p.operating_mode || "personal";
+    el("aiPriorityMode").value = p.priority_mode || "accuracy";
+    el("aiUseRag").checked = !!p.use_rag;
+    el("aiUseMemory").checked = !!p.use_verified_memory;
+    el("aiShowUncertainty").checked = !!p.show_uncertainty;
+    el("aiSuggestNext").checked = !!p.suggest_next_steps;
+    el("aiAskBeforeAssuming").checked = !!p.ask_before_assuming;
+
+    el("aiOpenChat").onclick = showChatWorkspace;
+    el("aiPreferencesForm").onsubmit = async (event) => {
+      event.preventDefault();
+      const result = el("aiPreferencesResult");
+      try {
+        await api("/api/ai/preferences", {
+          method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            communication_style: el("aiCommunicationStyle").value,
+            detail_level: el("aiDetailLevel").value,
+            initiative_level: el("aiInitiativeLevel").value,
+            operating_mode: el("aiOperatingMode").value,
+            priority_mode: el("aiPriorityMode").value,
+            use_rag: el("aiUseRag").checked,
+            use_verified_memory: el("aiUseMemory").checked,
+            show_uncertainty: el("aiShowUncertainty").checked,
+            suggest_next_steps: el("aiSuggestNext").checked,
+            ask_before_assuming: el("aiAskBeforeAssuming").checked
+          })
+        });
+        result.innerHTML = workspaceResult("Настройки Miyori AI сохранены и применяются к новым ответам.", "success");
+      } catch (error) {
+        result.innerHTML = workspaceResult(error.message, "error");
+      }
+    };
+  } catch (error) {
+    workspaceBody.innerHTML = workspaceResult(error.message, "error");
+  }
+}
+
 async function renderAccountWorkspace() {
   showWorkspaceShell("account", "Личный кабинет", "Личный кабинет", "Профиль, Cloud.ru, устройства и сессии.");
   try {
@@ -2199,7 +2286,7 @@ function renderMobileWorkspace() {
     '</div>';
 }
 
-if (menuMiyoriAI) menuMiyoriAI.onclick = showChatWorkspace;
+if (menuMiyoriAI) menuMiyoriAI.onclick = renderMiyoriAiWorkspace;
 if (el("workspaceBackToChat")) el("workspaceBackToChat").onclick = showChatWorkspace;
 if (menuAccount) menuAccount.onclick = renderAccountWorkspace;
 if (menuProjectUpdate) menuProjectUpdate.onclick = () => renderUpdateWorkspace(false);
@@ -2235,10 +2322,43 @@ if (systemStatusOverlay) {
   });
 }
 
+async function loadModuleVersions() {
+  try {
+    const manifest = await api("/api/modules");
+    const versions = new Map((manifest.modules || []).map(item => [item.key, item]));
+    const mapping = [
+      [menuMiyoriAI, "miyori_ai"],
+      [menuMobileApp, "mobile"],
+      [menuAccount, "account"],
+      [menuSettings, "settings"],
+      [menuDocumentsHub, "drive"],
+      [menuWorkProjects, "projects"],
+      [menuHomeProjects, "projects"],
+      [menuProjectUpdate, "updater"]
+    ];
+    for (const [button, key] of mapping) {
+      if (!button) continue;
+      const module = versions.get(key);
+      if (!module) continue;
+      let badge = button.querySelector(".module-version-badge");
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "module-version-badge";
+        button.appendChild(badge);
+      }
+      badge.textContent = "v" + module.version;
+      badge.title = module.description + " · " + module.status;
+    }
+  } catch (_) {
+    // Version badges are informative; navigation must still work without them.
+  }
+}
+
 async function boot() {
   showWelcome();
   showChatWorkspace();
   await loadStatus();
+  await loadModuleVersions();
   try { await loadProjects(); } catch (error) { showError(error.message); }
   input.focus();
 }
