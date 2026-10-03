@@ -21,6 +21,7 @@ async def chat(
     memory_context: list[str] | None = None,
     document_context: list[dict] | None = None,
     brain_plan: list[str] | None = None,
+    tool_context: list[dict] | None = None,
 ) -> str:
     if not settings.cloudru_api_key:
         raise ProviderError(
@@ -62,6 +63,21 @@ async def chat(
             + "\nИспользуй их только если они относятся к вопросу. "
               "Если утверждение основано на документе, укажи имя документа и номер фрагмента. "
               "Не придумывай содержание, которого в этих фрагментах нет."
+        )
+
+    if tool_context:
+        blocks = []
+        for item in tool_context:
+            blocks.append(
+                f"[Инструмент: {item['tool']}]\n"
+                f"Причина: {item['reason']}\n"
+                f"Результат: {item['result']}"
+            )
+        system_prompt += (
+            "\n\nРезультаты разрешённых инструментов Agent Core:\n"
+            + "\n\n".join(blocks)
+            + "\nИспользуй результаты как проверяемый контекст. "
+              "Не утверждай, что выполнялись другие действия, которых нет в этом списке."
         )
 
     payload = {
