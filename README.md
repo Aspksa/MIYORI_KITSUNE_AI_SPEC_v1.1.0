@@ -1,220 +1,170 @@
-# Miyori Kitsune AI v1.1.0
+# Miyori Kitsune AI
 
-Первый запускаемый каркас проекта **Miyori Kitsune AI**.
+Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-## Что уже работает
+**Внутренняя версия приложения: 00.00.35.**  
+Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
 
-- локальный веб-интерфейс;
-- запуск двойным кликом через `Miyori.bat`;
-- запуск из любой папки, USB-флешки или внешнего диска;
-- автоматическая подготовка собственного Python runtime, если Python в Windows не установлен;
-- локальная SQLite-база `data/miyori.sqlite3`;
-- сохранение сообщений диалога;
-- серверный адаптер Cloud.ru Foundation Models;
-- ключ Cloud.ru не отправляется в браузер и исключён из Git;
-- отображение состояния настройки провайдера;
-- Persona Pack Миёри v2.0.0: 24 раздела биографии, 700 речевых примеров и 300 демонстрационных диалогов;
-- контекстный выбор небольшого набора речевых примеров без загрузки всего корпуса в prompt;
-- отделение художественной биографии Миёри от реальной памяти пользователя;
-- retrieved memory/documents/tool output помечаются как данные, а не системные инструкции.
+## Состояние релиза 00.00.35
 
-Текущая внутренняя версия приложения: **00.00.17**.
+`00.00.35` — архитектурный cleanup-релиз без новой пользовательской функции. Он фиксирует и упрощает функциональную базу `00.00.34`:
 
-## Первый запуск на Windows
+- синхронизирована документация с фактическим состоянием проекта;
+- frontend разделён на упорядоченные JS/CSS-модули;
+- полностью удалён оставшийся legacy-код визуализации внутренних этапов обработки;
+- сохранены домашнее пространство, «Домашняя сеть», фундамент «Детского контроля Miyori» и UI-аудит `00.00.34`;
+- версия backend, UI assets и module registry синхронизирована на `00.00.35`.
 
-1. Скачайте или клонируйте репозиторий.
-2. Запустите `Miyori.bat`.
-3. Если рядом нет `runtime\python.exe` и в Windows нет Python, скрипт автоматически запустит `setup-portable.ps1` и создаст собственный runtime Миёри.
-4. При первом запуске будет создан `.env`.
-5. Заполните в `.env`:
-   - `CLOUDRU_API_KEY`
-   - `CLOUDRU_MODEL_ID`
-6. Снова запустите `Miyori.bat`.
+## Что уже реализовано
 
-Сайт открывается автоматически по адресу `http://127.0.0.1:8765`.
+### Miyori AI
 
-> Для первоначального скачивания portable runtime и для работы с Cloud.ru нужен интернет. После создания папки `runtime` сама Python-среда переносится вместе с проектом и не требует системной установки Python.
+- чат с Cloud.ru Foundation Models;
+- Persona Pack `2.0.0`;
+- локальный контекст проекта;
+- Brain plan;
+- Agent Core с ограниченным числом шагов;
+- инструменты чтения и контролируемые действия;
+- разрешения на write-действия;
+- фоновые задачи и self-check;
+- системный статус и диагностика.
 
-## Запуск с любого носителя
+### Память и знания
 
-`Miyori.bat` начинает работу из собственной папки:
+- SQLite-память проекта;
+- статусы фактов и ручная работа с памятью;
+- Epistemic Core: claims, sources, evidence, contradictions;
+- статусы `candidate / supported / verified / disputed / rejected / superseded`;
+- RAG по документам, проверенной памяти и подтверждённым знаниям;
+- FTS5 при наличии и lexical fallback;
+- RRF-объединение каналов поиска.
+
+### Документы / Miyori Drive
+
+Поддерживаются TXT, Markdown, JSON, PDF с текстовым слоем, DOCX, XLSX и PPTX. Документы сохраняются локально, индексируются и могут использоваться в RAG. Максимальный размер загружаемого файла — 25 MB.
+
+### Проекты
+
+Есть рабочие и домашние проектные пространства, включая модули АО «Примавтодор», сотрудников, контрагентов, договоров, счетов / предложений, домашних устройств и профилей детского контроля.
+
+### Домашнее пространство
+
+**Домашняя сеть** сейчас реализована как CRUD-реестр устройств: имя, тип, адрес, статус и заметка.
+
+Активное сетевое обнаружение, ping/heartbeat, MAC discovery и автоматический мониторинг устройств пока не реализованы.
+
+**Детский контроль Miyori** находится на стадии foundation. Есть профили, устройство, дневной лимит, bedtime и категории блокировок.
+
+Фактическое применение ограничений на телефоне требует отдельного мобильного клиента и явной привязки устройства. Скрытый мониторинг не является частью текущей реализации.
+
+### Аккаунт и настройки
+
+- локальный профиль и аватар;
+- device sessions;
+- Cloud.ru API key с маскированием секрета;
+- выбор модели и проверка подключения;
+- тема, плотность и стартовый экран;
+- automation/updater;
+- Windows autostart;
+- системная диагностика и очистка runtime/logs.
+
+### Обновление
+
+Поддерживаются Git fast-forward update и Portable ZIP updater с резервным копированием заменяемых файлов. Пользовательские `.env`, `data`, `logs`, `runtime`, `.venv` и `.git` не должны перезаписываться portable-обновлением.
+
+## Архитектура
+
+### Backend
+
+- `app.py` — FastAPI API и orchestration;
+- `miyori/db.py` — основная SQLite-модель;
+- `miyori/provider.py` — Cloud.ru provider;
+- `miyori/brain.py` — рабочий контекст и план;
+- `miyori/agent.py` — Agent Core;
+- `miyori/tools.py` — registry и политика инструментов;
+- `miyori/hands.py` — безопасные workspace-действия;
+- `miyori/rag.py` — retrieval;
+- `miyori/epistemic.py` — epistemic knowledge layer;
+- `miyori/persona.py` — Persona Pack;
+- `miyori/tasks.py` / `background.py` — фоновые задачи;
+- `miyori/system_settings.py` — настройки и диагностика;
+- `miyori/updater.py` / `portable_updater.py` — обновление;
+- `miyori/module_registry.py` — версии модулей и changelog.
+
+### Frontend с 00.00.35
+
+JavaScript загружается в фиксированном порядке:
+
+1. `static/js/core.js`
+2. `static/js/data.js`
+3. `static/js/chat.js`
+4. `static/js/workspace.js`
+5. `static/js/drive.js`
+6. `static/js/projects.js`
+7. `static/js/settings.js`
+8. `static/js/boot.js`
+
+CSS загружается в фиксированном cascade-порядке:
+
+1. `static/css/foundation.css`
+2. `static/css/chat.css`
+3. `static/css/workspace.css`
+4. `static/css/drive.css`
+5. `static/css/modules.css`
+6. `static/css/modes.css`
+7. `static/css/audit.css`
+
+Порядок файлов является частью frontend-контракта и не должен произвольно меняться.
+
+## Локальные данные и безопасность
+
+- SQLite и проектные файлы хранятся локально;
+- Cloud.ru API key не возвращается клиенту в открытом виде;
+- write-инструменты требуют разрешения;
+- project workspace защищён от path traversal;
+- локально-чувствительные account/settings операции ограничены loopback-доступом;
+- RAG/Memory/Epistemic блоки передаются модели как данные, а не как инструкции.
+
+## Запуск на Windows
+
+Основной portable-сценарий:
 
 ```bat
-cd /d "%~dp0"
+Miyori.bat
 ```
 
-Поэтому проект не привязан к букве диска. После создания `runtime` всю папку Miyori можно перенести, например:
+Launcher использует bundled runtime при наличии, иначе системный Python / локальную `.venv`; при необходимости portable Python подготавливается через `setup-portable.ps1`. Затем выполняются updater, подготовка `.env`, установка зависимостей и запуск `app.py`.
 
-```text
-C:\Miyori
-D:\AI\Miyori
-E:\Miyori
-USB:\Miyori
-```
+## Конфигурация
 
-Локальные данные и настройки остаются рядом с приложением:
-
-```text
-Miyori/
-├─ Miyori.bat
-├─ setup-portable.ps1
-├─ runtime/              # portable Python; создаётся автоматически
-├─ data/                 # SQLite и будущая память
-├─ .env                  # локальные секреты и настройки
-├─ app.py
-├─ miyori/
-├─ static/
-└─ templates/
-```
-
-## Настройка Cloud.ru
-
-Создаваемый `.env` использует:
+Минимальный `.env`:
 
 ```env
-CLOUDRU_API_KEY=...
-CLOUDRU_MODEL_ID=...
+CLOUDRU_API_KEY=
 CLOUDRU_BASE_URL=https://foundation-models.api.cloud.ru/v1
+CLOUDRU_MODEL_ID=deepseek-ai/DeepSeek-V4-Flash
 ```
 
-Ключ используется только Python-сервером. Браузер его не получает.
+Дополнительные параметры запуска и updater приведены в `.env.example`.
 
-## Архитектура текущего ядра
+## Тесты
 
-```text
-Miyori.bat
-   |
-   +--> runtime/python.exe          (предпочтительно)
-   |          |
-   |          +--> setup-portable.ps1 при первом запуске
-   |
-   +--> .venv/system Python         (резервный режим)
-              |
-              v
-          FastAPI
-          app.py
-            |
-            +---- /              web UI
-            +---- /api/status    состояние
-            +---- /api/chat      диалог
-            |
-            +---- miyori/provider.py -> Cloud.ru
-            +---- miyori/db.py       -> SQLite
-            +---- miyori/config.py   -> конфигурация
+Текущие автоматические тесты покрывают Account / Cloud.ru secret handling, Epistemic Core, Persona Pack, RAG и updater safety.
 
-Browser
-   +---- templates/index.html
-   +---- static/app.js
-   +---- static/style.css
-```
+Следующий слой покрытия: Home Network, Parental Control, Primavtodor CRUD, Settings API, permissions и интеграционный `/api/chat`.
 
-## Безопасность
+## Текущие ограничения
 
-- `.env` не коммитится;
-- API-ключ не включён в клиентский JavaScript;
-- каталог `data/` не коммитится;
-- ошибка Cloud.ru не превращается в выдуманный ответ;
-- пользовательское сообщение сохраняется до обращения к провайдеру.
+- Agent Core пока использует детерминированную/эвристическую маршрутизацию, а не полноценный LLM tool planner;
+- мобильный iOS/Android клиент ещё не реализован;
+- детский контроль пока не применяет политики на реальном устройстве;
+- домашняя сеть пока не выполняет автоматическое обнаружение;
+- OCR для сканированных PDF отсутствует;
+- автоматический внешний web research не является частью текущего backend-контура.
 
-## Что ещё не реализовано
+## Версии
 
-Это минимальная реализация первого этапа. Далее нужны проекты и отдельные области памяти, проверяемые факты и ссылки на источники, долговременная память, документы, изображения, фоновые задания, цифровые органы, голос, разрешённые инструменты, аватар и система проверяемого развития.
+- `00.00.34` — домашние модули + полный UI audit + удаление processing UI;
+- `00.00.35` — документация + frontend modularization + удаление processing legacy.
 
-
-## Persona Pack v2.0.0
-
-Канонический корпус Миёри хранится в `miyori/persona_data/` пятью последовательными частями.
-`miyori/persona.py` собирает их при первом обращении, проверяет тип и версию корпуса и кеширует результат.
-
-В prompt передаётся не весь корпус, а компактное ядро личности и небольшой релевантный набор фраз/диалогов.
-Демонстрационные диалоги используются только как образцы речи и не считаются историей пользователя.
-
-Проверка:
-
-```bash
-python -m unittest tests.test_persona
-```
-
-
-## Epistemic Core 00.00.16
-
-Миёри хранит проверяемое знание отдельно от обычной памяти:
-
-```text
-Claim
-├─ status: candidate | supported | verified | disputed | rejected | superseded
-├─ type: fact | preference | hypothesis | strategy
-├─ confidence
-├─ Evidence[]
-└─ Contradictions[]
-```
-
-Каждое свидетельство связано с источником и позицией `supports / contradicts / neutral`.
-Внешний факт из одного сообщения пользователя не становится истинным автоматически.
-Прямое пользовательское предпочтение может быть подтверждено самим пользователем.
-Для внешнего факта статус `verified` требует нескольких независимых подтверждений достаточного качества.
-
-Фоновая задача `epistemic_review` переоценивает статусы только по уже сохранённым свидетельствам и не выдумывает новые источники.
-
-API:
-
-- `GET /api/projects/{project_id}/epistemic`
-- `POST /api/projects/{project_id}/epistemic/claims`
-- `GET /api/projects/{project_id}/epistemic/claims/{claim_id}`
-- `POST /api/projects/{project_id}/epistemic/sources`
-- `POST /api/projects/{project_id}/epistemic/claims/{claim_id}/evidence`
-- `POST /api/projects/{project_id}/epistemic/claims/{claim_id}/verify`
-
-Проверка:
-
-```bash
-python -m unittest tests.test_epistemic
-```
-
-Важно: Epistemic Core оценивает предоставленные доказательства. Автоматический веб-поиск и получение внешних первичных источников ещё не реализованы.
-
-
-## RAG Core 00.00.17
-
-RAG объединяет три источника контекста:
-
-- chunks документов проекта;
-- подтверждённую память;
-- `supported/verified` знания Epistemic Core.
-
-Retrieval использует локальный гибридный режим:
-
-```text
-query
-├─ SQLite FTS5 по document_chunks
-├─ lexical document search
-├─ verified memory
-└─ epistemic knowledge
-       ↓
-Reciprocal Rank Fusion
-       ↓
-deduplication
-       ↓
-source quotas
-       ↓
-context budget
-       ↓
-RAG_ДАННЫЕ → provider
-```
-
-Если SQLite в portable Python собран без FTS5, RAG автоматически переходит в `hybrid_lexical_rrf` и приложение продолжает работать.
-
-API:
-
-- `GET /api/projects/{project_id}/rag?q=...&limit=8`
-- `GET /api/status` содержит состояние RAG/FTS5.
-
-После загрузки документа индекс автоматически пересобирается. Self-check проверяет согласованность количества FTS chunks с `document_chunks`.
-
-Проверка:
-
-```bash
-python -m unittest tests.test_persona tests.test_epistemic tests.test_rag
-```
-
-Текущий RAG не использует внешнюю vector database и embeddings. Это сознательный первый слой: переносимый локальный retrieval без новых API-зависимостей. Embedding-канал можно добавить позже как ещё один ranker в существующий RRF.
+Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

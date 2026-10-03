@@ -1,0 +1,119 @@
+/* Immediate interface modes */
+html[data-density="compact"] .workspace-page-body { padding: 14px; }
+html[data-density="compact"] .side-menu-item { min-height: 38px; }
+html[data-density="compact"] .workspace-card,
+html[data-density="compact"] .settings-section-card { padding: 12px; }
+html[data-density="compact"] .messages { padding-top: 22px; }
+
+html[data-theme="dark"] body {
+  background: #18151f;
+  color: #ded8e8;
+}
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .chat-area,
+html[data-theme="dark"] .workspace-view,
+html[data-theme="dark"] .workspace-page-header,
+html[data-theme="dark"] .workspace-card,
+html[data-theme="dark"] .settings-section-card,
+html[data-theme="dark"] .system-info-grid article,
+html[data-theme="dark"] .settings-tabs,
+html[data-theme="dark"] .settings-panel,
+html[data-theme="dark"] .account-tab-panel,
+html[data-theme="dark"] .miyori-drive,
+html[data-theme="dark"] .drive-main {
+  background: #211d29 !important;
+  border-color: #3a3246 !important;
+}
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .composer,
+html[data-theme="dark"] .drive-search {
+  background: #292330 !important;
+  color: #eee8f5 !important;
+  border-color: #44394f !important;
+}
+html[data-theme="dark"] strong,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3 {
+  color: #eee8f5 !important;
+}
+html[data-theme="dark"] small,
+html[data-theme="dark"] p,
+html[data-theme="dark"] span {
+  border-color: inherit;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] body { background:#18151f; color:#ded8e8; }
+  html[data-theme="system"] .workspace-card,
+  html[data-theme="system"] .settings-section-card,
+  html[data-theme="system"] .workspace-page-header { background:#211d29; border-color:#3a3246; }
+}
+
+@media (max-width: 760px) {
+  .settings-tabs { overflow-x:auto; }
+  .settings-module-version { display:none; }
+  .settings-field-grid,
+  .system-info-grid,
+  .diagnostic-module-grid { grid-template-columns:1fr; }
+  .settings-number-row { grid-template-columns:1fr 100px 60px; }
+}
+
+
+/* 00.00.33 — Primavtodor business modules */
+.business-module { width:min(1050px,100%); }
+.business-form {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+  margin-bottom:12px;
+}
+.business-form label { display:grid; gap:5px; }
+.business-form label span { color:#61566e; font-size:8px; font-weight:750; }
+.business-form input {
+  min-height:40px;
+  padding:0 10px;
+  border:1px solid #ddd5e9;
+  border-radius:10px;
+  background:#fff;
+  color:#4b4058;
+}
+.business-form-actions {
+  grid-column:1/-1;
+  display:flex;
+  gap:7px;
+}
+.business-list {
+  display:grid;
+  gap:7px;
+  margin-top:12px;
+}
+.business-list-row {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  padding:10px 11px;
+  border:1px solid #e8e1ef;
+  border-radius:12px;
+  background:#fcfbff;
+}
+.business-list-row strong,
+.business-list-row small { display:block; }
+.business-list-row strong { color:#493e58; font-size:9px; }
+.business-list-row small { margin-top:3px; color:#9a92a4; font-size:8px; }
+.business-list-row button {
+  border:0;
+  background:transparent;
+  color:#7256bb;
+  font-size:8px;
+  font-weight:750;
+}
+.business-list-row button.danger { color:#b85e5e; }
+
+@media (max-width:800px) {
+  .business-form { grid-template-columns:1fr 1fr; }
+}
+@media (max-width:560px) {
+  .business-form { grid-template-columns:1fr; }
+}

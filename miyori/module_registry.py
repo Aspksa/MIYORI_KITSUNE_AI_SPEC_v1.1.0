@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.34"
+PROJECT_VERSION = "00.00.35"
 
 MODULES = {
     "miyori_ai": {
@@ -120,6 +120,29 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.35",
+        "title": "Frontend Cleanup & Architecture",
+        "summary": "Синхронизирована документация, монолитные frontend-ресурсы разделены на упорядоченные модули, удалён оставшийся legacy-код визуализации внутренних этапов обработки. Пользовательское поведение релиза 00.00.34 сохранено.",
+        "modules": [
+            {
+                "key": "miyori_ai",
+                "version": "1.1.2",
+                "changes": [
+                    "Удалены пустой setProcessingStage, таймеры и вызовы скрытой processing-визуализации.",
+                    "Монолит static/app.js разделён на core, data, chat, workspace, drive, projects, settings и boot без изменения порядка выполнения.",
+                ],
+            },
+            {
+                "key": "settings",
+                "version": "0.4.1",
+                "changes": [
+                    "Монолит static/style.css разделён на foundation, chat, workspace, drive, modules, modes и audit.",
+                    "Удалены неиспользуемые processing selectors, keyframes и страховочные legacy overrides.",
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.34",
         "title": "Полный аудит веб-интерфейса и домашние модули",
