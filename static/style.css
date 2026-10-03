@@ -1627,3 +1627,195 @@ body.inspector-hidden .inspector { display: none; }
   .thread-step { min-width: 0; }
   .thread-step span { white-space: normal; text-align: center; }
 }
+
+
+/* 00.00.13 — unified core, response context, developer layer */
+.chat-area {
+  grid-template-rows: auto minmax(0,1fr) auto;
+}
+.developer-layer {
+  position: fixed;
+  z-index: 40;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: min(520px, calc(100vw - 32px));
+  margin: 0;
+  border-color: #313844;
+  box-shadow: 0 24px 70px rgba(0,0,0,.48);
+  transform: translateX(0);
+  transition: transform .22s ease, opacity .18s ease;
+}
+.developer-layer.collapsed {
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(calc(100% + 30px));
+}
+.developer-layer .console-body {
+  max-height: calc(100vh - 90px);
+}
+.developer-layer .console-pages {
+  max-height: calc(100vh - 150px);
+}
+body.developer-open::after {
+  content: "";
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  background: rgba(3,5,8,.52);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+.response-context {
+  width: min(700px, 82%);
+  margin: -10px 0 20px 46px;
+  border: 1px solid #272e38;
+  border-radius: 12px;
+  background: rgba(13,17,23,.92);
+  overflow: hidden;
+}
+.response-context-head {
+  display: grid;
+  grid-template-columns: 26px minmax(0,1fr) 20px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 9px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.response-context-head:hover { background: rgba(255,255,255,.018); }
+.response-context-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #1e1924;
+  color: #b99cca;
+}
+.response-context-copy strong {
+  display: block;
+  color: #cfd4db;
+  font-size: 9px;
+}
+.response-context-copy small {
+  display: block;
+  margin-top: 1px;
+  color: #6f7885;
+  font-size: 8px;
+}
+.response-context-chevron {
+  color: #6e7784;
+  transition: transform .18s ease;
+}
+.response-context.collapsed .response-context-chevron { transform: rotate(-90deg); }
+.response-context-body {
+  max-height: 520px;
+  overflow-y: auto;
+  padding: 9px;
+  border-top: 1px solid #222933;
+  transition: max-height .2s ease, opacity .16s ease, padding .2s ease;
+}
+.response-context.collapsed .response-context-body {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-top-color: transparent;
+  overflow: hidden;
+}
+.context-section {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.context-section h4 {
+  margin: 0;
+  color: #7e8794;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.context-item,
+.context-action,
+.context-plan-step,
+.context-stat {
+  padding: 7px 8px;
+  border: 1px solid #262d36;
+  border-radius: 8px;
+  background: #0f141a;
+}
+.context-item strong,
+.context-action strong {
+  display: block;
+  color: #d0d5dc;
+  font-size: 9px;
+}
+.context-item p {
+  margin: 4px 0 0;
+  color: #7f8996;
+  font-size: 8px;
+  line-height: 1.45;
+}
+.context-stat {
+  color: #8a94a0;
+  font-size: 9px;
+}
+.context-stat strong { color: #c9add8; }
+.context-plan-step {
+  display: grid;
+  grid-template-columns: 20px minmax(0,1fr);
+  gap: 7px;
+  color: #9aa3af;
+  font-size: 9px;
+}
+.context-plan-step > span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: #211a26;
+  color: #bfa1cf;
+  font-size: 8px;
+}
+.context-action {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.context-action > span { color: #b99cca; }
+.context-action small {
+  display: block;
+  margin-top: 2px;
+  color: #6f7885;
+  font-size: 8px;
+}
+.developer-link {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px dashed #343b46;
+  border-radius: 8px;
+  background: transparent;
+  color: #81718b;
+  font-size: 8px;
+}
+.developer-link:hover {
+  border-color: #594866;
+  color: #c0a1d0;
+}
+
+@media (max-width: 700px) {
+  .developer-layer {
+    inset: 10px;
+    width: auto;
+  }
+  .response-context {
+    width: 94%;
+    margin-left: 0;
+  }
+}
