@@ -70,29 +70,6 @@
         </button>
       </nav>
 
-      <section class="lavender-panel processing-panel">
-        <div class="panel-title">Этапы обработки</div>
-        <div class="processing-steps" id="processingSteps">
-          <div class="processing-step" data-stage="accepted">
-            <span class="stage-node">1</span>
-            <div><strong>Запрос принят</strong><small>Ожидаю задачу</small></div>
-          </div>
-          <div class="processing-step" data-stage="context">
-            <span class="stage-node">2</span>
-            <div><strong>Сбор контекста</strong><small>Память и документы</small></div>
-          </div>
-          <div class="processing-step" data-stage="work">
-            <span class="stage-node">3</span>
-            <div><strong>Работа</strong><small>Анализ и действия</small></div>
-          </div>
-          <div class="processing-step" data-stage="result">
-            <span class="stage-node">4</span>
-            <div><strong>Результат</strong><small>Ожидает выполнения</small></div>
-          </div>
-        </div>
-      </section>
-
-
       <details class="workspace-details">
         <summary>Проект и разговоры</summary>
         <section class="project-card compact-project">
@@ -235,6 +212,20 @@
       <section id="messages" class="messages" aria-live="polite"></section>
 
       <footer class="composer-wrap" id="chatComposer">
+        <div id="chatProcessStatus" class="chat-process-status" hidden>
+          <span class="chat-process-dot"></span>
+          <div class="chat-process-copy">
+            <strong id="chatProcessTitle">Пишет текст</strong>
+            <small id="chatProcessDetail">Подготовка запроса</small>
+          </div>
+          <div id="chatProcessSteps" class="chat-process-steps">
+            <span data-chat-stage="typing">Текст</span>
+            <span data-chat-stage="accepted">Запрос</span>
+            <span data-chat-stage="context">Контекст</span>
+            <span data-chat-stage="work">Работа</span>
+            <span data-chat-stage="result">Результат</span>
+          </div>
+        </div>
         <form id="chatForm" class="composer">
           <div class="composer-field">
             <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Задать вопрос…" required></textarea>
