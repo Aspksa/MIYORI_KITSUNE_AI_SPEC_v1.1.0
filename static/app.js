@@ -2471,7 +2471,7 @@ async function renderProjectModule(project) {
         '<div id="projectSubmodules" class="workspace-project-grid"></div>' +
       '</section>' +
       '<section class="workspace-card workspace-card-wide"><div class="sheet-actions">' +
-        '<button id="projectModuleDocuments" class="secondary-sheet-button" type="button">Документы проекта</button>' +
+        '<button id="projectModuleDocuments" class="secondary-sheet-button" type="button">▤ Miyori Drive проекта</button>' +
         '<button id="projectModuleChat" class="primary-sheet-button" type="button">Открыть чат проекта</button>' +
       '</div></section>' +
     '</div>';
