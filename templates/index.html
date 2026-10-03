@@ -63,14 +63,18 @@
       <section id="messages" class="messages" aria-live="polite"></section>
 
       <footer class="composer-wrap">
-        <div class="chat-actions-wrap">
-          <div class="chat-actions-head">
-            <span>Действия</span>
-            <small>Руки Миёри · безопасные действия выполняются сразу</small>
+        <div id="actionLauncher" class="action-launcher" hidden>
+          <div class="action-launcher-head">
+            <div>
+              <strong>Способности Миёри</strong>
+              <small>Выберите действие или просто опишите его словами</small>
+            </div>
+            <button id="closeActions" type="button" aria-label="Закрыть">×</button>
           </div>
           <div id="chatActionBar" class="chat-action-bar"></div>
         </div>
         <form id="chatForm" class="composer">
+          <button id="openActions" class="ability-button" type="button" title="Действия Миёри" aria-label="Действия Миёри">+</button>
           <div class="composer-field">
             <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Сообщение Миёри…" required></textarea>
             <div class="composer-hint">Enter — отправить · Shift+Enter — новая строка</div>
