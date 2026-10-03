@@ -157,6 +157,31 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(run_id) REFERENCES agent_runs(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS permission_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                tool_name TEXT NOT NULL,
+                arguments_json TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('pending','approved','denied','executed','failed')),
+                reason TEXT,
+                result_json TEXT,
+                created_at TEXT NOT NULL,
+                decided_at TEXT,
+                executed_at TEXT,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS hand_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                tool_name TEXT NOT NULL,
+                action TEXT NOT NULL,
+                arguments_json TEXT,
+                result_json TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
             """
         )
 
@@ -1055,3 +1080,148 @@ def get_agent_trace(run_id: int) -> dict | None:
     result = dict(run)
     result["actions"] = actions
     return result
+
+
+
+def create_permission_request(
+    project_id: int,
+    tool_name: str,
+    arguments: dict,
+    reason: str | None = None,
+) -> dict:
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO permission_requests(
+                project_id, tool_name, arguments_json, status, reason, created_at
+            ) VALUES (?, ?, ?, 'pending', ?, ?)
+            """,
+            (
+                project_id,
+                tool_name,
+                json.dumps(arguments, ensure_ascii=False),
+                reason,
+                utc_now(),
+            ),
+        )
+        row = conn.execute(
+            """
+            SELECT id, project_id, tool_name, arguments_json, status, reason,
+                   created_at, decided_at, executed_at
+            FROM permission_requests WHERE id = ?
+            """,
+            (cur.lastrowid,),
+        ).fetchone()
+    item = dict(row)
+    item["arguments"] = json.loads(item.pop("arguments_json"))
+    return item
+
+
+def list_permission_requests(project_id: int, limit: int = 50) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, tool_name, arguments_json, status, reason,
+                   result_json, created_at, decided_at, executed_at
+            FROM permission_requests
+            WHERE project_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (project_id, limit),
+        ).fetchall()
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["arguments"] = json.loads(item.pop("arguments_json"))
+        raw_result = item.pop("result_json")
+        item["result"] = json.loads(raw_result) if raw_result else None
+        result.append(item)
+    return result
+
+
+def get_permission_request(project_id: int, request_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT id, project_id, tool_name, arguments_json, status, reason,
+                   result_json, created_at, decided_at, executed_at
+            FROM permission_requests
+            WHERE id = ? AND project_id = ?
+            """,
+            (request_id, project_id),
+        ).fetchone()
+    if not row:
+        return None
+    item = dict(row)
+    item["arguments"] = json.loads(item.pop("arguments_json"))
+    raw_result = item.pop("result_json")
+    item["result"] = json.loads(raw_result) if raw_result else None
+    return item
+
+
+def decide_permission_request(project_id: int, request_id: int, approved: bool) -> dict | None:
+    status = "approved" if approved else "denied"
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE permission_requests
+            SET status = ?, decided_at = ?
+            WHERE id = ? AND project_id = ? AND status = 'pending'
+            """,
+            (status, utc_now(), request_id, project_id),
+        )
+        if cur.rowcount != 1:
+            return None
+    return get_permission_request(project_id, request_id)
+
+
+def finish_permission_execution(
+    project_id: int,
+    request_id: int,
+    status: str,
+    result: dict,
+) -> dict | None:
+    if status not in {"executed", "failed"}:
+        raise ValueError("Недопустимый статус выполнения разрешения.")
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE permission_requests
+            SET status = ?, result_json = ?, executed_at = ?
+            WHERE id = ? AND project_id = ?
+            """,
+            (
+                status,
+                json.dumps(result, ensure_ascii=False),
+                utc_now(),
+                request_id,
+                project_id,
+            ),
+        )
+    return get_permission_request(project_id, request_id)
+
+
+def record_hand_event(
+    project_id: int,
+    tool_name: str,
+    action: str,
+    arguments: dict,
+    result: dict,
+) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO hand_events(
+                project_id, tool_name, action, arguments_json, result_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id,
+                tool_name,
+                action,
+                json.dumps(arguments, ensure_ascii=False),
+                json.dumps(result, ensure_ascii=False),
+                utc_now(),
+            ),
+        )
