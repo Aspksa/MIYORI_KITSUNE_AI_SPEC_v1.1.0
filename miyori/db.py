@@ -61,6 +61,33 @@ def init_db() -> None:
                 last_seen_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS ai_preferences (
+                id INTEGER PRIMARY KEY CHECK(id = 1),
+                communication_style TEXT NOT NULL DEFAULT 'balanced',
+                detail_level TEXT NOT NULL DEFAULT 'normal',
+                initiative_level TEXT NOT NULL DEFAULT 'medium',
+                ask_before_assuming INTEGER NOT NULL DEFAULT 0,
+                suggest_next_steps INTEGER NOT NULL DEFAULT 1,
+                use_rag INTEGER NOT NULL DEFAULT 1,
+                use_verified_memory INTEGER NOT NULL DEFAULT 1,
+                show_uncertainty INTEGER NOT NULL DEFAULT 1,
+                priority_mode TEXT NOT NULL DEFAULT 'accuracy',
+                operating_mode TEXT NOT NULL DEFAULT 'personal',
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                full_name TEXT NOT NULL,
+                department TEXT NOT NULL DEFAULT '',
+                position TEXT NOT NULL DEFAULT '',
+                fuel_card_number TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER,
@@ -296,6 +323,20 @@ def init_db() -> None:
                 (utc_now(),),
             )
 
+        ai_pref = conn.execute("SELECT id FROM ai_preferences WHERE id = 1").fetchone()
+        if not ai_pref:
+            conn.execute(
+                """
+                INSERT INTO ai_preferences(
+                    id, communication_style, detail_level, initiative_level,
+                    ask_before_assuming, suggest_next_steps, use_rag,
+                    use_verified_memory, show_uncertainty, priority_mode,
+                    operating_mode, updated_at
+                ) VALUES (1, 'balanced', 'normal', 'medium', 0, 1, 1, 1, 1, 'accuracy', 'personal', ?)
+                """,
+                (utc_now(),),
+            )
+
         row = conn.execute(
             "SELECT id FROM projects WHERE name = ?", ("Личное",)
         ).fetchone()
@@ -451,6 +492,162 @@ def disconnect_device_session(session_id: int) -> bool:
             WHERE id = ?
             """,
             (utc_now(), session_id),
+        )
+    return cur.rowcount == 1
+
+
+def get_ai_preferences() -> dict:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT id, communication_style, detail_level, initiative_level,
+                   ask_before_assuming, suggest_next_steps, use_rag,
+                   use_verified_memory, show_uncertainty, priority_mode,
+                   operating_mode, updated_at
+            FROM ai_preferences WHERE id = 1
+            """
+        ).fetchone()
+    return dict(row) if row else {}
+
+
+def update_ai_preferences(
+    *,
+    communication_style: str,
+    detail_level: str,
+    initiative_level: str,
+    ask_before_assuming: bool,
+    suggest_next_steps: bool,
+    use_rag: bool,
+    use_verified_memory: bool,
+    show_uncertainty: bool,
+    priority_mode: str,
+    operating_mode: str,
+) -> dict:
+    if communication_style not in {"balanced", "warm", "business", "minimal"}:
+        raise ValueError("Недопустимый стиль общения.")
+    if detail_level not in {"short", "normal", "detailed"}:
+        raise ValueError("Недопустимый уровень подробности.")
+    if initiative_level not in {"low", "medium", "high"}:
+        raise ValueError("Недопустимый уровень инициативности.")
+    if priority_mode not in {"accuracy", "balanced", "speed"}:
+        raise ValueError("Недопустимый приоритет.")
+    if operating_mode not in {"personal", "work", "analyst", "research", "developer"}:
+        raise ValueError("Недопустимый режим Miyori.")
+
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE ai_preferences
+            SET communication_style = ?, detail_level = ?, initiative_level = ?,
+                ask_before_assuming = ?, suggest_next_steps = ?, use_rag = ?,
+                use_verified_memory = ?, show_uncertainty = ?,
+                priority_mode = ?, operating_mode = ?, updated_at = ?
+            WHERE id = 1
+            """,
+            (
+                communication_style, detail_level, initiative_level,
+                int(ask_before_assuming), int(suggest_next_steps), int(use_rag),
+                int(use_verified_memory), int(show_uncertainty),
+                priority_mode, operating_mode, utc_now(),
+            ),
+        )
+    return get_ai_preferences()
+
+
+def list_employees(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, full_name, department, position,
+                   fuel_card_number, created_at, updated_at
+            FROM employees
+            WHERE project_id = ?
+            ORDER BY full_name COLLATE NOCASE
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_employee(
+    project_id: int,
+    *,
+    full_name: str,
+    department: str,
+    position: str,
+    fuel_card_number: str,
+) -> dict:
+    clean_name = " ".join(full_name.strip().split())
+    if not clean_name:
+        raise ValueError("ФИО сотрудника обязательно.")
+    now = utc_now()
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO employees(
+                project_id, full_name, department, position,
+                fuel_card_number, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id, clean_name, department.strip(), position.strip(),
+                fuel_card_number.strip(), now, now,
+            ),
+        )
+        row = conn.execute(
+            """
+            SELECT id, project_id, full_name, department, position,
+                   fuel_card_number, created_at, updated_at
+            FROM employees WHERE id = ?
+            """,
+            (cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
+
+
+def update_employee(
+    project_id: int,
+    employee_id: int,
+    *,
+    full_name: str,
+    department: str,
+    position: str,
+    fuel_card_number: str,
+) -> dict | None:
+    clean_name = " ".join(full_name.strip().split())
+    if not clean_name:
+        raise ValueError("ФИО сотрудника обязательно.")
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE employees
+            SET full_name = ?, department = ?, position = ?,
+                fuel_card_number = ?, updated_at = ?
+            WHERE id = ? AND project_id = ?
+            """,
+            (
+                clean_name, department.strip(), position.strip(),
+                fuel_card_number.strip(), utc_now(), employee_id, project_id,
+            ),
+        )
+        if cur.rowcount != 1:
+            return None
+        row = conn.execute(
+            """
+            SELECT id, project_id, full_name, department, position,
+                   fuel_card_number, created_at, updated_at
+            FROM employees WHERE id = ?
+            """,
+            (employee_id,),
+        ).fetchone()
+    return dict(row)
+
+
+def delete_employee(project_id: int, employee_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM employees WHERE id = ? AND project_id = ?",
+            (employee_id, project_id),
         )
     return cur.rowcount == 1
 
