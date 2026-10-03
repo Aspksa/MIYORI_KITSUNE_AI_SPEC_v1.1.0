@@ -43,6 +43,36 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(conversation_id) REFERENCES conversations(id)
             );
+
+            CREATE TABLE IF NOT EXISTS memory_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                conversation_id INTEGER,
+                message_id INTEGER,
+                locator TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id),
+                FOREIGN KEY(conversation_id) REFERENCES conversations(id),
+                FOREIGN KEY(message_id) REFERENCES messages(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS memory_facts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                statement TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('candidate', 'verified', 'disputed', 'superseded')),
+                source_id INTEGER,
+                confidence REAL,
+                verification_method TEXT,
+                observed_at TEXT NOT NULL,
+                valid_from TEXT,
+                valid_until TEXT,
+                supersedes_fact_id INTEGER,
+                FOREIGN KEY(project_id) REFERENCES projects(id),
+                FOREIGN KEY(source_id) REFERENCES memory_sources(id),
+                FOREIGN KEY(supersedes_fact_id) REFERENCES memory_facts(id)
+            );
             """
         )
 
@@ -185,12 +215,13 @@ def ensure_conversation(conversation_id: int | None, project_id: int) -> int:
         return int(cur.lastrowid)
 
 
-def add_message(conversation_id: int, role: str, content: str) -> None:
+def add_message(conversation_id: int, role: str, content: str) -> int:
     with connect() as conn:
-        conn.execute(
+        cur = conn.execute(
             "INSERT INTO messages(conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)",
             (conversation_id, role, content, utc_now()),
         )
+        message_id = int(cur.lastrowid)
 
         if role == "user":
             row = conn.execute(
@@ -205,6 +236,173 @@ def add_message(conversation_id: int, role: str, content: str) -> None:
                     "UPDATE conversations SET title = ? WHERE id = ?",
                     (title or "Новый разговор", conversation_id),
                 )
+
+        return message_id
+
+
+def add_memory_fact(
+    project_id: int,
+    statement: str,
+    status: str = "candidate",
+    source_kind: str = "user_message",
+    conversation_id: int | None = None,
+    message_id: int | None = None,
+    confidence: float | None = None,
+    verification_method: str | None = None,
+) -> dict:
+    clean = statement.strip()
+    if not clean:
+        raise ValueError("Факт пустой.")
+    if status not in {"candidate", "verified", "disputed", "superseded"}:
+        raise ValueError("Недопустимый статус памяти.")
+
+    with connect() as conn:
+        duplicate = conn.execute(
+            """
+            SELECT id, statement, status, confidence, verification_method, observed_at
+            FROM memory_facts
+            WHERE project_id = ? AND lower(statement) = lower(?) AND status != 'superseded'
+            ORDER BY id DESC LIMIT 1
+            """,
+            (project_id, clean),
+        ).fetchone()
+        if duplicate:
+            return dict(duplicate)
+
+        source_cur = conn.execute(
+            """
+            INSERT INTO memory_sources(project_id, kind, conversation_id, message_id, locator, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (project_id, source_kind, conversation_id, message_id, None, utc_now()),
+        )
+        source_id = int(source_cur.lastrowid)
+
+        fact_cur = conn.execute(
+            """
+            INSERT INTO memory_facts(
+                project_id, statement, status, source_id, confidence,
+                verification_method, observed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id, clean, status, source_id, confidence,
+                verification_method, utc_now(),
+            ),
+        )
+        row = conn.execute(
+            """
+            SELECT id, statement, status, confidence, verification_method, observed_at
+            FROM memory_facts WHERE id = ?
+            """,
+            (fact_cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
+
+
+def list_memory_facts(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                f.id, f.statement, f.status, f.confidence, f.verification_method,
+                f.observed_at, s.kind AS source_kind, s.conversation_id, s.message_id
+            FROM memory_facts f
+            LEFT JOIN memory_sources s ON s.id = f.source_id
+            WHERE f.project_id = ?
+            ORDER BY
+                CASE f.status
+                    WHEN 'verified' THEN 0
+                    WHEN 'candidate' THEN 1
+                    WHEN 'disputed' THEN 2
+                    ELSE 3
+                END,
+                f.id DESC
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def update_memory_status(project_id: int, fact_id: int, status: str) -> dict | None:
+    if status not in {"candidate", "verified", "disputed", "superseded"}:
+        raise ValueError("Недопустимый статус памяти.")
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE memory_facts
+            SET status = ?,
+                verification_method = CASE
+                    WHEN ? = 'verified' THEN 'user_confirmed'
+                    ELSE verification_method
+                END
+            WHERE id = ? AND project_id = ?
+            """,
+            (status, status, fact_id, project_id),
+        )
+        row = conn.execute(
+            """
+            SELECT id, statement, status, confidence, verification_method, observed_at
+            FROM memory_facts WHERE id = ? AND project_id = ?
+            """,
+            (fact_id, project_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def verified_memory_context(project_id: int, limit: int = 24) -> list[str]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT statement FROM memory_facts
+            WHERE project_id = ? AND status = 'verified'
+            ORDER BY id DESC LIMIT ?
+            """,
+            (project_id, limit),
+        ).fetchall()
+    return [row["statement"] for row in reversed(rows)]
+
+
+def maybe_capture_user_memory(
+    project_id: int,
+    conversation_id: int,
+    message_id: int,
+    content: str,
+) -> dict | None:
+    text = content.strip()
+    lowered = text.lower()
+    triggers = (
+        "запомни ",
+        "запомни:",
+        "я предпочитаю ",
+        "мне нравится ",
+        "мне не нравится ",
+        "мой любимый ",
+        "моя любимая ",
+        "для этого проекта ",
+    )
+    if not lowered.startswith(triggers):
+        return None
+
+    statement = text
+    if lowered.startswith("запомни:"):
+        statement = text.split(":", 1)[1].strip()
+    elif lowered.startswith("запомни "):
+        statement = text[8:].strip()
+
+    if not statement:
+        return None
+
+    return add_memory_fact(
+        project_id=project_id,
+        statement=statement,
+        status="candidate",
+        source_kind="user_message",
+        conversation_id=conversation_id,
+        message_id=message_id,
+        confidence=None,
+        verification_method=None,
+    )
 
 
 def recent_messages(conversation_id: int, limit: int = 30) -> list[dict[str, str]]:
