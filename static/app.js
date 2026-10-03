@@ -1387,6 +1387,12 @@ function workspaceResult(message, tone = "neutral") {
   return '<div class="sheet-result ' + tone + '">' + escapeHtml(message) + '</div>';
 }
 
+function shortSha(value) {
+  if (!value) return "—";
+  const text = String(value).trim();
+  return text.length > 10 ? text.slice(0, 10) : text;
+}
+
 async function renderAccountWorkspace() {
   showWorkspaceShell("account", "Личный кабинет", "Cloud.ru", "Ключи, модель и подключение провайдера.");
   try {
@@ -1456,6 +1462,12 @@ async function renderAccountWorkspace() {
       modelState.textContent = "Загружаю GET /models…";
       try {
         const catalog = await api("/api/account/cloudru/models");
+        if (catalog.reason === "key_required") {
+          model.innerHTML = '<option value="">Сначала сохраните API-ключ Cloud.ru</option>';
+          modelState.textContent = "Введите API-ключ и нажмите «Сохранить», затем список моделей загрузится автоматически.";
+          result.innerHTML = workspaceResult("API-ключ Cloud.ru ещё не задан.", "neutral");
+          return;
+        }
         populateModels(catalog, p.model_id);
         const preferredDeepSeek = catalog.preferred_model_id || "deepseek-ai/DeepSeek-V4-Flash";
         const currentValid = !!p.model_id && !!catalog.selected_model_found;
