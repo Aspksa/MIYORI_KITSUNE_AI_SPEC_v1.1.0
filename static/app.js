@@ -14,6 +14,8 @@ const newChatSide = document.getElementById("newChatSide");
 const projectSelect = document.getElementById("projectSelect");
 const addProject = document.getElementById("addProject");
 const conversationList = document.getElementById("conversationList");
+const memoryList = document.getElementById("memoryList");
+const refreshMemory = document.getElementById("refreshMemory");
 const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
 const modelText = document.getElementById("modelText");
@@ -115,11 +117,70 @@ async function loadProjects() {
   projectSelect.value = String(state.projectId);
   updateProjectLabel();
   await loadConversations();
+  await loadMemory();
 }
 
 function updateProjectLabel() {
   const option = projectSelect.selectedOptions[0];
   projectLabel.textContent = option ? `Проект: ${option.textContent}` : "Проект";
+}
+
+async function loadMemory() {
+  if (!state.projectId) return;
+  try {
+    const data = await api(`/api/projects/${state.projectId}/memory`);
+    memoryList.innerHTML = "";
+
+    if (!data.facts.length) {
+      const empty = document.createElement("div");
+      empty.className = "conversation-empty";
+      empty.textContent = "Память пока пуста";
+      memoryList.appendChild(empty);
+      return;
+    }
+
+    for (const fact of data.facts) {
+      const card = document.createElement("div");
+      card.className = `memory-item status-${fact.status}`;
+
+      const actions = fact.status === "candidate"
+        ? `
+          <button data-action="verified">Подтвердить</button>
+          <button data-action="disputed">Оспорить</button>
+        `
+        : fact.status === "verified"
+          ? `<button data-action="superseded">Устарело</button>`
+          : "";
+
+      card.innerHTML = `
+        <div class="memory-statement">${escapeHtml(fact.statement)}</div>
+        <div class="memory-meta">
+          <span>${escapeHtml(fact.status)}</span>
+          <span>${escapeHtml(fact.source_kind || "source")}</span>
+        </div>
+        <div class="memory-actions">${actions}</div>
+      `;
+
+      card.querySelectorAll("button[data-action]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          try {
+            await api(`/api/projects/${state.projectId}/memory/${fact.id}`, {
+              method: "PATCH",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({status: button.dataset.action}),
+            });
+            await loadMemory();
+          } catch (error) {
+            showError(error.message);
+          }
+        });
+      });
+
+      memoryList.appendChild(card);
+    }
+  } catch (error) {
+    memoryList.innerHTML = `<div class="conversation-empty">${escapeHtml(error.message)}</div>`;
+  }
 }
 
 async function loadConversations() {
@@ -212,6 +273,7 @@ form.addEventListener("submit", async (event) => {
     state.conversationId = data.conversation_id;
     addMessage("assistant", data.answer);
     await loadConversations();
+    await loadMemory();
 
     const active = conversationList.querySelector(`[data-id="${state.conversationId}"] span`);
     if (active) conversationTitle.textContent = active.textContent;
@@ -230,6 +292,7 @@ projectSelect.addEventListener("change", async () => {
   updateProjectLabel();
   showWelcome();
   await loadConversations();
+  await loadMemory();
 });
 
 addProject.addEventListener("click", async () => {
@@ -265,6 +328,7 @@ input.addEventListener("keydown", (event) => {
 
 newChat.addEventListener("click", startNewChat);
 newChatSide.addEventListener("click", startNewChat);
+refreshMemory.addEventListener("click", loadMemory);
 
 async function boot() {
   showWelcome();
