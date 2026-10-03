@@ -29,6 +29,12 @@ from .db import (
     search_verified_memory,
     update_tool_operation,
 )
+from .document_intelligence import (
+    document_context_packet,
+    get_document_intelligence,
+    rebuild_document_intelligence,
+    search_document_nodes,
+)
 from .documents import (
     ensure_drive_folder,
     move_active_document,
@@ -134,6 +140,99 @@ def project_document_read(
             "chunk_count": document.get("chunk_count", 0),
         },
         "chunks": chunks,
+    }
+
+
+def project_document_understanding(
+    project_id: int,
+    document_id: int,
+    query: str = "",
+) -> dict:
+    document = get_document(project_id, int(document_id))
+    if not document:
+        raise ValueError("Документ не найден в текущем проекте.")
+    profile = get_document_intelligence(project_id, int(document_id))
+    if not profile:
+        profile = rebuild_document_intelligence(project_id, int(document_id))
+    if query.strip():
+        return {
+            "document": {
+                "id": document["id"],
+                "filename": document["filename"],
+            },
+            "context": document_context_packet(
+                project_id,
+                int(document_id),
+                query.strip(),
+                max_chars=14_000,
+            ),
+        }
+    return {
+        "document": {
+            "id": document["id"],
+            "filename": document["filename"],
+            "mime_type": document.get("mime_type"),
+            "size_bytes": document.get("size_bytes"),
+        },
+        "intelligence": {
+            "status": profile.get("status"),
+            "title": profile.get("title"),
+            "document_kind": profile.get("document_kind"),
+            "language": profile.get("language"),
+            "char_count": profile.get("char_count"),
+            "word_count": profile.get("word_count"),
+            "page_count": profile.get("page_count"),
+            "section_count": profile.get("section_count"),
+            "table_count": profile.get("table_count"),
+            "node_count": profile.get("node_count"),
+            "coverage_ratio": profile.get("coverage_ratio"),
+            "summary": profile.get("summary_long") or profile.get("summary_short"),
+            "keywords": profile.get("keywords") or [],
+            "analysis": profile.get("analysis") or {},
+            "outline": (profile.get("outline") or [])[:300],
+        },
+    }
+
+
+def project_document_outline(project_id: int, document_id: int) -> dict:
+    document = get_document(project_id, int(document_id))
+    if not document:
+        raise ValueError("Документ не найден в текущем проекте.")
+    profile = get_document_intelligence(project_id, int(document_id))
+    if not profile:
+        profile = rebuild_document_intelligence(project_id, int(document_id))
+    return {
+        "document_id": int(document_id),
+        "filename": document["filename"],
+        "title": profile.get("title"),
+        "status": profile.get("status"),
+        "coverage_ratio": profile.get("coverage_ratio"),
+        "outline": profile.get("outline") or [],
+    }
+
+
+def project_document_deep_search(
+    project_id: int,
+    document_id: int,
+    query: str,
+    limit: int = 12,
+) -> dict:
+    document = get_document(project_id, int(document_id))
+    if not document:
+        raise ValueError("Документ не найден в текущем проекте.")
+    nodes = search_document_nodes(
+        project_id,
+        int(document_id),
+        query,
+        limit=int(limit),
+        neighbor_radius=1,
+    )
+    return {
+        "document": {
+            "id": document["id"],
+            "filename": document["filename"],
+        },
+        "nodes": nodes,
     }
 
 
@@ -507,6 +606,69 @@ TOOLS: dict[str, ToolSpec] = {
             },
         },
         category="drive",
+    ),
+    "project_document_understanding": ToolSpec(
+        name="project_document_understanding",
+        description=(
+            "Чтение паспорта Document Intelligence: целостная сводка, покрытие, "
+            "структура, ключевые сущности и релевантный контекст конкретного документа."
+        ),
+        permission="read",
+        handler=project_document_understanding,
+        parameters={
+            "document_id": {
+                "type": "integer", "required": True, "minimum": 1,
+                "scope_entity": "document",
+            },
+            "query": {
+                "type": "string", "required": False, "default": "",
+                "max_length": 5000, "normalize": "strip",
+            },
+        },
+        category="document_intelligence",
+        version="1.0",
+    ),
+    "project_document_outline": ToolSpec(
+        name="project_document_outline",
+        description=(
+            "Полная карта разделов/глав/страниц/слайдов документа с locator-ами. "
+            "Используй перед последовательным разбором большого документа."
+        ),
+        permission="read",
+        handler=project_document_outline,
+        parameters={
+            "document_id": {
+                "type": "integer", "required": True, "minimum": 1,
+                "scope_entity": "document",
+            },
+        },
+        category="document_intelligence",
+        version="1.0",
+    ),
+    "project_document_deep_search": ToolSpec(
+        name="project_document_deep_search",
+        description=(
+            "Структурный поиск внутри конкретного документа с соседними узлами "
+            "и точными locator-ами; подходит для книг и длинных документов."
+        ),
+        permission="read",
+        handler=project_document_deep_search,
+        parameters={
+            "document_id": {
+                "type": "integer", "required": True, "minimum": 1,
+                "scope_entity": "document",
+            },
+            "query": {
+                "type": "string", "required": True,
+                "min_length": 1, "max_length": 5000, "normalize": "strip",
+            },
+            "limit": {
+                "type": "integer", "required": False, "default": 12,
+                "minimum": 1, "maximum": 40,
+            },
+        },
+        category="document_intelligence",
+        version="1.0",
     ),
     "drive_folder_create": ToolSpec(
         name="drive_folder_create",

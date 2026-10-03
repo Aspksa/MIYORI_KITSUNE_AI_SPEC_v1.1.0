@@ -176,10 +176,184 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
         '<span class="drive-file-knowledge">✦ ' + Number(document.chunk_count || 0) + ' фрагментов</span>' +
       '</div>' +
       '<div class="drive-file-actions">' +
+        '<button type="button" data-drive-understand="' + document.id + '" title="Понимание документа">◎</button>' +
         '<button type="button" data-drive-download="' + document.id + '" title="Скачать оригинал">↓</button>' +
         '<button type="button" data-drive-delete="' + document.id + '" class="danger" title="В корзину">⌫</button>' +
       '</div>' +
     '</article>';
+  };
+
+  const intelligenceStatusLabel = (status) => ({
+    indexed: "Структура готова",
+    queued: "В очереди",
+    analyzing: "Анализируется",
+    complete: "Понято полностью",
+    partial: "Понято частично",
+    needs_ocr: "Нужен OCR",
+    unsupported: "Только оригинал",
+    failed: "Ошибка анализа"
+  }[status] || status || "Не построено");
+
+  const renderIntelligencePanel = async (documentId) => {
+    const resultNode = el("driveResult");
+    resultNode.innerHTML = workspaceResult("Загружаю карту документа…", "working");
+
+    try {
+      const data = await api(
+        "/api/projects/" + state.projectId + "/documents/" +
+        documentId + "/intelligence"
+      );
+      const profile = data.intelligence || {};
+      const coverage = Math.max(0, Math.min(100, Math.round(
+        Number(profile.coverage_ratio || 0) * 100
+      )));
+      const outline = profile.outline || [];
+      const analysis = profile.analysis || {};
+      const keyPoints = analysis.key_points || [];
+      const risks = analysis.risks || [];
+      const entities = analysis.entities || [];
+      const dates = analysis.dates || [];
+      const amounts = analysis.amounts || [];
+      const status = profile.status || "indexed";
+
+      resultNode.innerHTML =
+        '<section class="drive-intelligence-panel">' +
+          '<header class="drive-intelligence-head">' +
+            '<div><span class="section-caption">Document Intelligence</span>' +
+              '<h3>' + escapeHtml(profile.title || "Документ") + '</h3>' +
+              '<p>' + escapeHtml(intelligenceStatusLabel(status)) + '</p></div>' +
+            '<button id="driveIntelligenceClose" class="sheet-close" type="button">×</button>' +
+          '</header>' +
+          '<div class="drive-intelligence-metrics">' +
+            '<div><span>Слов</span><strong>' + Number(profile.word_count || 0).toLocaleString("ru-RU") + '</strong></div>' +
+            '<div><span>Страниц</span><strong>' + Number(profile.page_count || 0) + '</strong></div>' +
+            '<div><span>Разделов</span><strong>' + Number(profile.section_count || 0) + '</strong></div>' +
+            '<div><span>Структурных узлов</span><strong>' + Number(profile.node_count || 0) + '</strong></div>' +
+          '</div>' +
+          '<div class="drive-intelligence-coverage">' +
+            '<div><strong>Глубокое покрытие</strong><span>' + coverage + '%</span></div>' +
+            '<div class="drive-intelligence-progress"><i style="width:' + coverage + '%"></i></div>' +
+            '<small>' +
+              (status === "complete"
+                ? "Miyori прошла весь извлечённый текст документа и построила итоговый синтез."
+                : status === "analyzing" || status === "queued"
+                  ? "Анализ выполняется по всему документу последовательно, окно за окном."
+                  : status === "needs_ocr"
+                    ? "Оригинал сохранён, но текст PDF нужно распознать OCR перед полным анализом."
+                    : "Локальная структура готова. Полный AI-анализ можно запустить отдельно.") +
+            '</small>' +
+          '</div>' +
+          (profile.summary_long || profile.summary_short
+            ? '<section class="drive-intelligence-section"><h4>Целостная сводка</h4><p>' +
+              escapeHtml(profile.summary_long || profile.summary_short) + '</p></section>'
+            : '') +
+          '<section class="drive-intelligence-section"><h4>Структура документа</h4>' +
+            (outline.length
+              ? '<div class="drive-intelligence-outline">' +
+                outline.slice(0, 100).map(item =>
+                  '<div style="--outline-level:' + Math.max(0, Number(item.level || 0)) + '">' +
+                    '<span>' + escapeHtml(item.locator || "") + '</span>' +
+                    '<strong>' + escapeHtml(item.title || "Раздел") + '</strong>' +
+                  '</div>'
+                ).join("") +
+                (outline.length > 100
+                  ? '<small>Показаны первые 100 из ' + outline.length +
+                    ' структурных элементов. Полная карта доступна Miyori через Agent Core.</small>'
+                  : '') +
+                '</div>'
+              : '<div class="workspace-empty">Структурные заголовки не обнаружены.</div>') +
+          '</section>' +
+          (keyPoints.length
+            ? '<section class="drive-intelligence-section"><h4>Ключевые пункты</h4><div class="drive-intelligence-list">' +
+              keyPoints.slice(0, 30).map(item =>
+                '<article><strong>' + escapeHtml(item.text || String(item)) + '</strong>' +
+                (item.locator ? '<small>' + escapeHtml(item.locator) + '</small>' : '') +
+                '</article>'
+              ).join("") + '</div></section>'
+            : '') +
+          (risks.length
+            ? '<section class="drive-intelligence-section"><h4>Риски и важные места</h4><div class="drive-intelligence-list">' +
+              risks.slice(0, 20).map(item =>
+                '<article><strong>' + escapeHtml(item.text || String(item)) + '</strong>' +
+                '<small>' + escapeHtml(item.locator || item.basis || "") + '</small></article>'
+              ).join("") + '</div></section>'
+            : '') +
+          ((entities.length || dates.length || amounts.length)
+            ? '<section class="drive-intelligence-section"><h4>Извлечённые сущности</h4><div class="drive-intelligence-tags">' +
+              entities.slice(0, 30).map(item =>
+                '<span>' + escapeHtml(item.name || String(item)) + '</span>'
+              ).join("") +
+              dates.slice(0, 15).map(item =>
+                '<span>' + escapeHtml(item.value || String(item)) + '</span>'
+              ).join("") +
+              amounts.slice(0, 15).map(item =>
+                '<span>' + escapeHtml(
+                  (item.value || "") + (item.currency ? " " + item.currency : "")
+                ) + '</span>'
+              ).join("") +
+              '</div></section>'
+            : '') +
+          (profile.last_error
+            ? '<div class="sheet-note warning">' + escapeHtml(profile.last_error) + '</div>'
+            : '') +
+          '<div class="sheet-actions drive-intelligence-actions">' +
+            '<button id="driveIntelligenceRefresh" class="secondary-sheet-button" type="button">Обновить статус</button>' +
+            '<button id="driveIntelligenceRebuild" class="secondary-sheet-button" type="button">Перестроить структуру</button>' +
+            '<button id="driveIntelligenceAnalyze" class="primary-sheet-button" type="button"' +
+              (status === "needs_ocr" || status === "unsupported" ? " disabled" : "") +
+              '>' + (status === "complete" ? "Проанализировать заново" : "Понять документ полностью") + '</button>' +
+          '</div>' +
+        '</section>';
+
+      el("driveIntelligenceClose").onclick = () => { resultNode.innerHTML = ""; };
+      el("driveIntelligenceRefresh").onclick = () => renderIntelligencePanel(documentId);
+      el("driveIntelligenceRebuild").onclick = async () => {
+        resultNode.innerHTML = workspaceResult("Перестраиваю локальную карту документа…", "working");
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/documents/" +
+            documentId + "/intelligence/rebuild",
+            {method: "POST"}
+          );
+          await renderIntelligencePanel(documentId);
+        } catch (error) {
+          resultNode.innerHTML = workspaceResult(error.message, "error");
+        }
+      };
+      el("driveIntelligenceAnalyze").onclick = async () => {
+        const force = status === "complete";
+        resultNode.innerHTML = workspaceResult(
+          "Полный анализ поставлен в очередь. Miyori пройдёт документ от начала до конца.",
+          "working"
+        );
+        try {
+          const queued = await api(
+            "/api/projects/" + state.projectId + "/documents/" +
+            documentId + "/intelligence/analyze",
+            {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({force})
+            }
+          );
+          const taskId = queued.task?.id;
+          resultNode.innerHTML =
+            workspaceResult(
+              "Document Intelligence запущен" +
+              (taskId ? " · задача #" + taskId : "") +
+              ". Можно продолжать работать: анализ выполняется в фоне.",
+              "success"
+            ) +
+            '<div class="sheet-actions"><button id="driveIntelligenceReturn" class="primary-sheet-button" type="button">Открыть статус документа</button></div>';
+          el("driveIntelligenceReturn").onclick = () => renderIntelligencePanel(documentId);
+          if (typeof loadTasks === "function") loadTasks();
+        } catch (error) {
+          resultNode.innerHTML = workspaceResult(error.message, "error");
+        }
+      };
+    } catch (error) {
+      resultNode.innerHTML = workspaceResult(error.message, "error");
+    }
   };
 
   const bindActiveActions = () => {
@@ -206,6 +380,12 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
         } catch (error) {
           el("driveResult").innerHTML = workspaceResult(error.message, "error");
         }
+      };
+    });
+
+    workspaceBody.querySelectorAll("[data-drive-understand]").forEach(button => {
+      button.onclick = async () => {
+        await renderIntelligencePanel(Number(button.dataset.driveUnderstand));
       };
     });
 

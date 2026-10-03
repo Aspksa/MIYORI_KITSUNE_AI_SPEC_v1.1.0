@@ -7,6 +7,7 @@ from dataclasses import dataclass, asdict
 from typing import Iterable
 
 from .db import connect, search_document_chunks, search_verified_memory
+from .document_intelligence import search_project_document_intelligence
 from .epistemic import trusted_claim_context
 
 
@@ -222,6 +223,37 @@ def _memory(
     return items
 
 
+def _document_intelligence(
+    project_id: int,
+    query: str,
+    limit: int = 12,
+) -> list[RAGItem]:
+    rows = search_project_document_intelligence(
+        project_id,
+        query,
+        limit=limit,
+    )
+    return [
+        RAGItem(
+            key=f"intel:{row['document_id']}:{row.get('node_id') or row.get('locator')}",
+            source_type="document",
+            title=row.get("filename") or row.get("title") or "Документ",
+            content=str(row.get("summary") or "")[:MAX_ITEM_CHARS],
+            score=0.0,
+            locator=row.get("locator") or f"document:{row['document_id']}:overview",
+            metadata={
+                "document_id": int(row["document_id"]),
+                "node_id": row.get("node_id"),
+                "intelligence_status": row.get("status"),
+                "coverage_ratio": row.get("coverage_ratio"),
+                "retrieval_kind": "document_intelligence",
+            },
+        )
+        for row in rows
+        if row.get("summary")
+    ]
+
+
 def _knowledge(project_id: int, query: str, limit: int = 12) -> list[RAGItem]:
     rows = trusted_claim_context(project_id, query, limit=limit)
     return [
@@ -303,6 +335,10 @@ def retrieve(
         _document_lexical(project_id, clean_query, limit=max(limit * 3, 12))
         if include_documents else []
     )
+    intelligence = (
+        _document_intelligence(project_id, clean_query, limit=max(limit * 2, 8))
+        if include_documents else []
+    )
     memory = (
         _memory(
             project_id,
@@ -323,6 +359,8 @@ def retrieve(
         rankings.append(("document_fts", fts, 1.15))
     if lexical:
         rankings.append(("document_lexical", lexical, 1.0))
+    if intelligence:
+        rankings.append(("document_intelligence", intelligence, 1.2))
     if memory:
         rankings.append(("verified_memory", memory, 0.95))
     if knowledge:

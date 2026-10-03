@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .db import development_snapshot, record_development_check
+from .document_intelligence import document_intelligence_status
 from .rag import rag_status
 
 
@@ -16,6 +17,8 @@ class CheckResult:
 def run_project_self_check(project_id: int) -> list[CheckResult]:
     snapshot = development_snapshot(project_id)
     rag = rag_status()
+    intelligence = document_intelligence_status(project_id)
+    intelligence_failed = int((intelligence.get("counts") or {}).get("failed", 0))
     rag_ok = (not rag["fts5"]) or rag["indexed_chunks"] == snapshot["document_chunks"]
     checks = [
         CheckResult(
@@ -40,6 +43,15 @@ def run_project_self_check(project_id: int) -> list[CheckResult]:
             "task_health",
             snapshot["failed_tasks"] == 0,
             f"failed_tasks={snapshot['failed_tasks']}",
+        ),
+        CheckResult(
+            "document_intelligence",
+            intelligence_failed == 0,
+            (
+                f"failed={intelligence_failed}; "
+                f"avg_coverage={float(intelligence.get('average_coverage') or 0.0):.3f}; "
+                f"parser={intelligence.get('parser_version')}"
+            ),
         ),
         CheckResult(
             "workflow_recovery",

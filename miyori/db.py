@@ -3432,10 +3432,27 @@ def mark_interrupted_runtime_for_recovery() -> dict:
             """,
             (now,),
         ).rowcount
+        cancelled_tasks = conn.execute(
+            """
+            UPDATE tasks
+            SET status = 'cancelled', finished_at = ?
+            WHERE status = 'running' AND cancel_requested = 1
+            """,
+            (now,),
+        ).rowcount
+        requeued_tasks = conn.execute(
+            """
+            UPDATE tasks
+            SET status = 'queued', started_at = NULL
+            WHERE status = 'running' AND cancel_requested = 0
+            """
+        ).rowcount
     return {
         "workflows": int(workflows),
         "steps": int(steps),
         "operations": int(operations),
+        "tasks_requeued": int(requeued_tasks),
+        "tasks_cancelled": int(cancelled_tasks),
     }
 
 

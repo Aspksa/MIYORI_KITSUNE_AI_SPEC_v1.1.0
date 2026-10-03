@@ -111,8 +111,8 @@ from miyori.development import run_project_self_check
 from miyori.documents import (
     MAX_FILE_BYTES,
     chunk_text,
-    decode_document,
     drive_relative_root,
+    extract_structured_document,
     ensure_drive_folder,
     migrate_legacy_document,
     move_document_to_trash,
@@ -125,6 +125,18 @@ from miyori.documents import (
     safe_folder_name,
     save_original,
     sha256_bytes,
+)
+from miyori.document_intelligence import (
+    build_local_document_intelligence,
+    document_context_packet,
+    document_intelligence_status,
+    enqueue_deep_document_analysis,
+    get_document_intelligence,
+    get_document_nodes,
+    init_document_intelligence_db,
+    mark_document_intelligence_unavailable,
+    rebuild_document_intelligence,
+    search_document_nodes,
 )
 from miyori.provider import ProviderError, chat
 from miyori.persona import persona_metadata
@@ -209,6 +221,7 @@ def _sync_project_drive(project_id: int) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    init_document_intelligence_db()
     recovery_marked = mark_interrupted_runtime_for_recovery()
     recovery_checked = reconcile_recoverable_operations(allow_retry=False)
     init_epistemic_db()
@@ -227,7 +240,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.38", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.39", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -273,8 +286,14 @@ class ToolExecuteRequest(BaseModel):
 
 
 class TaskCreateRequest(BaseModel):
-    task_type: str = Field(pattern="^(self_check|memory_consolidation|epistemic_review)$")
+    task_type: str = Field(
+        pattern="^(self_check|memory_consolidation|epistemic_review|document_intelligence)$"
+    )
     payload: dict = Field(default_factory=dict)
+
+
+class DocumentAnalysisRequest(BaseModel):
+    force: bool = False
 
 
 class PermissionDecisionRequest(BaseModel):
@@ -418,7 +437,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.38",
+        "version": "00.00.39",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -660,7 +679,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.38",
+        "project_version": "00.00.39",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1168,23 +1187,32 @@ async def document_upload(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     chunks: list[str] = []
+    structured = None
     index_warning: str | None = None
     try:
-        text = decode_document(filename, data)
-        chunks = chunk_text(text)
+        structured = extract_structured_document(filename, data)
+        chunks = chunk_text(structured.text)
         if not chunks:
             index_warning = "В файле нет извлекаемого текста для базы знаний."
     except ValueError as exc:
-        # Miyori Drive хранит оригинал даже если формат пока нельзя индексировать.
+        # Оригинал сохраняется даже если формат/OCR пока не позволяет построить знания.
         index_warning = str(exc)
 
     digest = sha256_bytes(data)
     existing = find_document_by_sha(project_id, digest, include_deleted=True)
     if existing and not existing.get("deleted_at"):
+        intelligence = get_document_intelligence(project_id, int(existing["id"]))
+        if not intelligence and structured is not None:
+            intelligence = build_local_document_intelligence(
+                project_id,
+                int(existing["id"]),
+                structured,
+            )
         return {
             "document": existing,
             "chunk_count": existing.get("chunk_count", len(chunks)),
             "duplicate": True,
+            "intelligence": intelligence,
             "message": "Этот оригинал уже хранится в проекте.",
         }
 
@@ -1209,12 +1237,36 @@ async def document_upload(
     except (ValueError, OSError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    try:
+        if structured is not None:
+            intelligence = build_local_document_intelligence(
+                project_id,
+                int(document["id"]),
+                structured,
+            )
+        else:
+            lower_warning = (index_warning or "").lower()
+            intelligence = mark_document_intelligence_unavailable(
+                project_id,
+                int(document["id"]),
+                status="needs_ocr" if "ocr" in lower_warning else "unsupported",
+                error=index_warning or "Текст документа не извлечён.",
+            )
+    except Exception as exc:
+        intelligence = mark_document_intelligence_unavailable(
+            project_id,
+            int(document["id"]),
+            status="failed",
+            error=f"Не удалось построить локальную структуру: {exc}",
+        )
+
     init_rag()
     return {
         "document": document,
         "chunk_count": len(chunks),
         "duplicate": False,
         "indexed": bool(chunks),
+        "intelligence": intelligence,
         "index_warning": index_warning,
         "message": (
             "Оригинал сохранён в Miyori Drive и добавлен в базу знаний."
@@ -1232,6 +1284,128 @@ def document_trash(project_id: int) -> dict:
         "documents": list_deleted_documents(project_id),
         "folders": list_deleted_document_folders(project_id),
         "storage_root": drive_relative_root(project_id),
+    }
+
+
+@app.get("/api/projects/{project_id}/documents/intelligence/status")
+def document_intelligence_project_status(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return document_intelligence_status(project_id)
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/intelligence")
+def document_intelligence_get(project_id: int, document_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    profile = get_document_intelligence(project_id, document_id)
+    if not profile:
+        try:
+            profile = rebuild_document_intelligence(project_id, document_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"intelligence": profile}
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/outline")
+def document_outline(project_id: int, document_id: int) -> dict:
+    profile = get_document_intelligence(project_id, document_id)
+    if not profile:
+        try:
+            profile = rebuild_document_intelligence(project_id, document_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "document_id": document_id,
+        "title": profile.get("title"),
+        "status": profile.get("status"),
+        "coverage_ratio": profile.get("coverage_ratio"),
+        "outline": profile.get("outline") or [],
+    }
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/nodes")
+def document_nodes(
+    project_id: int,
+    document_id: int,
+    offset: int = 0,
+    limit: int = 200,
+) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    return {
+        "nodes": get_document_nodes(
+            project_id,
+            document_id,
+            offset=max(0, offset),
+            limit=max(1, min(limit, 1000)),
+        )
+    }
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/deep-search")
+def document_deep_search(
+    project_id: int,
+    document_id: int,
+    q: str = "",
+    limit: int = 12,
+) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    query = q.strip()
+    if not query:
+        return {"nodes": []}
+    return {
+        "nodes": search_document_nodes(
+            project_id,
+            document_id,
+            query,
+            limit=max(1, min(limit, 40)),
+            neighbor_radius=1,
+        ),
+        "context": document_context_packet(
+            project_id,
+            document_id,
+            query,
+            max_chars=14_000,
+        ),
+    }
+
+
+@app.post("/api/projects/{project_id}/documents/{document_id}/intelligence/rebuild")
+def document_intelligence_rebuild(project_id: int, document_id: int) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        profile = rebuild_document_intelligence(project_id, document_id)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    init_rag()
+    return {"intelligence": profile}
+
+
+@app.post("/api/projects/{project_id}/documents/{document_id}/intelligence/analyze")
+def document_intelligence_analyze(
+    project_id: int,
+    document_id: int,
+    request: DocumentAnalysisRequest,
+) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        task = enqueue_deep_document_analysis(
+            project_id,
+            document_id,
+            force=request.force,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    wake_worker()
+    return {
+        "task": task,
+        "intelligence": get_document_intelligence(project_id, document_id),
     }
 
 

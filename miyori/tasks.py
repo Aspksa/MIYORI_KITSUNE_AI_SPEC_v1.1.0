@@ -39,7 +39,8 @@ def _run_worker() -> None:
             task_id = int(task["id"])
             task_type = task["task_type"]
             project_id = int(task["project_id"])
-            payload = task["payload"]
+            payload = dict(task["payload"])
+            payload["_task_id"] = task_id
 
             if is_task_cancel_requested(task_id):
                 finish_task(task_id, "cancelled", {"message": "Отменено до запуска."})

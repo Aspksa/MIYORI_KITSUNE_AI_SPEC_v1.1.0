@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+
 from .db import list_memory_facts
 from .epistemic import epistemic_snapshot, list_claims, verify_claim
 from .development import run_project_self_check
+from .document_intelligence import deep_analyze_document
 from .tasks import register_task_handler
 
 
@@ -34,6 +37,21 @@ def memory_consolidation_handler(project_id: int, payload: dict) -> dict:
     }
 
 
+def document_intelligence_handler(project_id: int, payload: dict) -> dict:
+    document_id = int(payload.get("document_id") or 0)
+    if document_id <= 0:
+        raise ValueError("Для Document Intelligence нужен document_id.")
+    task_id = payload.get("_task_id")
+    return asyncio.run(
+        deep_analyze_document(
+            project_id,
+            document_id,
+            task_id=int(task_id) if task_id is not None else None,
+            force=bool(payload.get("force", False)),
+        )
+    )
+
+
 def epistemic_review_handler(project_id: int, payload: dict) -> dict:
     reviewed = []
     for claim in list_claims(project_id, limit=300):
@@ -58,3 +76,4 @@ def register_background_handlers() -> None:
     register_task_handler("self_check", self_check_handler)
     register_task_handler("memory_consolidation", memory_consolidation_handler)
     register_task_handler("epistemic_review", epistemic_review_handler)
+    register_task_handler("document_intelligence", document_intelligence_handler)

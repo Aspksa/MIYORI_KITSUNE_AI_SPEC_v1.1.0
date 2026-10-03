@@ -2,25 +2,28 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.38.**  
+**Внутренняя версия приложения: 00.00.39.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
 
-## Состояние релиза 00.00.38
+## Состояние релиза 00.00.39
 
-`00.00.38` — **AI Reliability & Workflow Engine**. Релиз укрепляет AI Core v2 перед Document Intelligence и автономными рабочими сценариями:
+`00.00.39` — **Document Intelligence · полное понимание документов и книг**.
 
-- каждый инструментальный запрос получает persistent workflow в SQLite;
-- workflow хранит цель, маршрут контекста, текущий шаг, историю действий, pending permission и финальное состояние;
-- после `Разрешить / Отклонить` Agent продолжает тот же workflow, а не строит новую цепочку с нуля;
-- добавлены состояния `running / waiting_permission / recovering / completed / failed / cancelled`;
-- chat и manual tools получили idempotency keys, защищающие от повторных HTTP-запросов;
-- Tool Registry v2 описывает schema аргументов, риск, destructive-флаг, idempotency, timeout, rollback capability, recovery strategy и human-readable preview;
-- write-tools получают preflight snapshot и verify-before-write — устаревшее подтверждение не перезаписывает изменившиеся данные;
-- crash recovery проверяет фактическое состояние операции перед retry;
-- добавлен Audit Trail: запрос → решение Planner → permission → фактическое выполнение → завершение workflow;
-- recovery-состояния входят в Development Self-Check и отображаются в техническом интерфейсе;
-- добавлены интеграционные тесты chat → permission → resume, тесты idempotency/recovery и миграции SQLite `00.00.37 → 00.00.38`;
-- добавлен GitHub Actions CI для автоматического запуска тестов на push/PR.
+Основной принцип релиза: длинный документ больше не считается просто набором найденных фрагментов. Miyori строит постоянную структурную модель документа и может последовательно пройти весь извлечённый текст от начала до конца.
+
+- при загрузке оригинала сразу строится локальная карта документа: структура, порядок, locator-ы, outline и метрики;
+- TXT/Markdown распознают заголовки и уровни; DOCX — заголовки, параграфы и таблицы; PDF — страницы и структурные блоки; XLSX — листы и диапазоны строк; PPTX — слайды; JSON — JSON-path;
+- глубокий AI-анализ выполняется по окнам всего документа, а затем результаты объединяются многоуровневым map→reduce synthesis;
+- `coverage_ratio` показывает фактическую долю извлечённого текста, прошедшую глубокий AI-анализ;
+- статус `complete` ставится только при практически полном покрытии текста;
+- результаты сохраняют locator-ы к местам документа;
+- уже обработанные окна переиспользуются после перезапуска, если структура документа не изменилась;
+- running background tasks после аварийного завершения возвращаются в очередь;
+- Agent Core получил инструменты целостного понимания, outline и глубокого структурного поиска;
+- Document Intelligence участвует в RAG как отдельный retrieval-канал;
+- в Miyori Drive появился экран «Понимание документа» со сводкой, структурой, coverage, ключевыми пунктами, рисками и сущностями.
+
+Важно: «полное понимание» относится ко всему **извлечённому тексту** документа. Сканированный PDF без текстового слоя сохраняется как оригинал, но получает статус `needs_ocr` и не помечается как полностью понятый до появления OCR-контура.
 
 ## Что уже реализовано
 
@@ -31,8 +34,9 @@
 - локальный контекст проекта;
 - Brain plan;
 - Context Router для выборочной загрузки контекста;
-- Agent Core v2.1 с model-assisted Planner и deterministic fallback;
+- Agent Core v2.2 с model-assisted Planner и deterministic fallback;
 - persistent Workflow Engine для многошаговых задач;
+- Document Intelligence для целостного понимания длинных документов и книг;
 - до 5 проверяемых инструментальных шагов на один workflow;
 - продолжение того же workflow после permission;
 - компактный conversational context для ссылок «этот файл / перемести его»;
@@ -58,9 +62,28 @@
 
 ### Документы / Miyori Drive
 
-Miyori Drive сохраняет любые рабочие файлы размером до 25 MB как оригиналы. TXT, Markdown, JSON, PDF с текстовым слоем, DOCX, XLSX и PPTX дополнительно разбираются и индексируются для поиска и RAG. Неподдерживаемый формат или сканированный PDF всё равно сохраняется в Drive, но получает 0 фрагментов знаний до появления подходящего обработчика/OCR.
+Miyori Drive сохраняет оригинал файла байт-в-байт и отдельно строит два слоя знаний.
 
-Каждый проект получает отдельное физическое хранилище:
+**RAG-слой** сохраняет совместимые текстовые чанки для быстрого поиска и обычных ответов.
+
+**Document Intelligence** хранит постоянную структурную карту документа:
+
+- заголовки и уровни;
+- страницы / слайды / листы / таблицы / JSON-path;
+- последовательные структурные узлы;
+- точные locator-ы;
+- количество слов, страниц, разделов и таблиц;
+- outline;
+- локальную сводку;
+- результаты глубокого анализа и фактическое покрытие текста.
+
+Для больших документов глубокий анализ не пытается поместить всю книгу в одно context window. Текст последовательно разбивается на контролируемые окна, каждое окно анализируется отдельно, после чего результаты сводятся иерархически. Это позволяет обрабатывать документы значительно больше контекстного окна модели без молчаливого пропуска середины книги.
+
+После сбоя уже сохранённые окна анализа переиспользуются. Если оригинал/структура изменилась, границы или locator-ы не совпадут и соответствующее окно будет обработано заново.
+
+Поддерживаемые для извлечения форматы: TXT, Markdown, JSON, PDF с текстовым слоем, DOCX, XLSX и PPTX. Неподдерживаемый файл всё равно может храниться как оригинал. Сканированный PDF без текстового слоя требует OCR.
+
+Каждый проект имеет отдельное физическое хранилище:
 
 ```text
 data/
@@ -71,11 +94,7 @@ data/
         Корзина/
 ```
 
-> В интерфейсе раздел называется «Документы / Облако / Miyori». В имени физической папки используются дефисы, потому что символ `/` является разделителем пути и не может быть частью имени папки Windows.
-
-Папки, создаваемые через браузер, зеркалируются внутри `Файлы/`. Загруженные документы сохраняются как оригинальные байты и индексируются для Miyori. При удалении файл или целая папка перемещается в `Корзина/`; автоматического безвозвратного удаления в текущем релизе нет. Восстановление выполняется из интерфейса Drive.
-
-Удалённые документы исключаются из RAG и поиска по активной базе знаний.
+Удаление остаётся мягким: оригиналы перемещаются в локальную корзину, исключаются из активного RAG и могут быть восстановлены.
 
 ### Проекты
 
@@ -115,6 +134,7 @@ data/
 - `miyori/provider.py` — Cloud.ru provider;
 - `miyori/brain.py` — публичный операционный план;
 - `miyori/context_router.py` — маршрутизация памяти, документов, знаний и tools;
+- `miyori/document_intelligence.py` — document graph, outline, coverage, глубокий поиск и hierarchical map→reduce;
 - `miyori/planner.py` — Planner schema, fallback и безопасная валидация решений;
 - `miyori/agent.py` — persistent/resumable Agent Workflow Engine;
 - `miyori/sources.py` — манифест источников ответа;
@@ -202,11 +222,20 @@ CLOUDRU_MODEL_ID=deepseek-ai/DeepSeek-V4-Flash
 
 ## Тесты
 
-Автоматический контур покрывает Account / Cloud.ru secret handling, Persona Pack, RAG, Epistemic Core, updater safety, Miyori Drive, Context Router, Planner fallback, слои памяти, source manifest, межпроектную изоляцию, permission safety, Tool Registry v2, idempotency, stale-approval protection, crash recovery, SQLite migration и mocked-provider интеграционный сценарий `/api/chat → permission → resume`.
+GitHub Actions запускает полный `unittest`-контур на push/PR.
 
-GitHub Actions запускает `python -m unittest discover -s tests -p "test_*.py" -v` на push и pull request в `main`.
+Document Intelligence дополнительно проверяет:
 
-Следующий слой покрытия: Home Network, Parental Control, Primavtodor CRUD, Settings API, Document Intelligence extractors и длительные background workflows.
+- сохранение Markdown-outline и locator-ов;
+- структурный поиск с соседним контекстом;
+- глубокий анализ длинного документа через несколько окон;
+- `coverage_ratio ≈ 100%` после полного прохода;
+- повторное использование уже проанализированных окон;
+- возвращение interrupted background task в очередь после перезапуска;
+- участие Document Intelligence в RAG;
+- наличие новых Document Intelligence tools в Tool Registry.
+
+Существующий контур также продолжает проверять Account, Persona, RAG, Epistemic Core, Miyori Drive, Context Router, Planner, memory layers, project isolation, permissions, Tool Registry v2, idempotency, crash recovery, SQLite migrations и интеграционный workflow `/api/chat → permission → resume`.
 
 ## Текущие ограничения
 
@@ -216,7 +245,9 @@ GitHub Actions запускает `python -m unittest discover -s tests -p "test
 - мобильный iOS/Android клиент ещё не реализован;
 - детский контроль пока не применяет политики на реальном устройстве;
 - домашняя сеть пока не выполняет автоматическое обнаружение;
-- OCR для сканированных PDF отсутствует;
+- OCR для сканированных PDF пока отсутствует: такие файлы сохраняются, но получают `needs_ocr`;
+- глубокий AI-анализ требует настроенного Cloud.ru; локальная структура документа строится без него;
+- анализ изображений, схем и визуальной верстки внутри документов пока не является полноценным multimodal-контуром;
 - автоматический внешний web research не является частью текущего backend-контура.
 
 ## Версии
@@ -225,6 +256,7 @@ GitHub Actions запускает `python -m unittest discover -s tests -p "test
 - `00.00.35` — документация + frontend modularization + удаление processing legacy;
 - `00.00.36` — физический Miyori Drive проекта + оригиналы + безопасная корзина + восстановление + поиск по содержимому;
 - `00.00.37` — Miyori AI Core v2: Context Router + Planner + Agent loop + layered memory + sources + epistemic assessments + tool safety tests;
-- `00.00.38` — AI Reliability & Workflow Engine: persistent workflows + permission resume + idempotency + Tool Registry v2 + audit + crash recovery + CI.
+- `00.00.38` — AI Reliability & Workflow Engine: persistent workflows + permission resume + idempotency + Tool Registry v2 + audit + crash recovery + CI;
+- `00.00.39` — Document Intelligence: structural document graph + hierarchical full-text analysis + coverage tracking + deep search + Drive UI + Agent/RAG integration.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

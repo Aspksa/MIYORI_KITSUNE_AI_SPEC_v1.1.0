@@ -49,14 +49,49 @@ def build_answer_sources(
             entry["chunks"].add(int(chunk_index))
 
     for action in tool_context or []:
-        if action.get("tool") not in {"project_document_search", "project_document_read"}:
+        tool_name = action.get("tool")
+        if tool_name not in {
+            "project_document_search",
+            "project_document_read",
+            "project_document_understanding",
+            "project_document_outline",
+            "project_document_deep_search",
+        }:
             continue
         result = action.get("result") or {}
-        candidates: Iterable[dict] = (
-            result.get("chunks")
-            or result.get("documents")
-            or ([result.get("document")] if result.get("document") else [])
-        )
+
+        if tool_name == "project_document_outline":
+            candidates: Iterable[dict] = [{
+                "document_id": result.get("document_id"),
+                "filename": result.get("filename"),
+                "locator": (
+                    (result.get("outline") or [{}])[0].get("locator")
+                    if result.get("outline") else None
+                ),
+            }]
+        elif tool_name in {
+            "project_document_understanding",
+            "project_document_deep_search",
+        }:
+            document = result.get("document") or {}
+            context = result.get("context") or {}
+            matches = context.get("matches") or result.get("nodes") or []
+            locator = next(
+                (item.get("locator") for item in matches if isinstance(item, dict) and item.get("matched")),
+                None,
+            )
+            candidates = [{
+                "document_id": document.get("id"),
+                "filename": document.get("filename"),
+                "locator": locator,
+            }]
+        else:
+            candidates = (
+                result.get("chunks")
+                or result.get("documents")
+                or ([result.get("document")] if result.get("document") else [])
+            )
+
         for item in candidates:
             if not isinstance(item, dict):
                 continue
@@ -67,9 +102,11 @@ def build_answer_sources(
             document_id = int(document_id)
             entry = documents.setdefault(document_id, {
                 "title": filename,
-                "locator": f"document:{document_id}",
+                "locator": item.get("locator") or f"document:{document_id}",
                 "chunks": set(),
             })
+            if item.get("locator") and not entry.get("locator"):
+                entry["locator"] = item["locator"]
             chunk_index = item.get("chunk_index")
             if chunk_index is not None:
                 entry["chunks"].add(int(chunk_index))

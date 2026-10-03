@@ -1002,3 +1002,162 @@
     justify-self: start;
   }
 }
+
+
+/* 00.00.39 — Document Intelligence */
+.drive-intelligence-panel {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid #e4dced;
+  border-radius: 18px;
+  background: #fff;
+  display: grid;
+  gap: 18px;
+}
+.drive-intelligence-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.drive-intelligence-head h3 {
+  margin: 3px 0 4px;
+  font-size: 20px;
+}
+.drive-intelligence-head p {
+  margin: 0;
+  color: #756a7f;
+  font-size: 12px;
+}
+.drive-intelligence-metrics {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 10px;
+}
+.drive-intelligence-metrics > div {
+  padding: 12px 14px;
+  border: 1px solid #ece6f1;
+  border-radius: 12px;
+  background: #fcfbfe;
+}
+.drive-intelligence-metrics span {
+  display: block;
+  color: #8f8498;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.drive-intelligence-metrics strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+}
+.drive-intelligence-coverage {
+  display: grid;
+  gap: 8px;
+}
+.drive-intelligence-coverage > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.drive-intelligence-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #eee8f2;
+  overflow: hidden;
+}
+.drive-intelligence-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  color: #7860ba;
+}
+.drive-intelligence-coverage small {
+  color: #81768a;
+}
+.drive-intelligence-section {
+  display: grid;
+  gap: 10px;
+}
+.drive-intelligence-section h4 {
+  margin: 0;
+  font-size: 13px;
+}
+.drive-intelligence-section p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.65;
+  font-size: 13px;
+}
+.drive-intelligence-outline {
+  max-height: 360px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #eee8f2;
+  border-radius: 12px;
+}
+.drive-intelligence-outline > div {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px 7px calc(8px + (var(--outline-level) * 10px));
+  border-radius: 8px;
+}
+.drive-intelligence-outline > div:hover {
+  background: #f8f5fb;
+}
+.drive-intelligence-outline span {
+  color: #9b91a4;
+  font-size: 9px;
+}
+.drive-intelligence-outline strong {
+  font-size: 12px;
+}
+.drive-intelligence-list {
+  display: grid;
+  gap: 7px;
+}
+.drive-intelligence-list article {
+  padding: 10px 12px;
+  border: 1px solid #eee8f2;
+  border-radius: 10px;
+  background: #fcfbfe;
+}
+.drive-intelligence-list article strong,
+.drive-intelligence-list article small {
+  display: block;
+}
+.drive-intelligence-list article strong {
+  font-size: 12px;
+}
+.drive-intelligence-list article small {
+  margin-top: 4px;
+  color: #8c8195;
+  font-size: 10px;
+}
+.drive-intelligence-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.drive-intelligence-tags span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #f1edf6;
+  color: #655872;
+  font-size: 10px;
+}
+.drive-intelligence-actions {
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .drive-intelligence-panel {
+    padding: 14px;
+  }
+  .drive-intelligence-metrics {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}

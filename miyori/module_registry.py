@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.38"
+PROJECT_VERSION = "00.00.39"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "status": "active",
-        "description": "AI Core v2.1: persistent workflows, resumable Agent loop, idempotency, audit trail и crash-safe tool execution.",
+        "description": "AI Core v2.2: persistent workflows, Document Intelligence tools, hierarchical document context и проверяемые источники.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "active",
-        "description": "Persistent workflow state, permission continuation, tool operations, recovery, idempotency и audit trail.",
+        "description": "Persistent workflow state, permission continuation, tool operations, background-task recovery, idempotency и audit trail.",
     },
     "account": {
         "name": "Личный кабинет",
@@ -35,9 +35,15 @@ MODULES = {
     },
     "drive": {
         "name": "Документы / Облако / Miyori",
-        "version": "1.5.1",
+        "version": "1.6.0",
         "status": "active",
-        "description": "Miyori Drive: физическое хранилище проекта, оригиналы, папки, безопасная корзина, восстановление, поиск по содержимому и RAG.",
+        "description": "Miyori Drive: оригиналы, структура документов, безопасная корзина, восстановление, Document Intelligence, поиск и RAG.",
+    },
+    "document_intelligence": {
+        "name": "Document Intelligence",
+        "version": "1.0.0",
+        "status": "active",
+        "description": "Полное структурное понимание документов и книг: outline, locators, hierarchical map-reduce, coverage tracking и глубокий поиск.",
     },
     "projects": {
         "name": "Проекты",
@@ -101,9 +107,9 @@ MODULES = {
     },
     "rag": {
         "name": "RAG Core",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "status": "active",
-        "description": "Hybrid FTS5 + lexical retrieval, память и проверенные знания.",
+        "description": "Hybrid FTS5 + lexical retrieval + Document Intelligence, память и проверенные знания.",
     },
     "epistemic": {
         "name": "Epistemic Core",
@@ -126,6 +132,61 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.39",
+        "title": "Document Intelligence · полное понимание документов и книг",
+        "summary": "Miyori перестала воспринимать длинный документ как набор несвязанных чанков: добавлены структурный parser, persistent document graph, hierarchical map-reduce анализ всего извлечённого текста, coverage tracking, глубокий поиск, Agent tools и интерфейс понимания в Miyori Drive.",
+        "modules": [
+            {
+                "key": "document_intelligence",
+                "version": "1.0.0",
+                "changes": [
+                    "Добавлен отдельный persistent слой document_intelligence, document_nodes и document_analysis_windows.",
+                    "TXT/Markdown получают иерархию заголовков и строковые locator-ы; DOCX — стили заголовков, параграфы и таблицы; PDF — страницы и структурные блоки; XLSX — листы и диапазоны строк; PPTX — слайды; JSON — JSON-path блоки.",
+                    "Локальная структурная карта создаётся сразу при загрузке оригинала и не зависит от доступности Cloud.ru.",
+                    "Глубокий анализ проходит весь извлечённый текст последовательно по окнам и затем сводит результаты многоуровневым synthesis.",
+                    "coverage_ratio показывает фактическую долю текста, прошедшую AI-анализ; статус complete возможен только при практически полном покрытии.",
+                    "Каждый вывод сохраняет locator к месту документа; анализ не должен дополнять документ внешними знаниями.",
+                    "После сбоя уже обработанные окна переиспользуются, если границы и locator-ы совпадают."
+                ],
+            },
+            {
+                "key": "drive",
+                "version": "1.6.0",
+                "changes": [
+                    "В карточке файла появилась команда «Понимание документа».",
+                    "Экран показывает слова, страницы, разделы, структурные узлы, coverage, outline, целостную сводку, ключевые пункты, риски и сущности.",
+                    "Полный анализ книги запускается как фоновая задача; оригинал остаётся доступен независимо от результата анализа.",
+                    "Для PDF без текстового слоя сохраняется статус needs_ocr вместо ложного заявления о полном понимании."
+                ],
+            },
+            {
+                "key": "miyori_ai",
+                "version": "2.2.0",
+                "changes": [
+                    "Добавлены read-tools project_document_understanding, project_document_outline и project_document_deep_search.",
+                    "Planner может выбирать между обычным чтением чанков и структурным разбором целого документа.",
+                    "Source manifest сохраняет ссылку на оригинал и locator для ответов, основанных на Document Intelligence."
+                ],
+            },
+            {
+                "key": "rag",
+                "version": "1.2.0",
+                "changes": [
+                    "Document Intelligence стал отдельным retrieval-каналом с приоритетом структурных совпадений.",
+                    "Глобальная сводка и релевантные структурные узлы объединяются с FTS/lexical чанками через существующий RRF-контур."
+                ],
+            },
+            {
+                "key": "workflow_engine",
+                "version": "1.1.0",
+                "changes": [
+                    "Running background tasks после перезапуска возвращаются в очередь; отменённые задачи фиксируются как cancelled.",
+                    "Document Intelligence progress сохраняется по окнам и может безопасно продолжаться после сбоя."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.38",
         "title": "AI Reliability & Workflow Engine",

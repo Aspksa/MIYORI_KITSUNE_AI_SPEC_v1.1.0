@@ -699,8 +699,14 @@ async function loadTasks() {
     for (const task of data.tasks.slice(0, 10)) {
       const row = document.createElement("div");
       row.className = "task-item status-" + task.status;
+      const taskLabel = ({
+        self_check: "Самопроверка",
+        memory_consolidation: "Консолидация памяти",
+        epistemic_review: "Проверка знаний",
+        document_intelligence: "Полное понимание документа"
+      }[task.task_type] || task.task_type);
       row.innerHTML =
-        "<div><strong>#" + task.id + " " + escapeHtml(task.task_type) + "</strong>" +
+        "<div><strong>#" + task.id + " " + escapeHtml(taskLabel) + "</strong>" +
         "<small>" + escapeHtml(task.status) + "</small></div>";
       if (task.status === "queued" || task.status === "running") {
         const button = document.createElement("button");
