@@ -9,9 +9,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import settings
-
-SETTINGS_PATH = settings.data_dir / "system_settings.json"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT_DIR / "data"
+DATABASE_PATH = DATA_DIR / "miyori.sqlite3"
+SETTINGS_PATH = DATA_DIR / "system_settings.json"
 DEFAULTS = {
     "general": {
         "windows_autostart": False,
@@ -99,7 +100,7 @@ def _env_encode(value: str) -> str:
 
 
 def _persist_env_bridge(payload: dict) -> None:
-    env_path = settings.root_dir / ".env"
+    env_path = ROOT_DIR / ".env"
     original = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
     values = {
         "MIYORI_OPEN_BROWSER": "1" if payload["general"]["open_browser"] else "0",
@@ -150,10 +151,10 @@ def set_windows_autostart(enabled: bool) -> dict:
         return {"supported": False, "enabled": False, "path": None}
     target.parent.mkdir(parents=True, exist_ok=True)
     if enabled:
-        launcher = settings.root_dir / "Miyori.bat"
+        launcher = ROOT_DIR / "Miyori.bat"
         content = (
             "@echo off\r\n"
-            f'cd /d "{settings.root_dir}"\r\n'
+            f'cd /d "{ROOT_DIR}"\r\n'
             f'start "" /min "{launcher}"\r\n'
         )
         target.write_text(content, encoding="utf-8")
@@ -179,19 +180,19 @@ def autostart_status() -> dict:
 
 
 def system_snapshot() -> dict:
-    usage = shutil.disk_usage(settings.root_dir)
-    install_mode = "git" if (settings.root_dir / ".git").exists() else "portable"
-    db_ok = settings.database_path.exists()
+    usage = shutil.disk_usage(ROOT_DIR)
+    install_mode = "git" if (ROOT_DIR / ".git").exists() else "portable"
+    db_ok = DATABASE_PATH.exists()
     return {
-        "root_dir": str(settings.root_dir),
-        "data_dir": str(settings.data_dir),
+        "root_dir": str(ROOT_DIR),
+        "data_dir": str(DATA_DIR),
         "install_mode": install_mode,
         "python_version": sys.version.split()[0],
         "platform": platform.platform(),
         "sqlite": {
             "ok": db_ok,
-            "path": str(settings.database_path),
-            "size_bytes": settings.database_path.stat().st_size if db_ok else 0,
+            "path": str(DATABASE_PATH),
+            "size_bytes": DATABASE_PATH.stat().st_size if db_ok else 0,
         },
         "disk": {
             "total_bytes": usage.total,
@@ -203,7 +204,7 @@ def system_snapshot() -> dict:
 
 
 def open_data_folder() -> None:
-    path = settings.data_dir.resolve()
+    path = DATA_DIR.resolve()
     if platform.system() == "Windows":
         os.startfile(path)  # type: ignore[attr-defined]
     elif platform.system() == "Darwin":
@@ -216,7 +217,7 @@ def cleanup_runtime_logs() -> dict:
     removed_files = 0
     removed_bytes = 0
     for dirname in ("runtime", "logs"):
-        root = settings.root_dir / dirname
+        root = ROOT_DIR / dirname
         if not root.exists():
             continue
         for child in list(root.iterdir()):
