@@ -30,6 +30,11 @@ const permissionList = el("permissionList");
 const miyoriConsole = el("miyoriConsole");
 const consoleHeader = el("consoleHeader");
 const toggleConsole = el("toggleConsole");
+const aiStatusChip = el("aiStatusChip");
+const memoryStatusChip = el("memoryStatusChip");
+const dbStatusChip = el("dbStatusChip");
+const docsStatusChip = el("docsStatusChip");
+const docsStatusText = el("docsStatusText");
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -40,6 +45,20 @@ function escapeHtml(value) {
 function showError(text) {
   errorBox.textContent = text || "";
   errorBox.hidden = !text;
+}
+
+function setProcessingStage(stage, detail = null) {
+  const order = ["accepted", "context", "work", "result"];
+  const current = order.indexOf(stage);
+  document.querySelectorAll(".processing-step").forEach((row) => {
+    const index = order.indexOf(row.dataset.stage);
+    row.classList.toggle("active", index === current);
+    row.classList.toggle("completed", current >= 0 && index < current);
+    if (index === current && detail) {
+      const small = row.querySelector("small");
+      if (small) small.textContent = detail;
+    }
+  });
 }
 
 function setPulse(mode, label) {
@@ -149,6 +168,17 @@ async function loadNexus() {
     }
 
     const c = data.counts;
+    if (memoryStatusChip) {
+      memoryStatusChip.textContent = "Доступна";
+      memoryStatusChip.className = "soft-status ok";
+    }
+    if (docsStatusChip) {
+      docsStatusChip.textContent = c.documents ? "Готовы" : "Пусто";
+      docsStatusChip.className = c.documents ? "soft-status ok" : "soft-status neutral";
+    }
+    if (docsStatusText) {
+      docsStatusText.textContent = c.documents ? ("Документов: " + c.documents) : "Нет документов";
+    }
     const consoleSummary = el("consoleSummary");
     if (consoleSummary) {
       const parts = [];
@@ -388,18 +418,38 @@ async function loadStatus() {
   try {
     const data = await api("/api/status");
     versionText.textContent = data.version;
+    if (dbStatusChip) {
+      dbStatusChip.textContent = "Готова";
+      dbStatusChip.className = "soft-status ok";
+    }
     if (data.provider_configured) {
       statusDot.className = "dot ready";
-      statusText.textContent = "Cloud.ru настроен";
+      statusText.textContent = "Подключён";
       modelText.textContent = data.model_id;
+      if (aiStatusChip) {
+        aiStatusChip.textContent = "Подключён";
+        aiStatusChip.className = "soft-status ok";
+      }
     } else {
       statusDot.className = "dot warn";
       statusText.textContent = "Нужна настройка";
       modelText.textContent = "Заполните .env";
+      if (aiStatusChip) {
+        aiStatusChip.textContent = "Настройка";
+        aiStatusChip.className = "soft-status warn";
+      }
     }
   } catch {
     statusDot.className = "dot error-dot";
     statusText.textContent = "Сервер недоступен";
+    if (aiStatusChip) {
+      aiStatusChip.textContent = "Недоступен";
+      aiStatusChip.className = "soft-status error";
+    }
+    if (dbStatusChip) {
+      dbStatusChip.textContent = "Недоступна";
+      dbStatusChip.className = "soft-status error";
+    }
   }
 }
 
@@ -1065,6 +1115,7 @@ function startNewChat() {
   state.conversationId = null;
   showError("");
   showWelcome();
+  setProcessingStage("accepted", "Ожидаю задачу");
   brainPlan.innerHTML = '<span class="empty-copy">План появится после запроса.</span>';
   agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
   agentBudget.textContent = "0/3";
@@ -1080,8 +1131,10 @@ form.addEventListener("submit", async (event) => {
 
   showError("");
   addMessage("user", text);
+  setProcessingStage("accepted", "Запрос получен");
   const livingIntent = createLivingIntent(text);
   updateLivingIntent(livingIntent, "context");
+  setProcessingStage("context", "Собираю память и документы");
   input.value = "";
   input.style.height = "auto";
   setBusy(true);
@@ -1105,6 +1158,7 @@ form.addEventListener("submit", async (event) => {
 
     state.conversationId = data.conversation_id;
     updateLivingIntent(livingIntent, "actions");
+    setProcessingStage("work", "Анализирую и выполняю шаги");
     addMessage("assistant", data.answer);
     if (data.brain) {
       brainState.textContent = "ready";
@@ -1173,6 +1227,7 @@ form.addEventListener("submit", async (event) => {
       }
     }
     addContextOrbit(data.brain, data.agent);
+    setProcessingStage("result", "Результат готов");
     updateLivingIntent(
       livingIntent,
       "done",
@@ -1187,6 +1242,7 @@ form.addEventListener("submit", async (event) => {
       loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
     ]);
   } catch (error) {
+    setProcessingStage("result", "Нужно внимание");
     updateLivingIntent(livingIntent, "error", "нужно внимание", error.message || "Не удалось завершить задачу.");
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
