@@ -1,4 +1,4 @@
-const state = { projectId: null, conversationId: null, busy: false };
+const state = { projectId: null, conversationId: null, busy: false, tools: {} };
 
 const el = (id) => document.getElementById(id);
 const messages = el("messages");
@@ -271,8 +271,99 @@ function toolLabel(name) {
   return labels[name] || name;
 }
 
-async function runChatTool(tool) {
-  const args = askToolArguments(tool.name);
+function permissionPreview(request) {
+  const args = request.arguments || {};
+  const lines = [];
+  if (args.path) lines.push("Файл: " + args.path);
+  if (typeof args.content === "string") {
+    const preview = args.content.length > 500 ? args.content.slice(0, 500) + "…" : args.content;
+    lines.push("Содержимое:\n" + preview);
+  }
+  if (request.reason) lines.push("Причина: " + request.reason);
+  return lines.join("\n\n") || "Это действие изменит workspace проекта.";
+}
+
+function addToolResultCard(toolName, result) {
+  const card = addActivityCard("Готово · " + toolLabel(toolName), null, "success");
+  const body = document.createElement("div");
+  body.className = "activity-body structured-result";
+
+  if (toolName === "workspace_list") {
+    const files = result.files || [];
+    if (!files.length) {
+      body.textContent = "Workspace пока пуст.";
+    } else {
+      for (const file of files.slice(0, 40)) {
+        const row = document.createElement("div");
+        row.className = "result-row";
+        row.innerHTML = '<div><strong>' + escapeHtml(file.path) + '</strong><small>' +
+          file.size_bytes + ' байт</small></div>';
+        const read = document.createElement("button");
+        read.type = "button";
+        read.textContent = "Прочитать";
+        read.onclick = () => runChatTool(state.tools.workspace_read, {path: file.path});
+        row.appendChild(read);
+        body.appendChild(row);
+      }
+    }
+  } else if (toolName === "workspace_read") {
+    body.innerHTML = '<div class="result-title">' + escapeHtml(result.path || "Файл") + '</div>';
+    const pre = document.createElement("pre");
+    pre.textContent = result.content || "";
+    body.appendChild(pre);
+    if (result.truncated) {
+      const note = document.createElement("div");
+      note.className = "result-note";
+      note.textContent = "Показана только часть файла.";
+      body.appendChild(note);
+    }
+  } else if (toolName === "project_document_search") {
+    const chunks = result.chunks || [];
+    if (!chunks.length) body.textContent = "Подходящих фрагментов не найдено.";
+    for (const item of chunks.slice(0, 8)) {
+      const source = document.createElement("div");
+      source.className = "source-card";
+      source.innerHTML =
+        '<strong>' + escapeHtml(item.filename) + ' · фрагмент ' + item.chunk_index + '</strong>' +
+        '<p>' + escapeHtml((item.content || "").slice(0, 360)) + '</p>';
+      const ask = document.createElement("button");
+      ask.type = "button";
+      ask.textContent = "Спросить об этом";
+      ask.onclick = () => {
+        input.value = "По источнику " + item.filename + ", фрагмент " + item.chunk_index + ": ";
+        input.focus();
+      };
+      source.appendChild(ask);
+      body.appendChild(source);
+    }
+  } else if (toolName === "project_memory_search") {
+    const facts = result.facts || [];
+    if (!facts.length) body.textContent = "Подтверждённых совпадений в памяти нет.";
+    for (const fact of facts.slice(0, 10)) {
+      const row = document.createElement("div");
+      row.className = "fact-result";
+      row.innerHTML = '<strong>#' + fact.id + '</strong><span>' +
+        escapeHtml(fact.statement) + '</span><small>' + escapeHtml(fact.status || "") + '</small>';
+      body.appendChild(row);
+    }
+  } else if (toolName === "project_status") {
+    const project = result.project || {};
+    body.innerHTML =
+      '<div class="status-grid"><span>Проект</span><strong>' + escapeHtml(project.name || "—") +
+      '</strong><span>Состояние</span><strong>' + escapeHtml(result.status || "—") + '</strong></div>';
+  } else {
+    const pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(result, null, 2);
+    body.appendChild(pre);
+  }
+
+  card.appendChild(body);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+async function runChatTool(tool, providedArgs = null) {
+  if (!tool) return;
+  const args = providedArgs || askToolArguments(tool.name);
   if (args === null) return;
 
   addActivityCard(toolLabel(tool.name), "Запускаю действие…", "working");
@@ -288,7 +379,7 @@ async function runChatTool(tool) {
       const req = result.permission_request;
       addActivityCard(
         "Нужно подтверждение · " + toolLabel(tool.name),
-        req.reason || "Это действие изменит workspace проекта.",
+        permissionPreview(req),
         "warning",
         [
           {
@@ -310,11 +401,7 @@ async function runChatTool(tool) {
       return;
     }
 
-    addActivityCard(
-      "Готово · " + toolLabel(tool.name),
-      result.result,
-      "success"
-    );
+    addToolResultCard(tool.name, result.result);
   } catch (error) {
     addActivityCard(
       "Ошибка · " + toolLabel(tool.name),
@@ -327,6 +414,7 @@ async function runChatTool(tool) {
 async function loadTools() {
   try {
     const data = await api("/api/tools");
+    state.tools = Object.fromEntries(data.tools.map((tool) => [tool.name, tool]));
     chatActionBar.innerHTML = "";
     for (const tool of data.tools) {
       const button = document.createElement("button");
@@ -341,6 +429,20 @@ async function loadTools() {
       button.onclick = () => runChatTool(tool);
       chatActionBar.appendChild(button);
     }
+
+    const selfCheck = document.createElement("button");
+    selfCheck.type = "button";
+    selfCheck.className = "chat-action special";
+    selfCheck.innerHTML = '<span class="chat-action-icon">✓</span><span><strong>Самопроверка</strong><small>фоновая задача</small></span>';
+    selfCheck.onclick = () => runChatBackgroundTask("self_check", "Самопроверка");
+    chatActionBar.appendChild(selfCheck);
+
+    const memoryJob = document.createElement("button");
+    memoryJob.type = "button";
+    memoryJob.className = "chat-action special";
+    memoryJob.innerHTML = '<span class="chat-action-icon">✦</span><span><strong>Консолидация</strong><small>фоновая задача</small></span>';
+    memoryJob.onclick = () => runChatBackgroundTask("memory_consolidation", "Консолидация памяти");
+    chatActionBar.appendChild(memoryJob);
   } catch (error) {
     chatActionBar.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + "</div>";
   }
@@ -410,6 +512,52 @@ async function loadPermissions() {
   }
 }
 
+async function refreshChatTask(taskId, label) {
+  try {
+    const data = await api("/api/projects/" + state.projectId + "/tasks");
+    const task = data.tasks.find((item) => item.id === taskId);
+    if (!task) {
+      addActivityCard(label, "Задача не найдена.", "error");
+      return;
+    }
+    const tone = task.status === "completed" ? "success" :
+      task.status === "failed" ? "error" :
+      task.status === "cancelled" ? "neutral" : "working";
+    addActivityCard(
+      label + " · " + task.status,
+      task.result || ("Задача #" + task.id),
+      tone,
+      (task.status === "queued" || task.status === "running")
+        ? [{label: "Отменить", onClick: () => cancelTask(task.id, true)}]
+        : []
+    );
+  } catch (error) {
+    addActivityCard(label, error.message, "error");
+  }
+}
+
+async function runChatBackgroundTask(taskType, label) {
+  if (!state.projectId) return;
+  try {
+    const data = await api("/api/projects/" + state.projectId + "/tasks", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({task_type: taskType, payload: {}})
+    });
+    const task = data.task;
+    addActivityCard(
+      label + " · запущена",
+      "Задача #" + task.id + " добавлена в очередь.",
+      "working",
+      [{label: "Обновить статус", primary: true, onClick: () => refreshChatTask(task.id, label)},
+       {label: "Отменить", onClick: () => cancelTask(task.id, true)}]
+    );
+    await loadTasks();
+  } catch (error) {
+    addActivityCard(label, error.message, "error");
+  }
+}
+
 async function createBackgroundTask(taskType) {
   if (!state.projectId) return;
   try {
@@ -424,14 +572,16 @@ async function createBackgroundTask(taskType) {
   }
 }
 
-async function cancelTask(taskId) {
+async function cancelTask(taskId, fromChat = false) {
   try {
     await api("/api/projects/" + state.projectId + "/tasks/" + taskId + "/cancel", {
       method: "POST"
     });
+    if (fromChat) addActivityCard("Задача отменена", "Задача #" + taskId, "neutral");
     await loadTasks();
   } catch (error) {
-    showError(error.message);
+    if (fromChat) addActivityCard("Ошибка отмены задачи", error.message, "error");
+    else showError(error.message);
   }
 }
 
