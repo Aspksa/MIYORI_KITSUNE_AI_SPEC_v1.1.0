@@ -1185,3 +1185,259 @@ body.inspector-hidden .inspector { display: none; }
   .nexus-snapshot { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .context-orbit { margin-left: 0; width: 94%; }
 }
+
+
+/* 00.00.11 — Chat Console + Living Intent */
+.app-shell {
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+.chat-area {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+.miyori-console {
+  width: min(900px, calc(100% - 48px));
+  margin: 14px auto 0;
+  border: 1px solid #2b323d;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 0 0, rgba(178,138,200,.08), transparent 22rem),
+    linear-gradient(180deg, rgba(18,22,29,.98), rgba(13,16,22,.98));
+  box-shadow: 0 16px 36px rgba(0,0,0,.18);
+  overflow: hidden;
+}
+.console-header {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 34px minmax(0,1fr) auto 24px;
+  gap: 9px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.console-header:hover { background: rgba(255,255,255,.018); }
+.console-symbol {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #463852;
+  border-radius: 9px;
+  background: #211a26;
+  color: #c9add8;
+}
+.console-title strong {
+  display: block;
+  color: #e1e4e9;
+  font-size: 10px;
+}
+.console-title small {
+  display: block;
+  margin-top: 2px;
+  color: #707a87;
+  font-size: 8px;
+}
+.console-summary {
+  padding: 3px 7px;
+  border: 1px solid #334139;
+  border-radius: 999px;
+  color: #83c79b;
+  background: #101813;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+.console-chevron {
+  color: #707987;
+  font-size: 13px;
+  transition: transform .18s ease;
+}
+.miyori-console.collapsed .console-chevron { transform: rotate(-90deg); }
+.console-body {
+  max-height: 540px;
+  overflow: hidden;
+  border-top: 1px solid #222933;
+  transition: max-height .24s ease, opacity .18s ease;
+  opacity: 1;
+}
+.miyori-console.collapsed .console-body {
+  max-height: 0;
+  opacity: 0;
+  border-top-color: transparent;
+}
+.console-tabs {
+  padding: 9px 10px 8px;
+  border-bottom: 1px solid #202630;
+}
+.console-pages {
+  max-height: 470px;
+  overflow-y: auto;
+  padding: 10px;
+}
+.console-pages .inspector-page.active {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 9px;
+}
+.console-pages [data-page="data"].active,
+.console-pages [data-page="system"].active {
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+.console-pages .module-card {
+  min-width: 0;
+  margin: 0;
+}
+
+.intent-message {
+  justify-content: center;
+  margin: -4px 0 18px;
+}
+.living-intent {
+  width: min(720px, 90%);
+  border: 1px solid #3a3042;
+  border-radius: 15px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(178,138,200,.09), transparent 18rem),
+    #11151c;
+  box-shadow: 0 12px 30px rgba(0,0,0,.16);
+}
+.intent-head {
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr) auto 20px;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.intent-orb {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 9px;
+  background: #211a26;
+  color: #c7a7d7;
+  box-shadow: inset 0 0 0 1px #44364e;
+}
+.intent-title small {
+  display: block;
+  color: #7b6687;
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+}
+.intent-title strong {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e0e3e8;
+  font-size: 10px;
+}
+.intent-state {
+  padding: 3px 7px;
+  border: 1px solid #45404b;
+  border-radius: 999px;
+  color: #aeb5bf;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+.intent-chevron {
+  color: #737c88;
+  transition: transform .18s ease;
+}
+.living-intent.collapsed .intent-chevron { transform: rotate(-90deg); }
+.intent-body {
+  max-height: 190px;
+  padding: 0 11px 11px;
+  border-top: 1px solid #262c36;
+  overflow: hidden;
+  transition: max-height .2s ease, opacity .16s ease, padding .2s ease;
+}
+.living-intent.collapsed .intent-body {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-top-color: transparent;
+}
+.intent-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 7px;
+  padding-top: 10px;
+}
+.intent-step {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #292f39;
+  border-radius: 9px;
+  background: #0e1319;
+  color: #67717e;
+}
+.intent-step i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #464f5a;
+}
+.intent-step span {
+  font-size: 8px;
+  line-height: 1.3;
+}
+.intent-step.active {
+  border-color: #5c4968;
+  color: #d6c2e1;
+  background: #19151e;
+}
+.intent-step.active i {
+  background: #b28ac8;
+  box-shadow: 0 0 9px rgba(178,138,200,.55);
+}
+.intent-step.completed {
+  border-color: #2d4939;
+  color: #8bb59b;
+}
+.intent-step.completed i { background: #72d49b; }
+.intent-meta {
+  margin-top: 8px;
+  color: #626b77;
+  font-size: 8px;
+}
+.living-intent.complete { border-color: #2f4e3c; }
+.living-intent.complete .intent-state {
+  border-color: #31513d;
+  color: #89cba1;
+  background: #101914;
+}
+.living-intent.error { border-color: #613b3e; }
+.living-intent.error .intent-state {
+  border-color: #613b3e;
+  color: #e29494;
+  background: #211416;
+}
+
+@media (max-width: 1120px) {
+  .app-shell { grid-template-columns: 240px minmax(0,1fr); }
+  .console-pages .inspector-page.active,
+  .console-pages [data-page="data"].active,
+  .console-pages [data-page="system"].active {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .miyori-console {
+    width: calc(100% - 20px);
+    margin-top: 10px;
+  }
+  .intent-track { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .living-intent { width: 94%; }
+}
