@@ -1324,6 +1324,7 @@ function openSidebarSection(title, detail, tone = "neutral") {
   messages.scrollTop = messages.scrollHeight;
 }
 
+const menuMiyoriAI = el("menuMiyoriAI");
 const menuMobileApp = el("menuMobileApp");
 const menuAccount = el("menuAccount");
 const menuSettings = el("menuSettings");
@@ -1341,6 +1342,7 @@ const workspaceSubtitle = el("workspaceSubtitle");
 const workspaceEyebrow = el("workspaceEyebrow");
 
 const workspaceMenu = {
+  ai: menuMiyoriAI,
   mobile: menuMobileApp,
   account: menuAccount,
   settings: menuSettings,
@@ -1365,6 +1367,7 @@ function showChatWorkspace() {
   if (messages) messages.hidden = false;
   if (chatComposer) chatComposer.hidden = false;
   if (messages) messages.scrollTop = messages.scrollHeight;
+  setWorkspaceMenuActive("ai");
   input.focus();
 }
 
@@ -1394,167 +1397,247 @@ function shortSha(value) {
 }
 
 async function renderAccountWorkspace() {
-  showWorkspaceShell("account", "Личный кабинет", "Cloud.ru", "Ключи, модель и подключение провайдера.");
+  showWorkspaceShell("account", "Личный кабинет", "Личный кабинет", "Профиль, Cloud.ru, устройства и сессии.");
   try {
-    const data = await api("/api/account/cloudru");
-    const p = data.cloudru;
+    const [profileData, cloudData] = await Promise.all([
+      api("/api/account/profile"),
+      api("/api/account/cloudru")
+    ]);
+    const profile = profileData.profile || {};
+    const cloud = cloudData.cloudru || {};
+    let devices = profileData.devices || [];
+
     workspaceBody.innerHTML =
-      '<section class="workspace-card workspace-card-wide">' +
-        '<div class="workspace-card-head"><div><strong>Cloud.ru Foundation Models</strong>' +
-        '<small>Секрет хранится только локально в .env</small></div>' +
-        '<span class="soft-status ' + (p.configured ? 'ok' : 'warn') + '">' +
-        (p.configured ? 'Настроено' : 'Нужна настройка') + '</span></div>' +
-        '<form id="workspaceCloudForm" class="settings-form workspace-form">' +
-          '<label><span>API-ключ Cloud.ru</span>' +
-          '<input id="workspaceCloudKey" type="password" autocomplete="off" placeholder="Вставьте новый ключ">' +
-          '<small>' + (p.api_key_set ? 'Сохранён: ' + escapeHtml(p.api_key_masked) + ' · пустое поле сохранит текущий ключ' : 'Ключ не сохранён') + '</small></label>' +
-          '<label><span>Model ID</span>' +
-          '<select id="workspaceCloudModel"><option value="">Загружаю модели Cloud.ru…</option></select>' +
-          '<small id="workspaceCloudModelState">Модель выбирается только из GET /models.</small></label>' +
-          '<label><span>Base URL</span><input id="workspaceCloudBase" type="url" value="' +
-          escapeHtml(p.base_url || 'https://foundation-models.api.cloud.ru/v1') + '"></label>' +
-          '<div id="workspaceCloudResult"></div>' +
-          '<div class="sheet-actions"><button id="workspaceCloudReload" class="secondary-sheet-button" type="button">Обновить список моделей</button>' +
-          '<button id="workspaceCloudTest" class="secondary-sheet-button" type="button">Проверить модель</button>' +
-          '<button class="primary-sheet-button" type="submit">Сохранить</button></div>' +
-        '</form>' +
+      '<section class="account-dashboard">' +
+        '<div class="account-hero">' +
+          '<div class="account-avatar-wrap">' +
+            '<div id="accountAvatar" class="account-avatar">' +
+              (profile.avatar_url
+                ? '<img src="' + profile.avatar_url + '?v=' + Date.now() + '" alt="Аватар">'
+                : '<span>' + escapeHtml((profile.owner_name || "A").slice(0,1).toUpperCase()) + '</span>') +
+            '</div>' +
+            '<label class="account-avatar-edit">Изменить<input id="accountAvatarInput" type="file" accept="image/png,image/jpeg,image/webp" hidden></label>' +
+          '</div>' +
+          '<div class="account-hero-copy"><span>Владелец Miyori Kitsune</span><h3 id="accountOwnerTitle">' +
+            escapeHtml(profile.owner_name || "Не указано") + '</h3><p>Обращение: <strong>' +
+            escapeHtml(profile.miyori_address || "Господин") + '</strong></p></div>' +
+          '<div class="account-hero-status"><span class="soft-status ' + (cloud.configured ? 'ok' : 'warn') + '">' +
+            (cloud.configured ? 'Cloud.ru подключён' : 'Cloud.ru не настроен') + '</span></div>' +
+        '</div>' +
+        '<div class="account-stat-grid">' +
+          '<div><span>Основной профиль</span><strong>' + (profile.profile_kind === "work" ? "Рабочий" : "Личный") + '</strong></div>' +
+          '<div><span>Язык</span><strong>' + escapeHtml(profile.language || "ru-RU") + '</strong></div>' +
+          '<div><span>Часовой пояс</span><strong>' + escapeHtml(profile.timezone || "UTC") + '</strong></div>' +
+          '<div><span>Устройства</span><strong id="accountDeviceCount">' + devices.length + '</strong></div>' +
+        '</div>' +
+        '<div class="account-tabs">' +
+          '<button class="account-tab active" data-account-tab="profile" type="button">Профиль</button>' +
+          '<button class="account-tab" data-account-tab="cloud" type="button">Cloud.ru</button>' +
+          '<button class="account-tab" data-account-tab="devices" type="button">Устройства и сессии</button>' +
+        '</div>' +
+        '<div class="account-tab-panels">' +
+          '<section class="account-tab-panel active" data-account-panel="profile">' +
+            '<form id="accountProfileForm" class="account-form-grid">' +
+              '<label><span>Имя владельца</span><input id="accountOwnerName" type="text" value="' + escapeHtml(profile.owner_name || "") + '" placeholder="Aspksa"></label>' +
+              '<label><span>Как Миёри должна обращаться</span><input id="accountAddress" type="text" value="' + escapeHtml(profile.miyori_address || "Господин") + '"></label>' +
+              '<label><span>Язык</span><select id="accountLanguage">' +
+                '<option value="ru-RU"' + ((profile.language || "ru-RU") === "ru-RU" ? " selected" : "") + '>Русский</option>' +
+                '<option value="en-US"' + (profile.language === "en-US" ? " selected" : "") + '>English</option>' +
+              '</select></label>' +
+              '<label><span>Часовой пояс</span><input id="accountTimezone" type="text" value="' + escapeHtml(profile.timezone || "UTC") + '" placeholder="Europe/Moscow"></label>' +
+              '<label><span>Основной профиль</span><select id="accountProfileKind">' +
+                '<option value="personal"' + (profile.profile_kind !== "work" ? " selected" : "") + '>Личный</option>' +
+                '<option value="work"' + (profile.profile_kind === "work" ? " selected" : "") + '>Рабочий</option>' +
+              '</select></label>' +
+              '<div id="accountProfileResult" class="account-form-result"></div>' +
+              '<div class="sheet-actions account-form-actions"><button class="primary-sheet-button" type="submit">Сохранить профиль</button></div>' +
+            '</form>' +
+          '</section>' +
+          '<section class="account-tab-panel" data-account-panel="cloud">' +
+            '<div class="account-cloud-summary">' +
+              '<div><span>Состояние API</span><strong>' + (cloud.configured ? "Настроено" : "Не настроено") + '</strong></div>' +
+              '<div><span>Основная модель</span><strong>' + escapeHtml(cloud.model_id || "Не выбрана") + '</strong></div>' +
+              '<div><span>Предпочтительная</span><strong>DeepSeek V4 Flash</strong></div>' +
+              '<div><span>Расход запросов / токенов</span><strong>API статистики не подключён</strong></div>' +
+            '</div>' +
+            '<form id="accountCloudForm" class="settings-form account-cloud-form">' +
+              '<label><span>API-ключ Cloud.ru</span><input id="accountCloudKey" type="password" autocomplete="off" placeholder="Вставьте новый ключ"><small>' +
+              (cloud.api_key_set ? 'Сохранён: ' + escapeHtml(cloud.api_key_masked) + ' · пустое поле сохранит текущий ключ' : 'Ключ не сохранён') + '</small></label>' +
+              '<label><span>Модель</span><select id="accountCloudModel"><option value="">Загружаю список моделей…</option></select><small id="accountCloudModelState">DeepSeek V4 Flash используется как предпочтительная модель.</small></label>' +
+              '<label><span>Base URL</span><input id="accountCloudBase" type="url" value="' + escapeHtml(cloud.base_url || "https://foundation-models.api.cloud.ru/v1") + '"></label>' +
+              '<div id="accountCloudResult"></div>' +
+              '<div class="sheet-actions"><button id="accountCloudRefresh" class="secondary-sheet-button" type="button">Обновить модели</button><button id="accountCloudTest" class="secondary-sheet-button" type="button">Проверить соединение</button><button class="primary-sheet-button" type="submit">Сохранить Cloud.ru</button></div>' +
+            '</form>' +
+          '</section>' +
+          '<section class="account-tab-panel" data-account-panel="devices">' +
+            '<div class="account-devices-head"><div><strong>Устройства и сессии</strong><small>Текущий компьютер и будущие клиенты Miyori</small></div><span class="soft-status ok">Локальный доступ</span></div>' +
+            '<div id="accountDevicesList" class="account-device-list"></div>' +
+            '<div class="account-mobile-placeholder"><span>▣</span><div><strong>Мобильный клиент</strong><small>Будет подключаться через отдельную привязку устройства.</small></div><span class="soft-status neutral">Позже</span></div>' +
+          '</section>' +
+        '</div>' +
       '</section>';
 
-    const result = el("workspaceCloudResult");
-    const key = el("workspaceCloudKey");
-    const model = el("workspaceCloudModel");
-    const base = el("workspaceCloudBase");
-    const modelState = el("workspaceCloudModelState");
+    const switchTab = (name) => {
+      workspaceBody.querySelectorAll("[data-account-tab]").forEach(button => button.classList.toggle("active", button.dataset.accountTab === name));
+      workspaceBody.querySelectorAll("[data-account-panel]").forEach(panel => panel.classList.toggle("active", panel.dataset.accountPanel === name));
+    };
+    workspaceBody.querySelectorAll("[data-account-tab]").forEach(button => {
+      button.onclick = () => switchTab(button.dataset.accountTab);
+    });
 
-    const populateModels = (catalog, preferred = null) => {
-      const chatModels = catalog.chat_models || [];
-      model.innerHTML = '<option value="">Выберите чат-модель…</option>';
-      for (const item of chatModels) {
-        const option = document.createElement("option");
-        option.value = item.id;
-        option.textContent = (item.name && item.name !== item.id)
-          ? item.name + " — " + item.id
-          : item.id;
-        model.appendChild(option);
-      }
-      const preferredDeepSeek = "deepseek-ai/DeepSeek-V4-Flash";
-      const desired = preferred || p.model_id || preferredDeepSeek;
-      const exists = chatModels.some(item => item.id === desired);
-      const fallbackExists = chatModels.some(item => item.id === preferredDeepSeek);
-      model.value = exists ? desired : (fallbackExists ? preferredDeepSeek : "");
-      if (desired && !exists) {
-        modelState.textContent = fallbackExists
-          ? "Сохранённый ID недействителен. Выбрана DeepSeek V4 Flash."
-          : "Сохранённый ID «" + desired + "» не найден среди доступных чат-моделей. Выберите новый.";
-        result.innerHTML = workspaceResult(
-          fallbackExists
-            ? "Старый Model ID недействителен. DeepSeek V4 Flash выбрана как предпочтительная модель — нажмите «Сохранить»."
-            : "Сохранённый Model ID недействителен для Foundation Models.",
-          "warning"
-        );
-      } else {
-        modelState.textContent = "Доступных чат-моделей: " + chatModels.length + ".";
+    const renderDevices = () => {
+      const list = el("accountDevicesList");
+      list.innerHTML = devices.length ? devices.map(device =>
+        '<div class="account-device-row">' +
+          '<span class="account-device-icon">' + (device.session_kind === "desktop" ? "▣" : "◉") + '</span>' +
+          '<div><strong>' + escapeHtml(device.device_name) + '</strong><small>' +
+          escapeHtml(device.platform) + ' · последняя активность ' + escapeHtml(device.last_seen_at || "—") + '</small></div>' +
+          '<span class="soft-status ' + (device.status === "active" ? "ok" : "neutral") + '">' + (device.status === "active" ? "Активно" : "Отключено") + '</span>' +
+          '<button class="secondary-sheet-button" type="button" data-device-disconnect="' + device.id + '"' + (device.status !== "active" ? " disabled" : "") + '>Отключить</button>' +
+        '</div>'
+      ).join("") : '<div class="workspace-empty">Нет активных устройств.</div>';
+      list.querySelectorAll("[data-device-disconnect]").forEach(button => {
+        button.onclick = async () => {
+          try {
+            const data = await api("/api/account/devices/" + button.dataset.deviceDisconnect + "/disconnect", {method:"POST"});
+            devices = data.devices || [];
+            el("accountDeviceCount").textContent = devices.length;
+            renderDevices();
+          } catch (error) {
+            showError(error.message);
+          }
+        };
+      });
+    };
+    renderDevices();
+
+    el("accountProfileForm").onsubmit = async (event) => {
+      event.preventDefault();
+      const result = el("accountProfileResult");
+      try {
+        const saved = await api("/api/account/profile", {
+          method:"PUT",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            owner_name: el("accountOwnerName").value.trim(),
+            miyori_address: el("accountAddress").value.trim(),
+            language: el("accountLanguage").value,
+            timezone: el("accountTimezone").value.trim(),
+            profile_kind: el("accountProfileKind").value
+          })
+        });
+        el("accountOwnerTitle").textContent = saved.profile.owner_name || "Не указано";
+        result.innerHTML = workspaceResult("Профиль сохранён.", "success");
+      } catch (error) {
+        result.innerHTML = workspaceResult(error.message, "error");
       }
     };
 
-    const loadModels = async () => {
-      model.disabled = true;
-      modelState.textContent = "Загружаю GET /models…";
+    el("accountAvatarInput").onchange = async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const body = new FormData();
+      body.append("file", file);
+      try {
+        const response = await fetch("/api/account/profile/avatar", {method:"POST", body});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.detail || "Не удалось сохранить аватар.");
+        el("accountAvatar").innerHTML = '<img src="' + data.profile.avatar_url + '?v=' + Date.now() + '" alt="Аватар">';
+      } catch (error) {
+        showError(error.message);
+      }
+      event.target.value = "";
+    };
+
+    const cloudModel = el("accountCloudModel");
+    const cloudState = el("accountCloudModelState");
+    const cloudResult = el("accountCloudResult");
+    const cloudKey = el("accountCloudKey");
+    const cloudBase = el("accountCloudBase");
+
+    const populateCloudModels = (catalog, preferred = null) => {
+      const models = catalog.chat_models || [];
+      cloudModel.innerHTML = '<option value="">Выберите чат-модель…</option>';
+      models.forEach(item => {
+        const option = document.createElement("option");
+        option.value = item.id;
+        option.textContent = item.name && item.name !== item.id ? item.name + " — " + item.id : item.id;
+        cloudModel.appendChild(option);
+      });
+      const deepseek = catalog.preferred_model_id || "deepseek-ai/DeepSeek-V4-Flash";
+      const desired = preferred || cloud.model_id || deepseek;
+      const exists = models.some(item => item.id === desired);
+      const deepseekExists = models.some(item => item.id === deepseek);
+      cloudModel.value = exists ? desired : (deepseekExists ? deepseek : "");
+      cloudState.textContent = deepseekExists
+        ? "DeepSeek V4 Flash доступна и является предпочтительной."
+        : "Доступных чат-моделей: " + models.length + ".";
+    };
+
+    const loadCloudModels = async () => {
+      cloudModel.disabled = true;
       try {
         const catalog = await api("/api/account/cloudru/models");
         if (catalog.reason === "key_required") {
-          model.innerHTML = '<option value="">Сначала сохраните API-ключ Cloud.ru</option>';
-          modelState.textContent = "Введите API-ключ и нажмите «Сохранить», затем список моделей загрузится автоматически.";
-          result.innerHTML = workspaceResult("API-ключ Cloud.ru ещё не задан.", "neutral");
+          cloudModel.innerHTML = '<option value="">Сначала сохраните API-ключ</option>';
+          cloudState.textContent = "После сохранения ключа Miyori загрузит доступные модели.";
+          cloudResult.innerHTML = workspaceResult("Cloud.ru ожидает API-ключ.", "neutral");
           return;
         }
-        populateModels(catalog, p.model_id);
-        const preferredDeepSeek = catalog.preferred_model_id || "deepseek-ai/DeepSeek-V4-Flash";
-        const currentValid = !!p.model_id && !!catalog.selected_model_found;
-        if (!currentValid && catalog.preferred_model_available) {
-          model.value = preferredDeepSeek;
-          const saved = await api("/api/account/cloudru", {
-            method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-              api_key: null,
-              model_id: preferredDeepSeek,
-              base_url: base.value.trim()
-            })
-          });
-          p.model_id = saved.cloudru.model_id;
-          modelState.textContent = "DeepSeek V4 Flash выбрана как основная модель.";
-          result.innerHTML = workspaceResult(
-            "DeepSeek V4 Flash сохранена как основная модель Miyori.",
-            "success"
-          );
-          await loadStatus();
-        } else if (!catalog.chat_models?.length) {
-          result.innerHTML = workspaceResult("Cloud.ru не вернул чат-модели для этого ключа.", "warning");
-        }
+        populateCloudModels(catalog, cloud.model_id);
       } catch (error) {
-        model.innerHTML = '<option value="">Список моделей недоступен</option>';
-        modelState.textContent = "Не удалось загрузить модели.";
-        result.innerHTML = workspaceResult(error.message, "error");
+        cloudResult.innerHTML = workspaceResult(error.message, "error");
       } finally {
-        model.disabled = false;
+        cloudModel.disabled = false;
       }
     };
 
-    el("workspaceCloudReload").onclick = loadModels;
-
-    el("workspaceCloudTest").onclick = async () => {
-      result.innerHTML = workspaceResult("Проверяю выбранную модель через реальный chat/completions…", "working");
+    el("accountCloudRefresh").onclick = loadCloudModels;
+    el("accountCloudTest").onclick = async () => {
+      cloudResult.innerHTML = workspaceResult("Проверяю Cloud.ru и выбранную модель…", "working");
       try {
         const checked = await api("/api/account/cloudru/test", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            api_key: key.value.trim() || null,
-            model_id: model.value || null,
-            base_url: base.value.trim() || null
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            api_key: cloudKey.value.trim() || null,
+            model_id: cloudModel.value || null,
+            base_url: cloudBase.value.trim() || null
           })
         });
-        populateModels(checked, checked.selected_model);
-        result.innerHTML = workspaceResult(
-          checked.message || (checked.ok ? "Cloud.ru работает." : "Проверка не пройдена."),
-          checked.ok && checked.chat_ok ? "success" : "warning"
-        );
+        populateCloudModels(checked, checked.selected_model);
+        cloudResult.innerHTML = workspaceResult(checked.message || "Проверка завершена.", checked.ok && checked.chat_ok ? "success" : "warning");
       } catch (error) {
-        result.innerHTML = workspaceResult(error.message, "error");
+        cloudResult.innerHTML = workspaceResult(error.message, "error");
       }
     };
 
-    el("workspaceCloudForm").onsubmit = async (event) => {
+    el("accountCloudForm").onsubmit = async (event) => {
       event.preventDefault();
-      if (!model.value) {
-        result.innerHTML = workspaceResult("Сначала выберите Model ID из списка Cloud.ru.", "warning");
+      if (!cloudModel.value) {
+        cloudResult.innerHTML = workspaceResult("Выберите модель Cloud.ru.", "warning");
         return;
       }
       try {
         const saved = await api("/api/account/cloudru", {
-          method: "PUT",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            api_key: key.value.trim() || null,
-            model_id: model.value,
-            base_url: base.value.trim()
+          method:"PUT",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            api_key: cloudKey.value.trim() || null,
+            model_id: cloudModel.value,
+            base_url: cloudBase.value.trim()
           })
         });
-        result.innerHTML = workspaceResult(
-          saved.cloudru.configured
-            ? "Настройки сохранены. Выбранная модель: " + saved.cloudru.model_id
-            : "Настройки сохранены, но конфигурация неполная.",
-          saved.cloudru.configured ? "success" : "warning"
-        );
-        key.value = "";
+        cloud.model_id = saved.cloudru.model_id;
+        cloudResult.innerHTML = workspaceResult("Cloud.ru сохранён. Модель: " + saved.cloudru.model_id, "success");
+        cloudKey.value = "";
         await loadStatus();
       } catch (error) {
-        result.innerHTML = workspaceResult(error.message, "error");
+        cloudResult.innerHTML = workspaceResult(error.message, "error");
       }
     };
 
-    await loadModels();
+    await loadCloudModels();
   } catch (error) {
     workspaceBody.innerHTML = workspaceResult(error.message, "error");
   }
@@ -2085,6 +2168,7 @@ function renderMobileWorkspace() {
     '</div>';
 }
 
+if (menuMiyoriAI) menuMiyoriAI.onclick = showChatWorkspace;
 if (el("workspaceBackToChat")) el("workspaceBackToChat").onclick = showChatWorkspace;
 if (menuAccount) menuAccount.onclick = renderAccountWorkspace;
 if (menuProjectUpdate) menuProjectUpdate.onclick = () => renderUpdateWorkspace(false);
