@@ -25,6 +25,8 @@ const brainState = el("brainState");
 const toolList = el("toolList");
 const taskList = el("taskList");
 const developmentStats = el("developmentStats");
+const agentTrace = el("agentTrace");
+const agentBudget = el("agentBudget");
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -460,6 +462,15 @@ form.addEventListener("submit", async (event) => {
       brainPlan.innerHTML = data.brain.plan.map(
         (item, index) => "<div>" + (index + 1) + ". " + escapeHtml(item) + "</div>"
       ).join("");
+    }
+    if (data.agent) {
+      agentBudget.textContent = data.agent.steps_used + "/" + data.agent.max_steps;
+      agentTrace.innerHTML = data.agent.actions.map((action) => {
+        const tool = action.tool_name ? escapeHtml(action.tool_name) : "без инструмента";
+        return '<div class="agent-step"><strong>Шаг ' + action.step_index + ' · ' + tool +
+          '</strong><span>' + escapeHtml(action.reason) + '</span><small>' +
+          escapeHtml(action.status) + '</small></div>';
+      }).join("");
     }
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
