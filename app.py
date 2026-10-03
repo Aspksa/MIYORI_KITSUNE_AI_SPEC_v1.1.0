@@ -51,7 +51,7 @@ from miyori.tools import execute_approved_request, execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.08")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.09")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -103,7 +103,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.08",
+        "version": "00.00.09",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -404,6 +404,14 @@ async def send_message(request: ChatRequest) -> dict:
             "memory_items": len(brain.memory),
             "document_items": len(brain.documents),
             "tools_allowed": brain.tools_allowed,
+            "sources": [
+                {
+                    "filename": item.get("filename"),
+                    "chunk_index": item.get("chunk_index"),
+                    "content": item.get("content", "")[:360],
+                }
+                for item in brain.documents
+            ],
         },
         "agent": {
             "run_id": agent.run_id,
