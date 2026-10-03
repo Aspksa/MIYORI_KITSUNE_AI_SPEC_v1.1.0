@@ -19,24 +19,34 @@ from miyori.db import (
     get_project,
     init_db,
     add_document,
+    create_task,
+    development_snapshot,
     list_conversations,
     list_documents,
     list_projects,
     list_memory_facts,
+    list_tasks,
     maybe_capture_user_memory,
     recent_messages,
     replace_memory_fact,
     search_document_chunks,
+    recent_development_checks,
+    request_task_cancel,
     search_verified_memory,
     update_memory_status,
     verified_memory_context,
 )
+from miyori.background import register_background_handlers
+from miyori.brain import build_context
+from miyori.development import run_project_self_check
 from miyori.documents import chunk_text, decode_document, safe_filename, save_original, sha256_bytes
 from miyori.provider import ProviderError, chat
+from miyori.tasks import wake_worker
+from miyori.tools import execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.05")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.06")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -58,9 +68,21 @@ class MemoryReplaceRequest(BaseModel):
     statement: str = Field(min_length=1, max_length=1000)
 
 
+class ToolExecuteRequest(BaseModel):
+    name: str
+    arguments: dict = {}
+
+
+class TaskCreateRequest(BaseModel):
+    task_type: str = Field(pattern="^(self_check|memory_consolidation)$")
+    payload: dict = {}
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    register_background_handlers()
+    wake_worker()
 
 
 @app.get("/")
@@ -72,7 +94,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.05",
+        "version": "00.00.06",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -208,6 +230,73 @@ def document_search(project_id: int, q: str = "") -> dict:
     return {"chunks": search_document_chunks(project_id, q, limit=12)}
 
 
+@app.get("/api/tools")
+def tools_catalog() -> dict:
+    return {"tools": list_tools()}
+
+
+@app.post("/api/projects/{project_id}/tools/execute")
+def tool_execute(project_id: int, request: ToolExecuteRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        return execute_tool(request.name, project_id, request.arguments)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/tasks")
+def tasks_list(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"tasks": list_tasks(project_id)}
+
+
+@app.post("/api/projects/{project_id}/tasks")
+def task_create(project_id: int, request: TaskCreateRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    task = create_task(project_id, request.task_type, request.payload)
+    wake_worker()
+    return {"task": task}
+
+
+@app.post("/api/projects/{project_id}/tasks/{task_id}/cancel")
+def task_cancel(project_id: int, task_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    changed = request_task_cancel(project_id, task_id)
+    if not changed:
+        raise HTTPException(status_code=409, detail="Задачу уже нельзя отменить.")
+    return {"cancel_requested": True}
+
+
+@app.get("/api/projects/{project_id}/development")
+def development(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {
+        "snapshot": development_snapshot(project_id),
+        "checks": recent_development_checks(project_id),
+    }
+
+
+@app.post("/api/projects/{project_id}/development/check")
+def development_check(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    checks = run_project_self_check(project_id)
+    return {
+        "checks": [
+            {"name": c.name, "passed": c.passed, "details": c.details}
+            for c in checks
+        ],
+        "snapshot": development_snapshot(project_id),
+    }
+
+
 @app.post("/api/chat")
 async def send_message(request: ChatRequest) -> dict:
     text = request.message.strip()
@@ -233,13 +322,13 @@ async def send_message(request: ChatRequest) -> dict:
     )
 
     context = recent_messages(conversation_id)
-    memory_context = verified_memory_context(request.project_id, text)
-    document_context = search_document_chunks(request.project_id, text, limit=5)
+    brain = build_context(request.project_id, text)
     try:
         answer = await chat(
             context,
-            memory_context=memory_context,
-            document_context=document_context,
+            memory_context=brain.memory,
+            document_context=brain.documents,
+            brain_plan=brain.plan,
         )
     except ProviderError as exc:
         raise HTTPException(
@@ -255,6 +344,12 @@ async def send_message(request: ChatRequest) -> dict:
         "conversation_id": conversation_id,
         "project_id": request.project_id,
         "answer": answer,
+        "brain": {
+            "plan": brain.plan,
+            "memory_items": len(brain.memory),
+            "document_items": len(brain.documents),
+            "tools_allowed": brain.tools_allowed,
+        },
     }
 
 
