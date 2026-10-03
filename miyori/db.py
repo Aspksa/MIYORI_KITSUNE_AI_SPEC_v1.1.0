@@ -29,6 +29,16 @@ def init_db() -> None:
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS project_modules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                module_key TEXT NOT NULL,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(project_id, module_key),
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER,
@@ -226,14 +236,30 @@ def init_db() -> None:
             ('АО "Примавтодор"',),
         ).fetchone()
         if primavtodor:
+            primavtodor_id = int(primavtodor["id"])
             conn.execute(
                 "UPDATE projects SET kind = 'work' WHERE id = ?",
-                (int(primavtodor["id"]),),
+                (primavtodor_id,),
             )
         else:
-            conn.execute(
+            cur = conn.execute(
                 "INSERT INTO projects(name, kind, created_at) VALUES (?, 'work', ?)",
                 ('АО "Примавтодор"', utc_now()),
+            )
+            primavtodor_id = int(cur.lastrowid)
+
+        for module_key, module_name in (
+            ("timesheet", "Табель"),
+            ("garage", "Гараж"),
+            ("employees", "Сотрудники"),
+        ):
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO project_modules(
+                    project_id, module_key, name, created_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (primavtodor_id, module_key, module_name, utc_now()),
             )
 
         row = conn.execute(
@@ -303,6 +329,27 @@ def get_project(project_id: int) -> dict | None:
             (project_id,),
         ).fetchone()
     return dict(row) if row else None
+
+
+def list_project_modules(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, module_key, name, created_at
+            FROM project_modules
+            WHERE project_id = ?
+            ORDER BY
+                CASE module_key
+                    WHEN 'timesheet' THEN 1
+                    WHEN 'garage' THEN 2
+                    WHEN 'employees' THEN 3
+                    ELSE 99
+                END,
+                name COLLATE NOCASE
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def list_conversations(project_id: int) -> list[dict]:
