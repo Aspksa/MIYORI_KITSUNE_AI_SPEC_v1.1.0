@@ -15,7 +15,7 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.22</span>
+            <span class="version-pill" id="versionText">00.00.23</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
@@ -67,34 +67,7 @@
         </div>
       </section>
 
-      <section class="lavender-panel processing-panel">
-        <div class="panel-title">Этапы обработки</div>
-        <div class="processing-steps" id="processingSteps">
-          <div class="processing-step" data-stage="accepted">
-            <span class="stage-node">1</span>
-            <div><strong>Запрос принят</strong><small>Ожидаю задачу</small></div>
-          </div>
-          <div class="processing-step" data-stage="context">
-            <span class="stage-node">2</span>
-            <div><strong>Сбор контекста</strong><small>Память и документы</small></div>
-          </div>
-          <div class="processing-step" data-stage="work">
-            <span class="stage-node">3</span>
-            <div><strong>Работа</strong><small>Анализ и действия</small></div>
-          </div>
-          <div class="processing-step" data-stage="result">
-            <span class="stage-node">4</span>
-            <div><strong>Результат</strong><small>Ожидает выполнения</small></div>
-          </div>
-        </div>
-      </section>
-
       <nav class="main-side-menu" aria-label="Основное меню">
-        <button class="side-menu-item active" id="menuChat" type="button">
-          <span class="side-menu-icon">◉</span>
-          <span class="side-menu-copy"><strong>Чат с Миёри</strong><small>Основной диалог</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
         <button class="side-menu-item" id="menuMobileApp" type="button">
           <span class="side-menu-icon">▣</span>
           <span class="side-menu-copy"><strong>Мобильное приложение</strong><small>iOS · Android</small></span>
@@ -132,6 +105,29 @@
         </button>
       </nav>
 
+      <section class="lavender-panel processing-panel">
+        <div class="panel-title">Этапы обработки</div>
+        <div class="processing-steps" id="processingSteps">
+          <div class="processing-step" data-stage="accepted">
+            <span class="stage-node">1</span>
+            <div><strong>Запрос принят</strong><small>Ожидаю задачу</small></div>
+          </div>
+          <div class="processing-step" data-stage="context">
+            <span class="stage-node">2</span>
+            <div><strong>Сбор контекста</strong><small>Память и документы</small></div>
+          </div>
+          <div class="processing-step" data-stage="work">
+            <span class="stage-node">3</span>
+            <div><strong>Работа</strong><small>Анализ и действия</small></div>
+          </div>
+          <div class="processing-step" data-stage="result">
+            <span class="stage-node">4</span>
+            <div><strong>Результат</strong><small>Ожидает выполнения</small></div>
+          </div>
+        </div>
+      </section>
+
+
       <details class="workspace-details">
         <summary>Проект и разговоры</summary>
         <section class="project-card compact-project">
@@ -142,7 +138,6 @@
         </section>
         <div class="rail-heading">
           <span>Разговоры</span>
-          <button id="newChatSide" class="ghost-button" type="button">+ Новый</button>
         </div>
         <div id="conversationList" class="conversation-list"></div>
       </details>
@@ -151,12 +146,7 @@
     <main class="chat-area">
       <header class="chat-header" id="chatHeader">
         <div class="chat-title">
-          <span class="section-caption" id="projectLabel">Личная AI-помощница</span>
           <h2 id="conversationTitle">Чат с Миёри</h2>
-        </div>
-        <div class="header-actions">
-          <button id="toggleConsole" class="icon-action" type="button" title="Технические детали Миёри" aria-label="Технические детали Миёри">◎</button>
-          <button id="newChat" class="primary-soft" type="button">Новый разговор</button>
         </div>
       </header>
 
