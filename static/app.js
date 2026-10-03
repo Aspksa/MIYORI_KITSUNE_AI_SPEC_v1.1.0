@@ -91,64 +91,48 @@ function showWelcome() {
   avatar.textContent = "狐";
 
   const bubble = document.createElement("div");
-  bubble.className = "bubble welcome-bubble nexus-card";
+  bubble.className = "bubble welcome-bubble quiet-welcome";
   bubble.innerHTML =
-    '<div class="nexus-top">' +
-      '<div><strong>Миёри</strong><p>Здравствуйте, Господин. Я готова.</p></div>' +
+    '<div class="quiet-welcome-top">' +
+      '<div><strong>Миёри</strong><p>Здравствуйте, Господин. Чем займёмся?</p></div>' +
       '<div class="pulse-mini"><span class="pulse-dot"></span><span id="pulseText">готова</span></div>' +
     '</div>' +
-    '<div class="miyori-pulse" aria-label="Состояние Миёри">' +
-      '<span data-pulse="thinking"><i></i>думаю</span>' +
-      '<span data-pulse="reading"><i></i>читаю</span>' +
-      '<span data-pulse="acting"><i></i>действую</span>' +
-      '<span data-pulse="waiting"><i></i>жду решения</span>' +
-      '<span data-pulse="ready" class="active"><i></i>готова</span>' +
+    '<div id="nexusSuggestions" class="quiet-suggestions">' +
+      '<div class="nexus-loading">Подбираю следующий шаг…</div>' +
     '</div>' +
-    '<div id="nexusSnapshot" class="nexus-snapshot">' +
-      '<div class="nexus-loading">Собираю состояние проекта…</div>' +
-    '</div>' +
-    '<div id="nexusSuggestions" class="nexus-suggestions"></div>' +
-    '<div class="welcome-abilities">' +
-      '<div class="welcome-abilities-head">' +
-        '<span>Способности</span>' +
-        '<small>или просто опишите задачу своими словами</small>' +
-      '</div>' +
-      '<div id="chatActionBar" class="chat-action-bar welcome-action-bar"></div>' +
-    '</div>';
+    '<button id="openInnerWorld" class="inner-world-link" type="button">◎ Внутренний мир Миёри</button>';
 
   article.append(avatar, bubble);
   messages.appendChild(article);
   conversationTitle.textContent = "Новый разговор";
   messages.scrollTop = 0;
   setPulse("ready");
+
+  const openInnerWorld = el("openInnerWorld");
+  if (openInnerWorld) {
+    openInnerWorld.addEventListener("click", () => openConsole("context"));
+  }
 }
+
 
 async function loadNexus() {
   if (!state.projectId) return;
-  const snapshot = el("nexusSnapshot");
   const suggestions = el("nexusSuggestions");
-  if (!snapshot || !suggestions) return;
+  if (!suggestions) return;
 
   try {
     const data = await api("/api/projects/" + state.projectId + "/nexus");
-    const c = data.counts;
-    snapshot.innerHTML =
-      '<div class="nexus-metric"><span>Память</span><strong>' + c.verified_memory + '</strong><small>подтверждено</small></div>' +
-      '<div class="nexus-metric"><span>Документы</span><strong>' + c.documents + '</strong><small>в проекте</small></div>' +
-      '<div class="nexus-metric ' + (c.pending_permissions ? "attention" : "") + '"><span>Решения</span><strong>' +
-      c.pending_permissions + '</strong><small>ожидают вас</small></div>' +
-      '<div class="nexus-metric ' + (c.active_tasks ? "working" : "") + '"><span>Задачи</span><strong>' +
-      c.active_tasks + '</strong><small>активны</small></div>';
-
     suggestions.innerHTML = "";
+
     for (const suggestion of data.suggestions) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "nexus-suggestion";
+      button.className = "quiet-suggestion";
       button.innerHTML =
-        '<span class="nexus-suggestion-mark">↗</span><span><strong>' +
+        '<span class="quiet-suggestion-icon">↗</span><span><strong>' +
         escapeHtml(suggestion.label) + '</strong><small>' +
         escapeHtml(suggestion.detail) + '</small></span>';
+
       button.onclick = () => {
         if (suggestion.kind === "documents") {
           input.value = "Проанализируй материалы текущего проекта и скажи, что важно.";
@@ -163,10 +147,22 @@ async function loadNexus() {
       };
       suggestions.appendChild(button);
     }
+
+    const c = data.counts;
+    const consoleSummary = el("consoleSummary");
+    if (consoleSummary) {
+      const parts = [];
+      if (c.verified_memory) parts.push("память " + c.verified_memory);
+      if (c.documents) parts.push("документы " + c.documents);
+      if (c.active_tasks) parts.push("задачи " + c.active_tasks);
+      if (c.pending_permissions) parts.push("решения " + c.pending_permissions);
+      consoleSummary.textContent = parts.length ? parts.join(" · ") : "готова";
+    }
   } catch (error) {
-    snapshot.innerHTML = '<div class="nexus-loading">' + escapeHtml(error.message) + '</div>';
+    suggestions.innerHTML = '<div class="nexus-loading">' + escapeHtml(error.message) + '</div>';
   }
 }
+
 
 function addContextOrbit(brain, agent) {
   const chips = [];
@@ -208,24 +204,29 @@ function createLivingIntent(goal) {
   card.innerHTML =
     '<button class="intent-head" type="button">' +
       '<span class="intent-orb">◉</span>' +
-      '<span class="intent-title"><small>Living Intent</small><strong>' +
-        escapeHtml(goal.length > 90 ? goal.slice(0, 87) + "…" : goal) +
+      '<span class="intent-title"><small>Текущая задача</small><strong>' +
+        escapeHtml(goal.length > 96 ? goal.slice(0, 93) + "…" : goal) +
       '</strong></span>' +
       '<span class="intent-state">принято</span>' +
       '<span class="intent-chevron">⌄</span>' +
     '</button>' +
     '<div class="intent-body">' +
-      '<div class="intent-track">' +
-        '<div class="intent-step active" data-intent-step="accepted"><i></i><span>Цель принята</span></div>' +
-        '<div class="intent-step" data-intent-step="context"><i></i><span>Собираю контекст</span></div>' +
-        '<div class="intent-step" data-intent-step="actions"><i></i><span>Выполняю действия</span></div>' +
-        '<div class="intent-step" data-intent-step="done"><i></i><span>Результат готов</span></div>' +
+      '<div class="intent-thread">' +
+        '<div class="thread-step active" data-intent-step="accepted"><i></i><span>Цель</span></div>' +
+        '<div class="thread-line"></div>' +
+        '<div class="thread-step" data-intent-step="context"><i></i><span>Контекст</span></div>' +
+        '<div class="thread-line"></div>' +
+        '<div class="thread-step" data-intent-step="actions"><i></i><span>Работа</span></div>' +
+        '<div class="thread-line"></div>' +
+        '<div class="thread-step" data-intent-step="done"><i></i><span>Результат</span></div>' +
       '</div>' +
-      '<div class="intent-meta">Можно свернуть — выполнение продолжится.</div>' +
+      '<div class="intent-detail" data-intent-detail>Миёри приняла задачу.</div>' +
+      '<div class="intent-recovery" data-intent-recovery></div>' +
     '</div>';
 
-  const head = card.querySelector(".intent-head");
-  head.addEventListener("click", () => card.classList.toggle("collapsed"));
+  card.querySelector(".intent-head").addEventListener("click", () => {
+    card.classList.toggle("collapsed");
+  });
 
   article.appendChild(card);
   messages.appendChild(article);
@@ -233,27 +234,63 @@ function createLivingIntent(goal) {
   return card;
 }
 
-function updateLivingIntent(card, phase, label = null) {
+function updateLivingIntent(card, phase, label = null, detail = null) {
   if (!card) return;
   const order = ["accepted", "context", "actions", "done"];
   const current = order.indexOf(phase);
-  card.querySelectorAll(".intent-step").forEach((step) => {
+
+  card.querySelectorAll("[data-intent-step]").forEach((step) => {
     const index = order.indexOf(step.dataset.intentStep);
     step.classList.toggle("active", index === current);
     step.classList.toggle("completed", index < current || phase === "done");
   });
+
   const state = card.querySelector(".intent-state");
   if (state) {
     state.textContent = label || ({
       accepted: "принято",
-      context: "контекст",
-      actions: "действия",
+      context: "собираю контекст",
+      actions: "работаю",
       done: "готово",
-      error: "ошибка"
+      error: "нужно внимание"
     }[phase] || phase);
   }
-  if (phase === "done") card.classList.add("complete");
-  if (phase === "error") card.classList.add("error");
+
+  const detailNode = card.querySelector("[data-intent-detail]");
+  if (detailNode) {
+    detailNode.textContent = detail || ({
+      accepted: "Миёри приняла задачу.",
+      context: "Собираю память, документы и доступные действия.",
+      actions: "Использую доступный контекст и выполняю необходимые шаги.",
+      done: "Результат готов. Детали и использованный контекст находятся ниже.",
+      error: "Не удалось завершить задачу автоматически."
+    }[phase] || "");
+  }
+
+  const recovery = card.querySelector("[data-intent-recovery]");
+  if (recovery) {
+    recovery.innerHTML = "";
+    if (phase === "error") {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = "Попробовать иначе";
+      retry.onclick = () => {
+        input.value = "Попробуй выполнить эту задачу другим способом: " +
+          card.querySelector(".intent-title strong").textContent;
+        input.focus();
+      };
+
+      const inspect = document.createElement("button");
+      inspect.type = "button";
+      inspect.textContent = "Посмотреть состояние";
+      inspect.onclick = () => openConsole("context");
+
+      recovery.append(retry, inspect);
+    }
+  }
+
+  card.classList.toggle("complete", phase === "done");
+  card.classList.toggle("error", phase === "error");
 }
 
 async function api(url, options = {}) {
@@ -1061,7 +1098,7 @@ form.addEventListener("submit", async (event) => {
       loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
     ]);
   } catch (error) {
-    updateLivingIntent(livingIntent, "error", "ошибка");
+    updateLivingIntent(livingIntent, "error", "нужно внимание", error.message || "Не удалось завершить задачу.");
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
   } finally {
