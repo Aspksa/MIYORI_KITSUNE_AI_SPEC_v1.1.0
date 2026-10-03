@@ -28,6 +28,8 @@ const developmentStats = el("developmentStats");
 const agentTrace = el("agentTrace");
 const agentBudget = el("agentBudget");
 const permissionList = el("permissionList");
+const inspector = el("inspector");
+const toggleInspector = el("toggleInspector");
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -197,8 +199,11 @@ async function loadTools() {
     for (const tool of data.tools) {
       const row = document.createElement("div");
       row.className = "tool-item";
-      row.innerHTML = "<strong>" + escapeHtml(tool.name) + "</strong><small>" +
-        escapeHtml(tool.description) + "</small>";
+      const mode = tool.permission === "read" ? "авто" : "с подтверждением";
+      row.innerHTML =
+        "<strong>" + escapeHtml(tool.name) + "</strong>" +
+        "<small>" + escapeHtml(tool.description) + "</small>" +
+        '<div class="tool-meta">' + escapeHtml(mode) + "</div>";
       const button = document.createElement("button");
       button.type = "button";
       button.className = "mini-button";
@@ -490,6 +495,9 @@ function startNewChat() {
   state.conversationId = null;
   showError("");
   showWelcome();
+  brainPlan.innerHTML = '<span class="empty-copy">План появится после запроса.</span>';
+  agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
+  agentBudget.textContent = "0/3";
   loadConversations();
   input.focus();
 }
@@ -612,3 +620,25 @@ async function boot() {
   input.focus();
 }
 boot();
+
+
+function activateInspectorTab(name) {
+  document.querySelectorAll(".inspector-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.tab === name);
+  });
+  document.querySelectorAll(".inspector-page").forEach((page) => {
+    page.classList.toggle("active", page.dataset.page === name);
+  });
+}
+
+document.querySelectorAll(".inspector-tab").forEach((button) => {
+  button.addEventListener("click", () => activateInspectorTab(button.dataset.tab));
+});
+
+if (toggleInspector) {
+  toggleInspector.addEventListener("click", () => {
+    document.body.classList.toggle("inspector-hidden");
+    toggleInspector.textContent = document.body.classList.contains("inspector-hidden") ? "☰" : "☷";
+    input.focus();
+  });
+}
