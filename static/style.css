@@ -301,3 +301,90 @@ textarea:focus {
     max-width: 92%;
   }
 }
+
+select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #343b49;
+  border-radius: 11px;
+  background: #171c24;
+  color: #f5f6f8;
+  outline: none;
+}
+
+.project-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.icon-button {
+  width: 40px;
+  flex: 0 0 40px;
+  border: 1px solid #3b4350;
+  border-radius: 11px;
+  background: #202631;
+  color: #fff;
+  font-size: 20px;
+}
+
+.conversations-panel {
+  padding-bottom: 10px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.text-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #c7abd9;
+  font-size: 12px;
+}
+
+.conversation-list {
+  display: grid;
+  gap: 5px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.conversation-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  text-align: left;
+  background: transparent;
+  color: #cfd4dc;
+}
+
+.conversation-item:hover,
+.conversation-item.active {
+  border-color: #313946;
+  background: #1a2029;
+}
+
+.conversation-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-item small,
+.conversation-empty {
+  color: #727b89;
+  font-size: 11px;
+}
+
+.conversation-empty {
+  padding: 9px 2px;
+}
