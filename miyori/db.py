@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -96,6 +97,39 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 UNIQUE(document_id, chunk_index),
                 FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                task_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('queued','running','completed','failed','cancelled')),
+                cancel_requested INTEGER NOT NULL DEFAULT 0,
+                result_json TEXT,
+                created_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS task_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                details TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS development_checks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                passed INTEGER NOT NULL,
+                details TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
             );
             """
         )
@@ -666,3 +700,231 @@ def search_document_chunks(project_id: int, query: str, limit: int = 6) -> list[
 
     scored.sort(key=lambda item: item[0], reverse=True)
     return [row for _, row in scored[:limit]]
+
+
+
+def create_task(project_id: int, task_type: str, payload: dict) -> dict:
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO tasks(project_id, task_type, payload_json, status, created_at)
+            VALUES (?, ?, ?, 'queued', ?)
+            """,
+            (project_id, task_type, json.dumps(payload, ensure_ascii=False), utc_now()),
+        )
+        row = conn.execute(
+            """
+            SELECT id, project_id, task_type, status, cancel_requested, created_at,
+                   started_at, finished_at
+            FROM tasks WHERE id = ?
+            """,
+            (cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
+
+
+def list_tasks(project_id: int, limit: int = 50) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, task_type, status, cancel_requested, result_json,
+                   created_at, started_at, finished_at
+            FROM tasks
+            WHERE project_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (project_id, limit),
+        ).fetchall()
+
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["cancel_requested"] = bool(item["cancel_requested"])
+        if item.get("result_json"):
+            try:
+                item["result"] = json.loads(item["result_json"])
+            except json.JSONDecodeError:
+                item["result"] = {"raw": item["result_json"]}
+        else:
+            item["result"] = None
+        item.pop("result_json", None)
+        result.append(item)
+    return result
+
+
+def claim_next_task() -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT id, project_id, task_type, payload_json
+            FROM tasks
+            WHERE status = 'queued'
+            ORDER BY id ASC
+            LIMIT 1
+            """
+        ).fetchone()
+        if not row:
+            return None
+
+        updated = conn.execute(
+            """
+            UPDATE tasks
+            SET status = 'running', started_at = ?
+            WHERE id = ? AND status = 'queued'
+            """,
+            (utc_now(), row["id"]),
+        )
+        if updated.rowcount != 1:
+            return None
+
+        return {
+            "id": row["id"],
+            "project_id": row["project_id"],
+            "task_type": row["task_type"],
+            "payload": json.loads(row["payload_json"]),
+        }
+
+
+def request_task_cancel(project_id: int, task_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE tasks
+            SET cancel_requested = 1,
+                status = CASE WHEN status = 'queued' THEN 'cancelled' ELSE status END,
+                finished_at = CASE WHEN status = 'queued' THEN ? ELSE finished_at END
+            WHERE id = ? AND project_id = ? AND status IN ('queued','running')
+            """,
+            (utc_now(), task_id, project_id),
+        )
+        return cur.rowcount == 1
+
+
+def is_task_cancel_requested(task_id: int) -> bool:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT cancel_requested FROM tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+    return bool(row and row["cancel_requested"])
+
+
+def finish_task(task_id: int, status: str, result: dict) -> None:
+    if status not in {"completed", "failed", "cancelled"}:
+        raise ValueError("Недопустимый финальный статус задачи.")
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE tasks
+            SET status = ?, result_json = ?, finished_at = ?
+            WHERE id = ?
+            """,
+            (status, json.dumps(result, ensure_ascii=False), utc_now(), task_id),
+        )
+        conn.execute(
+            """
+            INSERT INTO task_events(task_id, event_type, details, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (task_id, status, json.dumps(result, ensure_ascii=False), utc_now()),
+        )
+
+
+def record_task_event(task_id: int, event_type: str, details: str | None = None) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO task_events(task_id, event_type, details, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (task_id, event_type, details, utc_now()),
+        )
+
+
+def development_snapshot(project_id: int) -> dict:
+    with connect() as conn:
+        verified_facts = conn.execute(
+            "SELECT COUNT(*) AS n FROM memory_facts WHERE project_id = ? AND status = 'verified'",
+            (project_id,),
+        ).fetchone()["n"]
+        documents = conn.execute(
+            "SELECT COUNT(*) AS n FROM documents WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()["n"]
+        document_chunks = conn.execute(
+            """
+            SELECT COUNT(*) AS n
+            FROM document_chunks c
+            JOIN documents d ON d.id = c.document_id
+            WHERE d.project_id = ?
+            """,
+            (project_id,),
+        ).fetchone()["n"]
+        failed_tasks = conn.execute(
+            "SELECT COUNT(*) AS n FROM tasks WHERE project_id = ? AND status = 'failed'",
+            (project_id,),
+        ).fetchone()["n"]
+        completed_tasks = conn.execute(
+            "SELECT COUNT(*) AS n FROM tasks WHERE project_id = ? AND status = 'completed'",
+            (project_id,),
+        ).fetchone()["n"]
+        checks_passed = conn.execute(
+            "SELECT COUNT(*) AS n FROM development_checks WHERE project_id = ? AND passed = 1",
+            (project_id,),
+        ).fetchone()["n"]
+        checks_total = conn.execute(
+            "SELECT COUNT(*) AS n FROM development_checks WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()["n"]
+
+    return {
+        "verified_facts": int(verified_facts),
+        "documents": int(documents),
+        "document_chunks": int(document_chunks),
+        "failed_tasks": int(failed_tasks),
+        "completed_tasks": int(completed_tasks),
+        "checks_passed": int(checks_passed),
+        "checks_total": int(checks_total),
+    }
+
+
+def record_development_check(project_id: int, name: str, passed: bool, details: str) -> dict:
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO development_checks(project_id, name, passed, details, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (project_id, name, int(passed), details, utc_now()),
+        )
+        row = conn.execute(
+            """
+            SELECT id, name, passed, details, created_at
+            FROM development_checks WHERE id = ?
+            """,
+            (cur.lastrowid,),
+        ).fetchone()
+    item = dict(row)
+    item["passed"] = bool(item["passed"])
+    return item
+
+
+def recent_development_checks(project_id: int, limit: int = 30) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, name, passed, details, created_at
+            FROM development_checks
+            WHERE project_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (project_id, limit),
+        ).fetchall()
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["passed"] = bool(item["passed"])
+        result.append(item)
+    return result
