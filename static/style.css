@@ -419,3 +419,19 @@ select {
   color: #dfc38f;
   font-size: 10px;
 }
+
+.documents-panel { padding-bottom: 10px; }
+.upload-label { cursor: pointer; }
+.document-list { display: grid; gap: 6px; max-height: 150px; overflow-y: auto; }
+.document-item {
+  display: grid; gap: 2px; padding: 8px 9px; border: 1px solid #303744;
+  border-radius: 9px; background: #171c24; font-size: 11px;
+}
+.document-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-item small { color: #747d8a; }
+.document-results { display: grid; gap: 7px; margin-top: 8px; max-height: 190px; overflow-y: auto; }
+.document-result {
+  padding: 8px 9px; border: 1px solid #343b49; border-radius: 9px; background: #12171e;
+}
+.document-result strong { display: block; margin-bottom: 4px; color: #c8b1da; font-size: 10px; }
+.document-result p { margin: 0; color: #aeb6c2; font-size: 10px; line-height: 1.4; }
