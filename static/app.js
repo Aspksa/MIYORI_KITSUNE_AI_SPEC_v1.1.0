@@ -22,7 +22,6 @@ const projectLabel = el("projectLabel");
 const conversationTitle = el("conversationTitle");
 const brainPlan = el("brainPlan");
 const brainState = el("brainState");
-const chatActionBar = el("chatActionBar");
 const taskList = el("taskList");
 const developmentStats = el("developmentStats");
 const agentTrace = el("agentTrace");
@@ -30,9 +29,6 @@ const agentBudget = el("agentBudget");
 const permissionList = el("permissionList");
 const inspector = el("inspector");
 const toggleInspector = el("toggleInspector");
-const actionLauncher = el("actionLauncher");
-const openActions = el("openActions");
-const closeActions = el("closeActions");
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -66,8 +62,31 @@ function addMessage(role, text) {
 
 function showWelcome() {
   messages.innerHTML = "";
-  addMessage("assistant", "Здравствуйте, Господин. Я готова. Выберите разговор или начните новый.");
+
+  const article = document.createElement("article");
+  article.className = "message assistant welcome-message";
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = "狐";
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble welcome-bubble";
+  bubble.innerHTML =
+    '<strong>Миёри</strong>' +
+    '<p>Здравствуйте, Господин. Я готова. Выберите разговор или начните новый.</p>' +
+    '<div class="welcome-abilities">' +
+      '<div class="welcome-abilities-head">' +
+        '<span>Что я могу сделать прямо сейчас</span>' +
+        '<small>Нажмите действие или просто напишите задачу своими словами</small>' +
+      '</div>' +
+      '<div id="chatActionBar" class="chat-action-bar welcome-action-bar"></div>' +
+    '</div>';
+
+  article.append(avatar, bubble);
+  messages.appendChild(article);
   conversationTitle.textContent = "Новый разговор";
+  messages.scrollTop = 0;
 }
 
 async function api(url, options = {}) {
@@ -364,17 +383,8 @@ function addToolResultCard(toolName, result) {
   messages.scrollTop = messages.scrollHeight;
 }
 
-function setActionLauncher(open) {
-  if (!actionLauncher) return;
-  actionLauncher.hidden = !open;
-  if (open) {
-    actionLauncher.scrollIntoView({block: "nearest"});
-  }
-}
-
 async function runChatTool(tool, providedArgs = null) {
   if (!tool) return;
-  setActionLauncher(false);
   const args = providedArgs || askToolArguments(tool.name);
   if (args === null) return;
 
@@ -427,6 +437,8 @@ async function loadTools() {
   try {
     const data = await api("/api/tools");
     state.tools = Object.fromEntries(data.tools.map((tool) => [tool.name, tool]));
+    const chatActionBar = el("chatActionBar");
+    if (!chatActionBar) return;
     chatActionBar.innerHTML = "";
     for (const tool of data.tools) {
       const button = document.createElement("button");
@@ -962,27 +974,3 @@ if (toggleInspector) {
 }
 
 
-if (openActions) {
-  openActions.addEventListener("click", () => {
-    setActionLauncher(actionLauncher.hidden);
-  });
-}
-if (closeActions) {
-  closeActions.addEventListener("click", () => setActionLauncher(false));
-}
-
-document.addEventListener("click", (event) => {
-  if (!actionLauncher || actionLauncher.hidden) return;
-  if (actionLauncher.contains(event.target) || openActions?.contains(event.target)) return;
-  setActionLauncher(false);
-});
-
-input.addEventListener("keydown", (event) => {
-  if (event.key === "/" && input.value.trim() === "") {
-    event.preventDefault();
-    setActionLauncher(true);
-  }
-  if (event.key === "Escape") {
-    setActionLauncher(false);
-  }
-});
