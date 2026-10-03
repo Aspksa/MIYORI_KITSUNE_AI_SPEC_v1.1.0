@@ -542,7 +542,7 @@ form.addEventListener("submit", async (event) => {
     }
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
-      loadTools(), loadTasks(), loadDevelopment()
+      loadTools(), loadPermissions(), loadTasks(), loadDevelopment()
     ]);
   } catch (error) {
     showError(error.message || "Не удалось получить ответ.");
@@ -560,7 +560,7 @@ projectSelect.addEventListener("change", async () => {
   showWelcome();
   await Promise.all([
     loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadTasks(), loadDevelopment()
+    loadTools(), loadPermissions(), loadTasks(), loadDevelopment()
   ]);
 });
 
