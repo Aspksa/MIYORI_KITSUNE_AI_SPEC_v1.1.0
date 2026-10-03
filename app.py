@@ -5,7 +5,7 @@ import webbrowser
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -18,21 +18,25 @@ from miyori.db import (
     ensure_conversation,
     get_project,
     init_db,
+    add_document,
     list_conversations,
+    list_documents,
     list_projects,
     list_memory_facts,
     maybe_capture_user_memory,
     recent_messages,
     replace_memory_fact,
+    search_document_chunks,
     search_verified_memory,
     update_memory_status,
     verified_memory_context,
 )
+from miyori.documents import chunk_text, decode_document, safe_filename, save_original, sha256_bytes
 from miyori.provider import ProviderError, chat
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.04")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.05")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -68,7 +72,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.04",
+        "version": "00.00.05",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -153,6 +157,57 @@ def memory_replace(project_id: int, fact_id: int, request: MemoryReplaceRequest)
     return {"fact": fact}
 
 
+@app.get("/api/projects/{project_id}/documents")
+def documents(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"documents": list_documents(project_id)}
+
+
+@app.post("/api/projects/{project_id}/documents")
+async def document_upload(
+    project_id: int,
+    file: UploadFile = File(...),
+) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+
+    filename = safe_filename(file.filename or "document.txt")
+    data = await file.read()
+
+    try:
+        text = decode_document(filename, data)
+        chunks = chunk_text(text)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if not chunks:
+        raise HTTPException(status_code=422, detail="В документе нет текста для усвоения.")
+
+    digest = sha256_bytes(data)
+    stored_path = save_original(project_id, filename, data, digest)
+    document = add_document(
+        project_id=project_id,
+        filename=filename,
+        stored_path=stored_path,
+        mime_type=file.content_type,
+        sha256=digest,
+        size_bytes=len(data),
+        chunks=chunks,
+    )
+    return {
+        "document": document,
+        "chunk_count": len(chunks),
+    }
+
+
+@app.get("/api/projects/{project_id}/documents/search")
+def document_search(project_id: int, q: str = "") -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"chunks": search_document_chunks(project_id, q, limit=12)}
+
+
 @app.post("/api/chat")
 async def send_message(request: ChatRequest) -> dict:
     text = request.message.strip()
@@ -179,8 +234,13 @@ async def send_message(request: ChatRequest) -> dict:
 
     context = recent_messages(conversation_id)
     memory_context = verified_memory_context(request.project_id, text)
+    document_context = search_document_chunks(request.project_id, text, limit=5)
     try:
-        answer = await chat(context, memory_context=memory_context)
+        answer = await chat(
+            context,
+            memory_context=memory_context,
+            document_context=document_context,
+        )
     except ProviderError as exc:
         raise HTTPException(
             status_code=503,
