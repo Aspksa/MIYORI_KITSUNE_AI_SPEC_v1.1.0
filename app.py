@@ -30,6 +30,7 @@ from miyori.db import (
     list_conversations,
     list_document_folders,
     list_documents,
+    list_project_modules,
     list_projects,
     list_memory_facts,
     list_permission_requests,
@@ -89,7 +90,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.26", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.27", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -188,7 +189,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.26",
+        "version": "00.00.27",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -293,6 +294,13 @@ def project_create(request: ProjectCreateRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"project": project}
+
+
+@app.get("/api/projects/{project_id}/modules")
+def project_modules(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"modules": list_project_modules(project_id)}
 
 
 @app.get("/api/projects/{project_id}/conversations")
