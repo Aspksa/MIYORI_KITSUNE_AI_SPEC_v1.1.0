@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import datetime, timezone
 
@@ -350,17 +351,114 @@ def update_memory_status(project_id: int, fact_id: int, status: str) -> dict | N
     return dict(row) if row else None
 
 
-def verified_memory_context(project_id: int, limit: int = 24) -> list[str]:
+def _memory_tokens(text: str) -> set[str]:
+    stop = {
+        "что", "это", "как", "для", "или", "мне", "мой", "моя", "мои",
+        "про", "при", "под", "над", "без", "есть", "был", "была", "будет",
+        "какой", "какая", "какие", "который", "когда", "где", "чем",
+    }
+    return {
+        token
+        for token in re.findall(r"[a-zA-Zа-яА-ЯёЁ0-9_-]{2,}", text.lower())
+        if token not in stop
+    }
+
+
+def search_verified_memory(project_id: int, query: str, limit: int = 8) -> list[dict]:
+    query_tokens = _memory_tokens(query)
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT statement FROM memory_facts
+            SELECT id, statement, observed_at
+            FROM memory_facts
             WHERE project_id = ? AND status = 'verified'
-            ORDER BY id DESC LIMIT ?
+            ORDER BY id DESC
+            LIMIT 200
             """,
-            (project_id, limit),
+            (project_id,),
         ).fetchall()
-    return [row["statement"] for row in reversed(rows)]
+
+    scored = []
+    for recency, row in enumerate(rows):
+        statement_tokens = _memory_tokens(row["statement"])
+        overlap = len(query_tokens & statement_tokens)
+        exact_bonus = 3 if query.strip().lower() in row["statement"].lower() else 0
+        score = overlap * 10 + exact_bonus - min(recency, 50) * 0.02
+        if overlap or exact_bonus:
+            scored.append((score, dict(row)))
+
+    if not scored:
+        return [dict(row) for row in rows[: min(limit, 3)]]
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [row for _, row in scored[:limit]]
+
+
+def verified_memory_context(project_id: int, query: str, limit: int = 8) -> list[str]:
+    return [
+        row["statement"]
+        for row in search_verified_memory(project_id, query, limit=limit)
+    ]
+
+
+def replace_memory_fact(
+    project_id: int,
+    fact_id: int,
+    statement: str,
+    source_kind: str = "user_correction",
+) -> dict:
+    clean = statement.strip()
+    if not clean:
+        raise ValueError("Новый факт пустой.")
+
+    with connect() as conn:
+        old = conn.execute(
+            """
+            SELECT id, status FROM memory_facts
+            WHERE id = ? AND project_id = ?
+            """,
+            (fact_id, project_id),
+        ).fetchone()
+        if not old:
+            raise ValueError("Исходный факт не найден.")
+
+        now = utc_now()
+        conn.execute(
+            """
+            UPDATE memory_facts
+            SET status = 'superseded', valid_until = ?
+            WHERE id = ? AND project_id = ?
+            """,
+            (now, fact_id, project_id),
+        )
+
+        source_cur = conn.execute(
+            """
+            INSERT INTO memory_sources(project_id, kind, locator, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (project_id, source_kind, f"replaces_fact:{fact_id}", now),
+        )
+        source_id = int(source_cur.lastrowid)
+
+        fact_cur = conn.execute(
+            """
+            INSERT INTO memory_facts(
+                project_id, statement, status, source_id,
+                verification_method, observed_at, valid_from, supersedes_fact_id
+            ) VALUES (?, ?, 'verified', ?, 'user_correction', ?, ?, ?)
+            """,
+            (project_id, clean, source_id, now, now, fact_id),
+        )
+        row = conn.execute(
+            """
+            SELECT id, statement, status, confidence, verification_method,
+                   observed_at, valid_from, valid_until, supersedes_fact_id
+            FROM memory_facts WHERE id = ?
+            """,
+            (fact_cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
 
 
 def maybe_capture_user_memory(
