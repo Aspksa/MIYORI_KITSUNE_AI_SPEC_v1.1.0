@@ -1357,10 +1357,14 @@ function setWorkspaceMenuActive(name) {
 }
 
 function showChatWorkspace() {
-  if (workspaceView) workspaceView.hidden = true;
+  if (workspaceView) {
+    workspaceView.hidden = true;
+    workspaceView.style.display = "none";
+  }
   if (chatHeader) chatHeader.hidden = false;
   if (messages) messages.hidden = false;
   if (chatComposer) chatComposer.hidden = false;
+  if (messages) messages.scrollTop = messages.scrollHeight;
   input.focus();
 }
 
@@ -1368,7 +1372,10 @@ function showWorkspaceShell(name, eyebrow, title, subtitle) {
   if (chatHeader) chatHeader.hidden = true;
   if (messages) messages.hidden = true;
   if (chatComposer) chatComposer.hidden = true;
-  if (workspaceView) workspaceView.hidden = false;
+  if (workspaceView) {
+    workspaceView.hidden = false;
+    workspaceView.style.display = "grid";
+  }
   workspaceEyebrow.textContent = eyebrow;
   workspaceTitle.textContent = title;
   workspaceSubtitle.textContent = subtitle;
@@ -1616,28 +1623,184 @@ async function renderUpdateWorkspace(refresh = false) {
 }
 
 async function renderDocumentsWorkspace() {
-  showWorkspaceShell("documents", "Данные Miyori", "Документы / Облако / Miyori", "Файлы и знания текущего проекта.");
+  showWorkspaceShell("documents", "Данные Miyori", "Документы / Облако / Miyori", "Папки, файлы и знания текущего проекта.");
+  workspaceBody.innerHTML =
+    '<section class="workspace-card workspace-card-wide document-hub-card">' +
+      '<div class="workspace-card-head"><div><strong>Документы</strong><small>Создавайте папки и загружайте файлы внутрь них</small></div>' +
+      '<div class="document-hub-actions"><button id="createDocumentFolder" class="secondary-sheet-button" type="button">+ Папка</button>' +
+      '<label class="primary-sheet-button document-upload-button">Загрузить файл<input id="workspaceDocumentUpload" type="file" accept=".txt,.md,.markdown,.json" hidden></label></div></div>' +
+      '<div id="documentFolderBreadcrumb" class="document-breadcrumb"></div>' +
+      '<div id="workspaceFolders" class="document-folder-grid"></div>' +
+      '<div id="workspaceDocs" class="document-file-list"></div>' +
+      '<div id="workspaceDocumentResult"></div>' +
+    '</section>' +
+    '<section class="workspace-card workspace-card-wide"><strong>Miyori</strong><small>Память и RAG проекта</small><div id="workspaceMiyoriState">Загружаю…</div></section>';
+
+  let activeFolderId = null;
+  let folders = [];
+
+  const renderContent = async () => {
+    const resultNode = el("workspaceDocumentResult");
+    try {
+      const [docs, status] = await Promise.all([
+        api("/api/projects/" + state.projectId + "/documents"),
+        api("/api/status")
+      ]);
+      folders = docs.folders || [];
+
+      const folderMap = new Map(folders.map(folder => [folder.id, folder]));
+      const activeFolder = activeFolderId ? folderMap.get(activeFolderId) : null;
+      el("documentFolderBreadcrumb").innerHTML =
+        '<button class="document-breadcrumb-button" type="button" data-folder-root="1">Документы</button>' +
+        (activeFolder ? '<span>›</span><strong>' + escapeHtml(activeFolder.name) + '</strong>' : '');
+
+      const visibleFolders = folders.filter(folder =>
+        activeFolderId === null ? folder.parent_id === null : folder.parent_id === activeFolderId
+      );
+      el("workspaceFolders").innerHTML = visibleFolders.length
+        ? visibleFolders.map(folder =>
+            '<button class="document-folder-card" type="button" data-folder-id="' + folder.id + '">' +
+              '<span class="document-folder-icon">▰</span>' +
+              '<strong>' + escapeHtml(folder.name) + '</strong>' +
+              '<small>' + folder.document_count + ' файл(ов)</small>' +
+            '</button>'
+          ).join("")
+        : '';
+
+      const visibleDocs = (docs.documents || []).filter(document =>
+        activeFolderId === null ? document.folder_id === null : document.folder_id === activeFolderId
+      );
+      el("workspaceDocs").innerHTML = visibleDocs.length
+        ? visibleDocs.map(document =>
+            '<div class="document-file-row">' +
+              '<span class="document-file-icon">▤</span><div><strong>' + escapeHtml(document.filename) + '</strong>' +
+              '<small>' + document.size_bytes + ' байт · ' + document.chunk_count + ' фрагм.</small></div>' +
+            '</div>'
+          ).join("")
+        : '<div class="workspace-empty">В этой папке файлов пока нет.</div>';
+
+      el("workspaceMiyoriState").innerHTML = workspaceResult(
+        "RAG: " + (status.rag?.fts5 ? "Hybrid FTS5" : "Lexical fallback") +
+        " · chunks " + (status.rag?.indexed_chunks || 0),
+        "neutral"
+      );
+
+      workspaceBody.querySelectorAll("[data-folder-id]").forEach(button => {
+        button.onclick = async () => {
+          activeFolderId = Number(button.dataset.folderId);
+          await renderContent();
+        };
+      });
+      const rootButton = workspaceBody.querySelector("[data-folder-root]");
+      if (rootButton) {
+        rootButton.onclick = async () => {
+          activeFolderId = null;
+          await renderContent();
+        };
+      }
+      if (resultNode && !resultNode.innerHTML) resultNode.innerHTML = "";
+    } catch (error) {
+      if (resultNode) resultNode.innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  el("createDocumentFolder").onclick = async () => {
+    const name = prompt("Название новой папки:");
+    if (!name || !name.trim()) return;
+    const resultNode = el("workspaceDocumentResult");
+    try {
+      await api("/api/projects/" + state.projectId + "/document-folders", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name: name.trim(), parent_id: activeFolderId})
+      });
+      resultNode.innerHTML = workspaceResult("Папка создана.", "success");
+      await renderContent();
+    } catch (error) {
+      resultNode.innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  el("workspaceDocumentUpload").onchange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const resultNode = el("workspaceDocumentResult");
+    resultNode.innerHTML = workspaceResult("Загружаю «" + file.name + "»…", "working");
+    const body = new FormData();
+    body.append("file", file);
+    if (activeFolderId !== null) body.append("folder_id", String(activeFolderId));
+    try {
+      const response = await fetch("/api/projects/" + state.projectId + "/documents", {
+        method: "POST",
+        body
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const detail = data?.detail || "Не удалось загрузить документ.";
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      resultNode.innerHTML = workspaceResult("Файл загружен и добавлен в RAG.", "success");
+      event.target.value = "";
+      await renderContent();
+    } catch (error) {
+      resultNode.innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  await renderContent();
+}
+
+async function renderProjectModule(project) {
+  state.projectId = Number(project.id);
+  projectSelect.value = String(state.projectId);
+  updateProjectLabel();
+  showWorkspaceShell(
+    project.kind === "work" ? "work" : "home",
+    project.kind === "work" ? "Рабочий модуль" : "Домашний модуль",
+    project.name,
+    "Отдельное пространство проекта Miyori."
+  );
+
   workspaceBody.innerHTML =
     '<div class="workspace-grid">' +
-      '<section class="workspace-card workspace-card-wide"><strong>Документы</strong><small>Материалы текущего проекта</small><div id="workspaceDocs">Загружаю…</div></section>' +
-      '<section class="workspace-card workspace-card-wide"><strong>Miyori</strong><small>Память и RAG проекта</small><div id="workspaceMiyoriState">Загружаю…</div></section>' +
+      '<section class="workspace-card"><strong>Документы</strong><small>Материалы проекта</small><div id="projectModuleDocs">Загружаю…</div></section>' +
+      '<section class="workspace-card"><strong>Память</strong><small>Факты проекта</small><div id="projectModuleMemory">Загружаю…</div></section>' +
+      '<section class="workspace-card"><strong>Задачи</strong><small>Фоновые процессы</small><div id="projectModuleTasks">Загружаю…</div></section>' +
+      '<section class="workspace-card workspace-card-wide"><div class="sheet-actions">' +
+        '<button id="projectModuleDocuments" class="secondary-sheet-button" type="button">Документы проекта</button>' +
+        '<button id="projectModuleChat" class="primary-sheet-button" type="button">Открыть чат проекта</button>' +
+      '</div></section>' +
     '</div>';
+
   try {
-    const [docs, status] = await Promise.all([
-      api("/api/projects/" + state.projectId + "/documents"),
-      api("/api/status")
+    const [docs, memory, tasks] = await Promise.all([
+      api("/api/projects/" + project.id + "/documents"),
+      api("/api/projects/" + project.id + "/memory"),
+      api("/api/projects/" + project.id + "/tasks")
     ]);
-    el("workspaceDocs").innerHTML = docs.documents.length
-      ? docs.documents.map(d => '<div class="workspace-list-row"><strong>' + escapeHtml(d.filename) + '</strong><small>' + d.size_bytes + ' байт</small></div>').join("")
-      : '<div class="workspace-empty">Документов пока нет.</div>';
-    el("workspaceMiyoriState").innerHTML = workspaceResult(
-      "RAG: " + (status.rag?.fts5 ? "Hybrid FTS5" : "Lexical fallback") +
-      " · chunks " + (status.rag?.indexed_chunks || 0),
+    el("projectModuleDocs").innerHTML = workspaceResult(
+      (docs.documents || []).length + " файл(ов) · " + (docs.folders || []).length + " папок",
+      "neutral"
+    );
+    el("projectModuleMemory").innerHTML = workspaceResult(
+      (memory.facts || []).length + " фактов",
+      "neutral"
+    );
+    el("projectModuleTasks").innerHTML = workspaceResult(
+      (tasks.tasks || []).length + " задач",
       "neutral"
     );
   } catch (error) {
-    workspaceBody.innerHTML = workspaceResult(error.message, "error");
+    workspaceBody.insertAdjacentHTML("beforeend", workspaceResult(error.message, "error"));
   }
+
+  el("projectModuleDocuments").onclick = renderDocumentsWorkspace;
+  el("projectModuleChat").onclick = async () => {
+    state.conversationId = null;
+    showChatWorkspace();
+    showWelcome();
+    await Promise.all([loadConversations(), loadMemory(), loadDocuments(), loadNexus()]);
+  };
 }
 
 async function renderProjectsWorkspace(kind) {
@@ -1646,27 +1809,30 @@ async function renderProjectsWorkspace(kind) {
     kind,
     "Проекты",
     isWork ? "Рабочие проекты" : "Домашние проекты",
-    isWork ? "Рабочие пространства Miyori без чата." : "Личные и домашние пространства Miyori без чата."
+    isWork ? "Рабочие пространства Miyori." : "Личные и домашние пространства Miyori."
   );
   try {
     const data = await api("/api/projects");
+    const projects = (data.projects || []).filter(project => (project.kind || "home") === kind);
     workspaceBody.innerHTML =
       '<section class="workspace-card workspace-card-wide"><div class="workspace-project-grid">' +
-      data.projects.map(project =>
-        '<button class="workspace-project-card" type="button" data-project-id="' + project.id + '">' +
+      projects.map(project =>
+        '<button class="workspace-project-card ' +
+        (project.name === 'АО "Примавтодор"' ? 'primavtodor-project-card' : '') +
+        '" type="button" data-project-id="' + project.id + '">' +
           '<span class="workspace-project-icon">' + (isWork ? '▰' : '⌂') + '</span>' +
-          '<strong>' + escapeHtml(project.name) + '</strong><small>Проект #' + project.id + '</small>' +
+          '<strong>' + escapeHtml(project.name) + '</strong>' +
+          '<small>' + (project.name === 'АО "Примавтодор"' ? 'Отдельный рабочий модуль' : 'Проект #' + project.id) + '</small>' +
         '</button>'
       ).join("") +
-      '</div><div class="sheet-note">Сейчас проекты ещё не имеют постоянной категории «рабочий/домашний», поэтому список общий. Экран и навигация уже разделены.</div></section>';
+      '</div>' +
+      (!projects.length ? '<div class="workspace-empty">Проектов в этом разделе пока нет.</div>' : '') +
+      '</section>';
+
     workspaceBody.querySelectorAll("[data-project-id]").forEach(button => {
-      button.onclick = async () => {
-        state.projectId = Number(button.dataset.projectId);
-        projectSelect.value = String(state.projectId);
-        updateProjectLabel();
-        showChatWorkspace();
-        startNewChat();
-        await Promise.all([loadConversations(), loadMemory(), loadDocuments(), loadNexus()]);
+      button.onclick = () => {
+        const project = projects.find(item => item.id === Number(button.dataset.projectId));
+        if (project) renderProjectModule(project);
       };
     });
   } catch (error) {
