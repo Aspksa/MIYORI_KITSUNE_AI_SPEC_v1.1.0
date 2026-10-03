@@ -15,7 +15,7 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.18</span>
+            <span class="version-pill" id="versionText">00.00.19</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
@@ -260,6 +260,76 @@
     </main>
 
 
+  </div>
+
+
+  <div id="accountOverlay" class="settings-overlay" hidden>
+    <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+      <header class="settings-sheet-head">
+        <div>
+          <span class="section-caption">Личный кабинет</span>
+          <h3 id="accountTitle">Cloud.ru</h3>
+        </div>
+        <button id="closeAccountPanel" class="sheet-close" type="button" aria-label="Закрыть">×</button>
+      </header>
+      <div class="settings-sheet-body">
+        <div class="sheet-note">
+          Ключ хранится локально в <code>.env</code> и не отправляется в GitHub. В интерфейс возвращается только маска.
+        </div>
+        <form id="cloudruForm" class="settings-form">
+          <label>
+            <span>API-ключ Cloud.ru</span>
+            <input id="cloudruApiKey" type="password" autocomplete="off" placeholder="Вставьте новый ключ">
+            <small id="cloudruKeyState">Ключ ещё не загружен</small>
+          </label>
+          <label>
+            <span>Model ID</span>
+            <input id="cloudruModelId" type="text" autocomplete="off" placeholder="ID модели Cloud.ru">
+          </label>
+          <label>
+            <span>Base URL</span>
+            <input id="cloudruBaseUrl" type="url" autocomplete="off" value="https://foundation-models.api.cloud.ru/v1">
+          </label>
+          <div id="cloudruResult" class="sheet-result" hidden></div>
+          <div class="sheet-actions">
+            <button id="testCloudru" class="secondary-sheet-button" type="button">Проверить Cloud.ru</button>
+            <button class="primary-sheet-button" type="submit">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div id="updateOverlay" class="settings-overlay" hidden>
+    <section class="settings-sheet update-sheet" role="dialog" aria-modal="true" aria-labelledby="updateTitle">
+      <header class="settings-sheet-head">
+        <div>
+          <span class="section-caption">Система</span>
+          <h3 id="updateTitle">Обновление проекта</h3>
+        </div>
+        <button id="closeUpdatePanel" class="sheet-close" type="button" aria-label="Закрыть">×</button>
+      </header>
+      <div class="settings-sheet-body">
+        <div class="repository-card">
+          <strong>Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0</strong>
+          <small>github.com · ветка main · fast-forward only</small>
+        </div>
+        <div id="updateStatusGrid" class="update-status-grid">
+          <div><span>Локальная версия</span><strong id="updateLocalSha">—</strong></div>
+          <div><span>GitHub версия</span><strong id="updateRemoteSha">—</strong></div>
+          <div><span>Рабочая копия</span><strong id="updateWorktree">—</strong></div>
+          <div><span>Автообновление</span><strong id="updateAutoState">—</strong></div>
+        </div>
+        <div id="updateResult" class="sheet-result" hidden></div>
+        <div class="sheet-note">
+          Автообновление применяется только если origin совпадает с доверенным репозиторием, активна ветка <code>main</code>, нет локальных изменений и обновление можно выполнить без merge-коммита.
+        </div>
+        <div class="sheet-actions">
+          <button id="checkProjectUpdate" class="secondary-sheet-button" type="button">Проверить GitHub</button>
+          <button id="applyProjectUpdate" class="primary-sheet-button" type="button">Обновить сейчас</button>
+        </div>
+      </div>
+    </section>
   </div>
 
   <script src="/static/app.js"></script>
