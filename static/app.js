@@ -1375,6 +1375,53 @@ el("runDevelopmentCheck").addEventListener("click", runDevelopmentCheck);
 el("newChat").addEventListener("click", startNewChat);
 el("newChatSide").addEventListener("click", startNewChat);
 
+function openSidebarSection(title, detail, tone = "neutral") {
+  addActivityCard(title, detail, tone);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+const menuMobileApp = el("menuMobileApp");
+const menuAccount = el("menuAccount");
+const menuSettings = el("menuSettings");
+const menuProjectUpdate = el("menuProjectUpdate");
+
+if (menuMobileApp) {
+  menuMobileApp.addEventListener("click", () => {
+    openSidebarSection(
+      "Мобильное приложение",
+      "Раздел подготовлен в навигации. Здесь позже появятся подключение устройства, QR-привязка, push-уведомления и мобильный клиент Miyori.",
+      "neutral"
+    );
+  });
+}
+
+if (menuAccount) {
+  menuAccount.addEventListener("click", () => {
+    openSidebarSection(
+      "Личный кабинет",
+      "Раздел подготовлен в навигации. Здесь позже будут профиль, устройства, сессии, доступы и персональные параметры.",
+      "neutral"
+    );
+  });
+}
+
+if (menuSettings) {
+  menuSettings.addEventListener("click", () => {
+    openConsole("system");
+  });
+}
+
+if (menuProjectUpdate) {
+  menuProjectUpdate.addEventListener("click", () => {
+    openSidebarSection(
+      "Обновление проекта",
+      "Текущая версия Miyori: " + (versionText?.textContent || "неизвестна") +
+      ". Автоматическое обновление пока не подключено; раздел готов для будущего updater-модуля.",
+      "neutral"
+    );
+  });
+}
+
 async function boot() {
   showWelcome();
   await loadStatus();
