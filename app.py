@@ -20,13 +20,17 @@ from miyori.db import (
     init_db,
     list_conversations,
     list_projects,
+    list_memory_facts,
+    maybe_capture_user_memory,
     recent_messages,
+    update_memory_status,
+    verified_memory_context,
 )
 from miyori.provider import ProviderError, chat
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.02")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.03")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -38,6 +42,10 @@ class ChatRequest(BaseModel):
 
 class ProjectCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+
+
+class MemoryStatusRequest(BaseModel):
+    status: str = Field(pattern="^(candidate|verified|disputed|superseded)$")
 
 
 @app.on_event("startup")
@@ -54,7 +62,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.02",
+        "version": "00.00.03",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -101,6 +109,26 @@ def conversation(project_id: int, conversation_id: int) -> dict:
     }
 
 
+@app.get("/api/projects/{project_id}/memory")
+def memory(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"facts": list_memory_facts(project_id)}
+
+
+@app.patch("/api/projects/{project_id}/memory/{fact_id}")
+def memory_status(project_id: int, fact_id: int, request: MemoryStatusRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        fact = update_memory_status(project_id, fact_id, request.status)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not fact:
+        raise HTTPException(status_code=404, detail="Факт не найден.")
+    return {"fact": fact}
+
+
 @app.post("/api/chat")
 async def send_message(request: ChatRequest) -> dict:
     text = request.message.strip()
@@ -117,11 +145,18 @@ async def send_message(request: ChatRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    add_message(conversation_id, "user", text)
+    user_message_id = add_message(conversation_id, "user", text)
+    maybe_capture_user_memory(
+        request.project_id,
+        conversation_id,
+        user_message_id,
+        text,
+    )
 
     context = recent_messages(conversation_id)
+    memory_context = verified_memory_context(request.project_id)
     try:
-        answer = await chat(context)
+        answer = await chat(context, memory_context=memory_context)
     except ProviderError as exc:
         raise HTTPException(
             status_code=503,
