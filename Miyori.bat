@@ -51,6 +51,9 @@ if not exist "runtime\python.exe" goto :fail
 set "RUN_PYTHON=%CD%\runtime\python.exe"
 
 :python_ready
+echo [update] Checking trusted GitHub updates...
+"%RUN_PYTHON%" -m miyori.updater --auto
+echo.
 echo [2/3] Checking dependencies...
 "%RUN_PYTHON%" -m pip install --disable-pip-version-check -q -r requirements.txt
 if errorlevel 1 goto :fail
