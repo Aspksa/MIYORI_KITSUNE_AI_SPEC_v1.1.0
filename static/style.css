@@ -4559,3 +4559,323 @@ html[data-theme="dark"] span {
 @media (max-width:560px) {
   .business-form { grid-template-columns:1fr; }
 }
+
+
+/* 00.00.34 — full web UI audit baseline */
+html {
+  font-size: 16px;
+}
+body {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Readable global controls */
+button,
+input,
+select,
+textarea {
+  font-size: 14px;
+}
+button {
+  min-height: 40px;
+}
+input,
+select {
+  min-height: 42px;
+}
+textarea {
+  font-size: 15px;
+  line-height: 1.5;
+}
+small {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Sidebar */
+.side-menu-copy strong {
+  font-size: 13px;
+}
+.side-menu-copy small {
+  font-size: 11px;
+}
+.side-menu-item {
+  min-height: 48px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.module-version-badge {
+  font-size: 10px;
+  padding: 3px 7px;
+}
+.system-status-launcher strong {
+  font-size: 13px;
+}
+.system-status-launcher small {
+  font-size: 11px;
+}
+
+/* Chat: narrower and easier to read */
+.chat-header {
+  min-height: 68px;
+  padding-left: max(20px, calc((100% - 760px) / 2));
+  padding-right: max(20px, calc((100% - 760px) / 2));
+}
+.chat-title h2 {
+  max-width: 100%;
+  font-size: 20px;
+}
+.messages {
+  padding: 28px max(20px, calc((100% - 720px) / 2)) 110px;
+}
+.message {
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.avatar {
+  width: 38px;
+  height: 38px;
+  font-size: 13px;
+}
+.bubble {
+  max-width: min(620px, 88%);
+  padding: 14px 16px;
+  line-height: 1.6;
+}
+.bubble strong {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.bubble p {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.composer-wrap {
+  padding: 10px max(20px, calc((100% - 720px) / 2)) 18px;
+}
+.composer {
+  border-radius: 16px;
+  padding: 7px;
+}
+.composer textarea {
+  min-height: 46px;
+  padding: 11px 12px 6px;
+  font-size: 15px;
+}
+.composer-hint {
+  padding: 0 12px 6px;
+  font-size: 11px;
+}
+.send-button {
+  width: 46px;
+  height: 46px;
+  flex-basis: 46px;
+}
+
+/* Workspaces and forms */
+.workspace-page-body {
+  padding: 22px;
+}
+.workspace-page-header h2,
+.workspace-page-header h3,
+.workspace-title h2 {
+  font-size: 22px;
+}
+.workspace-loading,
+.workspace-empty {
+  font-size: 13px;
+}
+.workspace-card {
+  padding: 18px;
+}
+.workspace-card > strong,
+.workspace-card-head strong {
+  font-size: 15px;
+}
+.workspace-card > small,
+.workspace-card-head small,
+.workspace-card p,
+.workspace-list-row strong,
+.workspace-list-row small {
+  font-size: 12px;
+}
+.workspace-project-card strong {
+  font-size: 14px;
+}
+.workspace-project-card small {
+  font-size: 11px;
+}
+.workspace-card-wide {
+  width: min(980px, 100%);
+}
+.workspace-grid {
+  gap: 16px;
+}
+
+/* All major form systems */
+.settings-form label > span,
+.account-form-grid label > span,
+.ai-settings-card label > span,
+.employee-form label span,
+.business-form label span,
+.home-module-form label span,
+.settings-field-grid label > span,
+.settings-number-row > span {
+  font-size: 12px;
+}
+.settings-form input,
+.settings-form select,
+.account-form-grid input,
+.account-form-grid select,
+.ai-settings-card select,
+.employee-form input,
+.business-form input,
+.home-module-form input,
+.settings-field-grid select,
+.settings-number-row input {
+  font-size: 14px;
+}
+.primary-sheet-button,
+.secondary-sheet-button {
+  min-height: 42px;
+  font-size: 13px;
+}
+.sheet-note,
+.sheet-result {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Drive */
+.drive-nav-item strong,
+.drive-storage-card strong,
+.drive-tile-copy strong,
+.drive-file-copy strong,
+.drive-knowledge-card strong {
+  font-size: 13px;
+}
+.drive-nav-item small,
+.drive-storage-card span,
+.drive-storage-card small,
+.drive-tile-copy small,
+.drive-file-copy small,
+.drive-knowledge-card small {
+  font-size: 11px;
+}
+.drive-search input {
+  font-size: 13px;
+}
+.drive-section-title strong {
+  font-size: 15px;
+}
+.drive-section-title span {
+  font-size: 11px;
+}
+
+/* Data tables */
+.employee-table th,
+.employee-table td {
+  font-size: 12px;
+  padding: 11px 12px;
+}
+.employee-row-actions button,
+.business-list-row button,
+.home-module-row button {
+  font-size: 12px;
+}
+
+/* Home modules */
+.home-module-card {
+  width: min(1000px, 100%);
+}
+.home-module-form {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.home-module-form label {
+  display: grid;
+  gap: 6px;
+}
+.home-module-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+.home-module-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.home-module-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e5dfed;
+  border-radius: 12px;
+  background: #fcfbff;
+}
+.home-module-row strong {
+  display: block;
+  font-size: 13px;
+}
+.home-module-row small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+}
+.home-module-row button {
+  border: 0;
+  background: transparent;
+  color: #7256bb;
+  font-weight: 750;
+}
+.home-module-row button.danger {
+  color: #b85e5e;
+}
+
+/* Hide dead legacy processing styles if a cached template survives */
+.chat-process-status,
+.processing-panel {
+  display: none !important;
+}
+
+/* Responsive audit */
+@media (max-width: 1100px) {
+  .workspace-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
+@media (max-width: 760px) {
+  .messages {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .composer-wrap {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .bubble {
+    max-width: calc(100% - 48px);
+  }
+  .workspace-page-body {
+    padding: 14px;
+  }
+  .workspace-grid,
+  .home-module-form {
+    grid-template-columns: 1fr;
+  }
+  .workspace-card-wide {
+    width: 100%;
+  }
+  .side-menu-copy strong {
+    font-size: 12px;
+  }
+  .side-menu-copy small {
+    font-size: 10px;
+  }
+}
