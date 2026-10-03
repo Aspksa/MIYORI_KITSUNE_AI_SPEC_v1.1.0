@@ -53,42 +53,10 @@ function showError(text) {
   errorBox.hidden = !text;
 }
 
-let processingHideTimer = null;
-
-function setProcessingStage(stage, detail = null) {
-  const box = el("chatProcessStatus");
-  const title = el("chatProcessTitle");
-  const detailNode = el("chatProcessDetail");
-  if (!box || !title || !detailNode) return;
-
-  const labels = {
-    typing: ["Пишет текст", "Подготовка запроса"],
-    accepted: ["Запрос принят", "Запрос получен"],
-    context: ["Сбор контекста", "Память, документы и RAG"],
-    work: ["Работа", "Миёри формирует ответ"],
-    result: ["Результат", "Ответ готов"]
-  };
-  const order = ["typing", "accepted", "context", "work", "result"];
-  if (!order.includes(stage)) {
-    box.hidden = true;
-    return;
-  }
-
-  clearTimeout(processingHideTimer);
-  box.hidden = false;
-  title.textContent = labels[stage][0];
-  detailNode.textContent = detail || labels[stage][1];
-  const current = order.indexOf(stage);
-  box.querySelectorAll("[data-chat-stage]").forEach(node => {
-    const index = order.indexOf(node.dataset.chatStage);
-    node.classList.toggle("active", index === current);
-    node.classList.toggle("completed", index < current);
-  });
-
-  if (stage === "result") {
-    processingHideTimer = setTimeout(() => { box.hidden = true; }, 1000);
-  }
+function setProcessingStage(_stage, _detail = null) {
+  // Processing stages remain internal; no visual timeline is rendered in chat.
 }
+
 
 function setPulse(mode, label) {
   state.pulse = mode;
@@ -1328,10 +1296,6 @@ el("addProject").addEventListener("click", async () => {
 input.addEventListener("input", () => {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 180) + "px";
-  if (!state.busy) {
-    if (input.value.trim()) setProcessingStage("typing", "Подготовка запроса");
-    else setProcessingStage("idle");
-  }
 });
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
@@ -2407,6 +2371,113 @@ async function renderPrimavtodorBusinessModule(project, module) {
 }
 
 
+async function renderHomeModule(project, module) {
+  const isNetwork = module.module_key === "home_network";
+  const endpoint = isNetwork ? "home-devices" : "parental-controls";
+  const title = isNetwork ? "Домашняя сеть" : "Детский контроль Miyori";
+  const subtitle = isNetwork
+    ? "Устройства домашней сети и их состояние."
+    : "Прозрачные правила использования подключённого телефона ребёнка.";
+
+  showWorkspaceShell("home", "Домашний модуль", title, subtitle);
+
+  const fields = isNetwork ? [
+    ["name","Название устройства","text"],
+    ["device_type","Тип","text"],
+    ["address","IP / адрес","text"],
+    ["status","Статус","text"],
+    ["notes","Заметка","text"]
+  ] : [
+    ["child_name","Имя ребёнка","text"],
+    ["device_name","Телефон / устройство","text"],
+    ["daily_limit_minutes","Лимит в день, минут","number"],
+    ["bedtime_start","Начало ночного режима","time"],
+    ["bedtime_end","Конец ночного режима","time"],
+    ["blocked_categories","Ограниченные категории","text"],
+    ["status","Статус","text"]
+  ];
+
+  workspaceBody.innerHTML =
+    '<section class="workspace-card workspace-card-wide home-module-card">' +
+      '<div class="workspace-card-head"><div><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(subtitle) + '</small></div>' +
+      '<span class="soft-status neutral">v' + escapeHtml(state.moduleVersions?.[isNetwork ? "home_network" : "parental_control"]?.version || "0.1.0") + '</span></div>' +
+      (!isNetwork ? '<div class="sheet-note">Модуль не выполняет скрытое наблюдение. Управление возможно только после явной привязки мобильного устройства Miyori.</div>' : '') +
+      '<form id="homeModuleForm" class="home-module-form"><input id="homeModuleItemId" type="hidden">' +
+      fields.map(field =>
+        '<label><span>' + escapeHtml(field[1]) + '</span><input data-home-field="' + field[0] + '" type="' + field[2] + '"' +
+        (["name","child_name","device_name"].includes(field[0]) ? ' required' : '') + '></label>'
+      ).join("") +
+      '<div class="home-module-actions"><button id="homeModuleCancel" class="secondary-sheet-button" type="button" hidden>Отмена</button>' +
+      '<button class="primary-sheet-button" type="submit">Сохранить</button></div></form>' +
+      '<div id="homeModuleResult"></div><div id="homeModuleList" class="home-module-list"></div>' +
+      '<div class="sheet-actions"><button id="homeModuleBack" class="secondary-sheet-button" type="button">← К проекту</button></div>' +
+    '</section>';
+
+  let items = [];
+  const reset = () => {
+    el("homeModuleItemId").value = "";
+    workspaceBody.querySelectorAll("[data-home-field]").forEach(input => input.value = "");
+    if (!isNetwork) el("homeModuleForm").querySelector('[data-home-field="daily_limit_minutes"]').value = "120";
+    el("homeModuleCancel").hidden = true;
+  };
+
+  const load = async () => {
+    try {
+      const data = await api("/api/projects/" + project.id + "/" + endpoint);
+      items = data.items || [];
+      el("homeModuleList").innerHTML = items.length ? items.map(item => {
+        const primary = isNetwork ? item.name : item.child_name;
+        const details = isNetwork
+          ? [item.device_type, item.address, item.status].filter(Boolean).join(" · ")
+          : [item.device_name, (item.daily_limit_minutes || 0) + " мин/день", item.bedtime_start + "–" + item.bedtime_end, item.status].filter(Boolean).join(" · ");
+        return '<article class="home-module-row"><div><strong>' + escapeHtml(primary) + '</strong><small>' + escapeHtml(details) + '</small></div>' +
+          '<div><button type="button" data-home-edit="' + item.id + '">Изменить</button><button type="button" class="danger" data-home-delete="' + item.id + '">Удалить</button></div></article>';
+      }).join("") : '<div class="workspace-empty">Записей пока нет.</div>';
+
+      workspaceBody.querySelectorAll("[data-home-edit]").forEach(button => button.onclick = () => {
+        const item = items.find(x => x.id === Number(button.dataset.homeEdit));
+        if (!item) return;
+        el("homeModuleItemId").value = item.id;
+        workspaceBody.querySelectorAll("[data-home-field]").forEach(input => input.value = item[input.dataset.homeField] ?? "");
+        el("homeModuleCancel").hidden = false;
+      });
+      workspaceBody.querySelectorAll("[data-home-delete]").forEach(button => button.onclick = async () => {
+        if (!confirm("Удалить запись?")) return;
+        await api("/api/projects/" + project.id + "/" + endpoint + "/" + button.dataset.homeDelete, {method:"DELETE"});
+        await load();
+      });
+    } catch (error) {
+      el("homeModuleResult").innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  el("homeModuleForm").onsubmit = async event => {
+    event.preventDefault();
+    const id = el("homeModuleItemId").value;
+    const payload = {};
+    workspaceBody.querySelectorAll("[data-home-field]").forEach(input => {
+      payload[input.dataset.homeField] = input.type === "number" ? Number(input.value || 0) : input.value.trim();
+    });
+    try {
+      await api("/api/projects/" + project.id + "/" + endpoint + (id ? "/" + id : ""), {
+        method:id ? "PUT" : "POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(payload)
+      });
+      reset();
+      await load();
+      el("homeModuleResult").innerHTML = workspaceResult(id ? "Запись обновлена." : "Запись добавлена.", "success");
+    } catch (error) {
+      el("homeModuleResult").innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+  el("homeModuleCancel").onclick = reset;
+  el("homeModuleBack").onclick = () => renderProjectModule(project);
+  reset();
+  await load();
+}
+
+
 async function renderPrimavtodorSubmodule(project, module) {
   if (module.module_key === "employees") {
     await renderEmployeesModule(project, module);
@@ -2500,7 +2571,9 @@ async function renderProjectModule(project) {
     if (projectModules.length) {
       el("projectSubmodulesCard").hidden = false;
       el("projectSubmodules").innerHTML = projectModules.map(module => {
-        const versionKey = "primavtodor_" + module.module_key;
+        const versionKey = project.kind === "work"
+          ? "primavtodor_" + module.module_key
+          : module.module_key;
         const meta = state.moduleVersions?.[versionKey];
         const status = meta?.status === "active" ? "Развивается" :
           meta?.status === "foundation" ? "Основа" :
@@ -2517,7 +2590,12 @@ async function renderProjectModule(project) {
       workspaceBody.querySelectorAll("[data-module-id]").forEach(button => {
         button.onclick = () => {
           const module = projectModules.find(item => item.id === Number(button.dataset.moduleId));
-          if (module) renderPrimavtodorSubmodule(project, module);
+          if (!module) return;
+          if (project.kind === "home" || ["home_network","parental_control"].includes(module.module_key)) {
+            renderHomeModule(project, module);
+          } else {
+            renderPrimavtodorSubmodule(project, module);
+          }
         };
       });
     }
@@ -2553,7 +2631,7 @@ async function renderProjectsWorkspace(kind) {
         '" type="button" data-project-id="' + project.id + '">' +
           '<span class="workspace-project-icon">' + (isWork ? '▰' : '⌂') + '</span>' +
           '<strong>' + escapeHtml(project.name) + '</strong>' +
-          '<small>' + (project.name === 'АО "Примавтодор"' ? 'Отдельный рабочий модуль' : 'Проект #' + project.id) + '</small>' +
+          '<small>' + (project.name === 'АО "Примавтодор"' ? 'Отдельный рабочий модуль' : project.name === "Личное" ? "Домашнее пространство Miyori" : 'Проект #' + project.id) + '</small>' +
         '</button>'
       ).join("") +
       '</div>' +
