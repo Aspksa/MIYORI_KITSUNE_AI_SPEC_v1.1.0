@@ -39,6 +39,28 @@ def init_db() -> None:
                 FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS account_profile (
+                id INTEGER PRIMARY KEY CHECK(id = 1),
+                owner_name TEXT NOT NULL DEFAULT '',
+                miyori_address TEXT NOT NULL DEFAULT 'Господин',
+                avatar_path TEXT,
+                language TEXT NOT NULL DEFAULT 'ru-RU',
+                timezone TEXT NOT NULL DEFAULT 'Europe/Amsterdam',
+                profile_kind TEXT NOT NULL DEFAULT 'personal',
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS device_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_key TEXT NOT NULL UNIQUE,
+                device_name TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                session_kind TEXT NOT NULL DEFAULT 'desktop',
+                status TEXT NOT NULL DEFAULT 'active',
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER,
@@ -262,6 +284,18 @@ def init_db() -> None:
                 (primavtodor_id, module_key, module_name, utc_now()),
             )
 
+        profile = conn.execute("SELECT id FROM account_profile WHERE id = 1").fetchone()
+        if not profile:
+            conn.execute(
+                """
+                INSERT INTO account_profile(
+                    id, owner_name, miyori_address, avatar_path,
+                    language, timezone, profile_kind, updated_at
+                ) VALUES (1, '', 'Господин', NULL, 'ru-RU', 'Europe/Amsterdam', 'personal', ?)
+                """,
+                (utc_now(),),
+            )
+
         row = conn.execute(
             "SELECT id FROM projects WHERE name = ?", ("Личное",)
         ).fetchone()
@@ -297,6 +331,128 @@ def list_projects() -> list[dict]:
             """
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_account_profile() -> dict:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT id, owner_name, miyori_address, avatar_path,
+                   language, timezone, profile_kind, updated_at
+            FROM account_profile WHERE id = 1
+            """
+        ).fetchone()
+    return dict(row) if row else {}
+
+
+def update_account_profile(
+    *,
+    owner_name: str,
+    miyori_address: str,
+    language: str,
+    timezone_name: str,
+    profile_kind: str,
+) -> dict:
+    if profile_kind not in {"personal", "work"}:
+        raise ValueError("Недопустимый основной профиль.")
+    clean_owner = " ".join(owner_name.strip().split())[:120]
+    clean_address = " ".join(miyori_address.strip().split())[:80] or "Господин"
+    clean_language = language.strip()[:20] or "ru-RU"
+    clean_timezone = timezone_name.strip()[:80] or "UTC"
+
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE account_profile
+            SET owner_name = ?, miyori_address = ?, language = ?,
+                timezone = ?, profile_kind = ?, updated_at = ?
+            WHERE id = 1
+            """,
+            (
+                clean_owner, clean_address, clean_language,
+                clean_timezone, profile_kind, utc_now(),
+            ),
+        )
+    return get_account_profile()
+
+
+def update_account_avatar(avatar_path: str | None) -> dict:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE account_profile SET avatar_path = ?, updated_at = ? WHERE id = 1",
+            (avatar_path, utc_now()),
+        )
+    return get_account_profile()
+
+
+def upsert_device_session(
+    *,
+    device_key: str,
+    device_name: str,
+    platform_name: str,
+    session_kind: str = "desktop",
+) -> dict:
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id FROM device_sessions WHERE device_key = ?",
+            (device_key,),
+        ).fetchone()
+        if row:
+            conn.execute(
+                """
+                UPDATE device_sessions
+                SET device_name = ?, platform = ?, session_kind = ?,
+                    status = 'active', last_seen_at = ?
+                WHERE device_key = ?
+                """,
+                (device_name, platform_name, session_kind, now, device_key),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO device_sessions(
+                    device_key, device_name, platform, session_kind,
+                    status, first_seen_at, last_seen_at
+                ) VALUES (?, ?, ?, ?, 'active', ?, ?)
+                """,
+                (device_key, device_name, platform_name, session_kind, now, now),
+            )
+        result = conn.execute(
+            """
+            SELECT id, device_key, device_name, platform, session_kind,
+                   status, first_seen_at, last_seen_at
+            FROM device_sessions WHERE device_key = ?
+            """,
+            (device_key,),
+        ).fetchone()
+    return dict(result)
+
+
+def list_device_sessions() -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, device_key, device_name, platform, session_kind,
+                   status, first_seen_at, last_seen_at
+            FROM device_sessions
+            ORDER BY status = 'active' DESC, last_seen_at DESC
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def disconnect_device_session(session_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE device_sessions
+            SET status = 'disconnected', last_seen_at = ?
+            WHERE id = ?
+            """,
+            (utc_now(), session_id),
+        )
+    return cur.rowcount == 1
 
 
 def create_project(name: str, kind: str = "home") -> dict:
