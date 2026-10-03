@@ -1640,7 +1640,7 @@ async function renderDocumentsWorkspace() {
     '<section class="workspace-card workspace-card-wide document-hub-card">' +
       '<div class="workspace-card-head"><div><strong>Документы</strong><small>Создавайте папки и загружайте файлы внутрь них</small></div>' +
       '<div class="document-hub-actions"><button id="createDocumentFolder" class="secondary-sheet-button" type="button">+ Папка</button>' +
-      '<label class="primary-sheet-button document-upload-button">Загрузить файл<input id="workspaceDocumentUpload" type="file" accept=".txt,.md,.markdown,.json" hidden></label></div></div>' +
+      '<label class="primary-sheet-button document-upload-button">Загрузить файл<input id="workspaceDocumentUpload" type="file" accept=".txt,.md,.markdown,.json,.pdf,.docx,.xlsx,.pptx" hidden></label></div></div>' +
       '<div id="documentFolderBreadcrumb" class="document-breadcrumb"></div>' +
       '<div id="workspaceFolders" class="document-folder-grid"></div>' +
       '<div id="workspaceDocs" class="document-file-list"></div>' +
@@ -1762,6 +1762,38 @@ async function renderDocumentsWorkspace() {
   await renderContent();
 }
 
+async function renderPrimavtodorSubmodule(project, module) {
+  showWorkspaceShell(
+    "work",
+    'АО "Примавтодор"',
+    module.name,
+    "Отдельный модуль рабочего проекта."
+  );
+
+  const descriptions = {
+    timesheet: "Учёт табелей, смен, рабочего времени и связанных документов.",
+    garage: "Учёт гаража, техники, транспорта и эксплуатационных материалов.",
+    employees: "Сотрудники проекта, кадровые сведения и связанные документы."
+  };
+
+  workspaceBody.innerHTML =
+    '<section class="workspace-card workspace-card-wide primavtodor-module-view">' +
+      '<div class="workspace-hero-icon">' +
+        (module.module_key === "timesheet" ? "▦" : module.module_key === "garage" ? "▰" : "◉") +
+      '</div>' +
+      '<strong>' + escapeHtml(module.name) + '</strong>' +
+      '<p>' + escapeHtml(descriptions[module.module_key] || "Модуль проекта.") + '</p>' +
+      '<div class="sheet-note">Модуль привязан к проекту АО «Примавтодор». Данные и документы остаются в контексте этого проекта.</div>' +
+      '<div class="sheet-actions">' +
+        '<button id="primavtodorModuleBack" class="secondary-sheet-button" type="button">← К проекту</button>' +
+        '<button id="primavtodorModuleDocuments" class="primary-sheet-button" type="button">Документы проекта</button>' +
+      '</div>' +
+    '</section>';
+
+  el("primavtodorModuleBack").onclick = () => renderProjectModule(project);
+  el("primavtodorModuleDocuments").onclick = renderDocumentsWorkspace;
+}
+
 async function renderProjectModule(project) {
   state.projectId = Number(project.id);
   projectSelect.value = String(state.projectId);
@@ -1778,6 +1810,10 @@ async function renderProjectModule(project) {
       '<section class="workspace-card"><strong>Документы</strong><small>Материалы проекта</small><div id="projectModuleDocs">Загружаю…</div></section>' +
       '<section class="workspace-card"><strong>Память</strong><small>Факты проекта</small><div id="projectModuleMemory">Загружаю…</div></section>' +
       '<section class="workspace-card"><strong>Задачи</strong><small>Фоновые процессы</small><div id="projectModuleTasks">Загружаю…</div></section>' +
+      '<section id="projectSubmodulesCard" class="workspace-card workspace-card-wide" hidden>' +
+        '<strong>Модули</strong><small>Разделы рабочего проекта</small>' +
+        '<div id="projectSubmodules" class="workspace-project-grid"></div>' +
+      '</section>' +
       '<section class="workspace-card workspace-card-wide"><div class="sheet-actions">' +
         '<button id="projectModuleDocuments" class="secondary-sheet-button" type="button">Документы проекта</button>' +
         '<button id="projectModuleChat" class="primary-sheet-button" type="button">Открыть чат проекта</button>' +
@@ -1785,10 +1821,11 @@ async function renderProjectModule(project) {
     '</div>';
 
   try {
-    const [docs, memory, tasks] = await Promise.all([
+    const [docs, memory, tasks, modules] = await Promise.all([
       api("/api/projects/" + project.id + "/documents"),
       api("/api/projects/" + project.id + "/memory"),
-      api("/api/projects/" + project.id + "/tasks")
+      api("/api/projects/" + project.id + "/tasks"),
+      api("/api/projects/" + project.id + "/modules")
     ]);
     el("projectModuleDocs").innerHTML = workspaceResult(
       (docs.documents || []).length + " файл(ов) · " + (docs.folders || []).length + " папок",
@@ -1802,6 +1839,27 @@ async function renderProjectModule(project) {
       (tasks.tasks || []).length + " задач",
       "neutral"
     );
+
+    const projectModules = modules.modules || [];
+    if (projectModules.length) {
+      el("projectSubmodulesCard").hidden = false;
+      el("projectSubmodules").innerHTML = projectModules.map(module =>
+        '<button class="workspace-project-card project-submodule-card" type="button" data-module-id="' + module.id + '">' +
+          '<span class="workspace-project-icon">' +
+            (module.module_key === "timesheet" ? "▦" : module.module_key === "garage" ? "▰" : "◉") +
+          '</span>' +
+          '<strong>' + escapeHtml(module.name) + '</strong>' +
+          '<small>Модуль проекта</small>' +
+        '</button>'
+      ).join("");
+
+      workspaceBody.querySelectorAll("[data-module-id]").forEach(button => {
+        button.onclick = () => {
+          const module = projectModules.find(item => item.id === Number(button.dataset.moduleId));
+          if (module) renderPrimavtodorSubmodule(project, module);
+        };
+      });
+    }
   } catch (error) {
     workspaceBody.insertAdjacentHTML("beforeend", workspaceResult(error.message, "error"));
   }
