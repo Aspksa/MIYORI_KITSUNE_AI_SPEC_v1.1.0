@@ -131,6 +131,32 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(project_id) REFERENCES projects(id)
             );
+
+            CREATE TABLE IF NOT EXISTS agent_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                conversation_id INTEGER,
+                goal TEXT NOT NULL,
+                status TEXT NOT NULL,
+                max_steps INTEGER NOT NULL,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                FOREIGN KEY(project_id) REFERENCES projects(id),
+                FOREIGN KEY(conversation_id) REFERENCES conversations(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS agent_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id INTEGER NOT NULL,
+                step_index INTEGER NOT NULL,
+                tool_name TEXT,
+                reason TEXT NOT NULL,
+                arguments_json TEXT,
+                result_json TEXT,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(run_id) REFERENCES agent_runs(id) ON DELETE CASCADE
+            );
             """
         )
 
@@ -927,4 +953,105 @@ def recent_development_checks(project_id: int, limit: int = 30) -> list[dict]:
         item = dict(row)
         item["passed"] = bool(item["passed"])
         result.append(item)
+    return result
+
+
+
+def start_agent_run(project_id: int, conversation_id: int | None, goal: str, max_steps: int) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO agent_runs(project_id, conversation_id, goal, status, max_steps, started_at)
+            VALUES (?, ?, ?, 'running', ?, ?)
+            """,
+            (project_id, conversation_id, goal, max_steps, utc_now()),
+        )
+        return int(cur.lastrowid)
+
+
+def record_agent_action(
+    run_id: int,
+    step_index: int,
+    reason: str,
+    status: str,
+    tool_name: str | None = None,
+    arguments: dict | None = None,
+    result: dict | None = None,
+) -> dict:
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO agent_actions(
+                run_id, step_index, tool_name, reason,
+                arguments_json, result_json, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                step_index,
+                tool_name,
+                reason,
+                json.dumps(arguments or {}, ensure_ascii=False),
+                json.dumps(result or {}, ensure_ascii=False),
+                status,
+                utc_now(),
+            ),
+        )
+        row = conn.execute(
+            """
+            SELECT id, run_id, step_index, tool_name, reason, arguments_json,
+                   result_json, status, created_at
+            FROM agent_actions WHERE id = ?
+            """,
+            (cur.lastrowid,),
+        ).fetchone()
+    item = dict(row)
+    item["arguments"] = json.loads(item.pop("arguments_json") or "{}")
+    item["result"] = json.loads(item.pop("result_json") or "{}")
+    return item
+
+
+def finish_agent_run(run_id: int, status: str = "completed") -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE agent_runs SET status = ?, finished_at = ?
+            WHERE id = ?
+            """,
+            (status, utc_now(), run_id),
+        )
+
+
+def get_agent_trace(run_id: int) -> dict | None:
+    with connect() as conn:
+        run = conn.execute(
+            """
+            SELECT id, project_id, conversation_id, goal, status, max_steps,
+                   started_at, finished_at
+            FROM agent_runs WHERE id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+        if not run:
+            return None
+        rows = conn.execute(
+            """
+            SELECT id, step_index, tool_name, reason, arguments_json,
+                   result_json, status, created_at
+            FROM agent_actions
+            WHERE run_id = ?
+            ORDER BY step_index ASC, id ASC
+            """,
+            (run_id,),
+        ).fetchall()
+
+    actions = []
+    for row in rows:
+        item = dict(row)
+        item["arguments"] = json.loads(item.pop("arguments_json") or "{}")
+        item["result"] = json.loads(item.pop("result_json") or "{}")
+        actions.append(item)
+
+    result = dict(run)
+    result["actions"] = actions
     return result
