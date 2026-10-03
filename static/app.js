@@ -544,6 +544,7 @@ async function loadProjects() {
 }
 
 function updateProjectLabel() {
+  if (!projectLabel) return;
   const option = projectSelect.selectedOptions[0];
   projectLabel.textContent = option ? "Проект: " + option.textContent : "Проект";
 }
@@ -1372,15 +1373,14 @@ el("refreshTasks").addEventListener("click", loadTasks);
 el("runSelfCheckTask").addEventListener("click", () => createBackgroundTask("self_check"));
 el("runMemoryTask").addEventListener("click", () => createBackgroundTask("memory_consolidation"));
 el("runDevelopmentCheck").addEventListener("click", runDevelopmentCheck);
-el("newChat").addEventListener("click", startNewChat);
-el("newChatSide").addEventListener("click", startNewChat);
+if (el("newChat")) el("newChat").addEventListener("click", startNewChat);
+if (el("newChatSide")) el("newChatSide").addEventListener("click", startNewChat);
 
 function openSidebarSection(title, detail, tone = "neutral") {
   addActivityCard(title, detail, tone);
   messages.scrollTop = messages.scrollHeight;
 }
 
-const menuChat = el("menuChat");
 const menuMobileApp = el("menuMobileApp");
 const menuAccount = el("menuAccount");
 const menuSettings = el("menuSettings");
@@ -1398,7 +1398,6 @@ const workspaceSubtitle = el("workspaceSubtitle");
 const workspaceEyebrow = el("workspaceEyebrow");
 
 const workspaceMenu = {
-  chat: menuChat,
   mobile: menuMobileApp,
   account: menuAccount,
   settings: menuSettings,
@@ -1419,7 +1418,6 @@ function showChatWorkspace() {
   if (chatHeader) chatHeader.hidden = false;
   if (messages) messages.hidden = false;
   if (chatComposer) chatComposer.hidden = false;
-  setWorkspaceMenuActive("chat");
   input.focus();
 }
 
@@ -1483,13 +1481,19 @@ async function renderAccountWorkspace() {
           : item.id;
         model.appendChild(option);
       }
-      const desired = preferred || p.model_id || "";
+      const preferredDeepSeek = "deepseek-ai/DeepSeek-V4-Flash";
+      const desired = preferred || p.model_id || preferredDeepSeek;
       const exists = chatModels.some(item => item.id === desired);
-      model.value = exists ? desired : "";
+      const fallbackExists = chatModels.some(item => item.id === preferredDeepSeek);
+      model.value = exists ? desired : (fallbackExists ? preferredDeepSeek : "");
       if (desired && !exists) {
-        modelState.textContent = "Сохранённый ID «" + desired + "» не найден среди доступных чат-моделей. Выберите новый.";
+        modelState.textContent = fallbackExists
+          ? "Сохранённый ID недействителен. Выбрана DeepSeek V4 Flash."
+          : "Сохранённый ID «" + desired + "» не найден среди доступных чат-моделей. Выберите новый.";
         result.innerHTML = workspaceResult(
-          "Сохранённый Model ID недействителен для Foundation Models. Это и вызывало HTTP 404.",
+          fallbackExists
+            ? "Старый Model ID недействителен. DeepSeek V4 Flash выбрана как предпочтительная модель — нажмите «Сохранить»."
+            : "Сохранённый Model ID недействителен для Foundation Models.",
           "warning"
         );
       } else {
@@ -1649,12 +1653,11 @@ async function renderUpdateWorkspace(refresh = false) {
 }
 
 async function renderDocumentsWorkspace() {
-  showWorkspaceShell("documents", "Данные Miyori", "Документы / Облако / Miyori", "Файлы проекта, локальное хранилище и связь с Cloud.ru.");
+  showWorkspaceShell("documents", "Данные Miyori", "Документы / Облако / Miyori", "Файлы и знания текущего проекта.");
   workspaceBody.innerHTML =
     '<div class="workspace-grid">' +
-      '<section class="workspace-card"><strong>Документы</strong><small>Материалы текущего проекта</small><div id="workspaceDocs">Загружаю…</div></section>' +
-      '<section class="workspace-card"><strong>Облако</strong><small>Cloud.ru используется как AI-провайдер</small><div id="workspaceCloudState">Загружаю…</div></section>' +
-      '<section class="workspace-card"><strong>Miyori</strong><small>Локальная память и RAG</small><div id="workspaceMiyoriState">Загружаю…</div></section>' +
+      '<section class="workspace-card workspace-card-wide"><strong>Документы</strong><small>Материалы текущего проекта</small><div id="workspaceDocs">Загружаю…</div></section>' +
+      '<section class="workspace-card workspace-card-wide"><strong>Miyori</strong><small>Память и RAG проекта</small><div id="workspaceMiyoriState">Загружаю…</div></section>' +
     '</div>';
   try {
     const [docs, status] = await Promise.all([
@@ -1664,10 +1667,6 @@ async function renderDocumentsWorkspace() {
     el("workspaceDocs").innerHTML = docs.documents.length
       ? docs.documents.map(d => '<div class="workspace-list-row"><strong>' + escapeHtml(d.filename) + '</strong><small>' + d.size_bytes + ' байт</small></div>').join("")
       : '<div class="workspace-empty">Документов пока нет.</div>';
-    el("workspaceCloudState").innerHTML = workspaceResult(
-      status.provider_configured ? "Cloud.ru подключён · " + (status.model_id || "") : "Cloud.ru не настроен",
-      status.provider_configured ? "success" : "warning"
-    );
     el("workspaceMiyoriState").innerHTML = workspaceResult(
       "RAG: " + (status.rag?.fts5 ? "Hybrid FTS5" : "Lexical fallback") +
       " · chunks " + (status.rag?.indexed_chunks || 0),
@@ -1740,7 +1739,6 @@ function renderMobileWorkspace() {
     '</div>';
 }
 
-if (menuChat) menuChat.onclick = showChatWorkspace;
 if (el("workspaceBackToChat")) el("workspaceBackToChat").onclick = showChatWorkspace;
 if (menuAccount) menuAccount.onclick = renderAccountWorkspace;
 if (menuProjectUpdate) menuProjectUpdate.onclick = () => renderUpdateWorkspace(false);
