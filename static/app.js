@@ -2354,15 +2354,20 @@ async function renderProjectModule(project) {
     const projectModules = modules.modules || [];
     if (projectModules.length) {
       el("projectSubmodulesCard").hidden = false;
-      el("projectSubmodules").innerHTML = projectModules.map(module =>
-        '<button class="workspace-project-card project-submodule-card" type="button" data-module-id="' + module.id + '">' +
+      el("projectSubmodules").innerHTML = projectModules.map(module => {
+        const versionKey = "primavtodor_" + module.module_key;
+        const meta = state.moduleVersions?.[versionKey];
+        const status = meta?.status === "active" ? "Развивается" :
+          meta?.status === "foundation" ? "Основа" :
+          meta?.status === "planned" ? "Запланирован" : "Модуль";
+        return '<button class="workspace-project-card project-submodule-card" type="button" data-module-id="' + module.id + '">' +
           '<span class="workspace-project-icon">' +
             (module.module_key === "timesheet" ? "▦" : module.module_key === "garage" ? "▰" : "◉") +
           '</span>' +
           '<strong>' + escapeHtml(module.name) + '</strong>' +
-          '<small>Модуль проекта</small>' +
-        '</button>'
-      ).join("");
+          '<small>' + escapeHtml(status) + (meta ? ' · v' + escapeHtml(meta.version) : '') + '</small>' +
+        '</button>';
+      }).join("");
 
       workspaceBody.querySelectorAll("[data-module-id]").forEach(button => {
         button.onclick = () => {
@@ -2489,6 +2494,7 @@ async function loadModuleVersions() {
   try {
     const manifest = await api("/api/modules");
     const versions = new Map((manifest.modules || []).map(item => [item.key, item]));
+    state.moduleVersions = Object.fromEntries(versions);
     const mapping = [
       [menuMiyoriAI, "miyori_ai"],
       [menuMobileApp, "mobile"],
