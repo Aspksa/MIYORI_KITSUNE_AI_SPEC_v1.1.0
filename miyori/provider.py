@@ -175,7 +175,11 @@ async def chat(
 
     if response.is_error:
         detail = response.text[:1500]
-        raise ProviderError(f"Cloud.ru вернул HTTP {response.status_code}: {detail}")
+        raise ProviderError(
+            "Cloud.ru chat/completions завершился ошибкой. "
+            f"Model ID: {settings.cloudru_model_id}; endpoint: {url}; "
+            f"HTTP {response.status_code}: {detail or 'без текста ошибки'}"
+        )
 
     data = response.json()
     try:
