@@ -2538,7 +2538,7 @@ async function renderProjectModule(project) {
       '<section class="workspace-card"><strong>Память</strong><small>Факты проекта</small><div id="projectModuleMemory">Загружаю…</div></section>' +
       '<section class="workspace-card"><strong>Задачи</strong><small>Фоновые процессы</small><div id="projectModuleTasks">Загружаю…</div></section>' +
       '<section id="projectSubmodulesCard" class="workspace-card workspace-card-wide" hidden>' +
-        '<strong>Модули</strong><small>Разделы рабочего проекта</small>' +
+        '<strong>Модули</strong><small>Разделы проекта Miyori</small>' +
         '<div id="projectSubmodules" class="workspace-project-grid"></div>' +
       '</section>' +
       '<section class="workspace-card workspace-card-wide"><div class="sheet-actions">' +
