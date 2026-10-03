@@ -429,10 +429,16 @@ form.addEventListener("submit", async (event) => {
 
     state.conversationId = data.conversation_id;
     addMessage("assistant", data.answer);
+    if (data.brain) {
+      brainState.textContent = "ready";
+      brainPlan.innerHTML = data.brain.plan.map(
+        (item, index) => "<div>" + (index + 1) + ". " + escapeHtml(item) + "</div>"
+      ).join("");
+    }
     await Promise.all([
-    loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadTasks(), loadDevelopment()
-  ]);
+      loadConversations(), loadMemory(), loadDocuments(),
+      loadTools(), loadTasks(), loadDevelopment()
+    ]);
   } catch (error) {
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
@@ -447,7 +453,10 @@ projectSelect.addEventListener("change", async () => {
   state.conversationId = null;
   updateProjectLabel();
   showWelcome();
-  await Promise.all([loadConversations(), loadMemory()]);
+  await Promise.all([
+    loadConversations(), loadMemory(), loadDocuments(),
+    loadTools(), loadTasks(), loadDevelopment()
+  ]);
 });
 
 el("addProject").addEventListener("click", async () => {
