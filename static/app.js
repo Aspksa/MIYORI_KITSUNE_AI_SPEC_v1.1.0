@@ -116,27 +116,19 @@ function showWelcome() {
   avatar.textContent = "狐";
 
   const bubble = document.createElement("div");
-  bubble.className = "bubble welcome-bubble quiet-welcome";
+  bubble.className = "bubble welcome-bubble clean-welcome";
   bubble.innerHTML =
     '<div class="quiet-welcome-top">' +
       '<div><strong>Миёри</strong><p>Здравствуйте, Господин. Чем займёмся?</p></div>' +
       '<div class="pulse-mini"><span class="pulse-dot"></span><span id="pulseText">готова</span></div>' +
     '</div>' +
-    '<div id="nexusSuggestions" class="quiet-suggestions">' +
-      '<div class="nexus-loading">Подбираю следующий шаг…</div>' +
-    '</div>' +
-    '<button id="openInnerWorld" class="inner-world-link" type="button">◎ Состояние и детали проекта</button>';
+    '<div id="nexusSuggestions" hidden></div>';
 
   article.append(avatar, bubble);
   messages.appendChild(article);
-  conversationTitle.textContent = "Новый разговор";
+  conversationTitle.textContent = "Miyori Kitsune";
   messages.scrollTop = 0;
   setPulse("ready");
-
-  const openInnerWorld = el("openInnerWorld");
-  if (openInnerWorld) {
-    openInnerWorld.addEventListener("click", () => openConsole("context"));
-  }
 }
 
 
@@ -1108,7 +1100,7 @@ async function openConversation(id, title) {
   for (const item of data.messages) {
     if (item.role === "user" || item.role === "assistant") addMessage(item.role, item.content);
   }
-  conversationTitle.textContent = title || "Разговор с Миёри";
+  conversationTitle.textContent = "Miyori Kitsune";
   await loadConversations();
   input.focus();
 }
@@ -1212,8 +1204,6 @@ form.addEventListener("submit", async (event) => {
   showError("");
   addMessage("user", text);
   setProcessingStage("accepted", "Запрос получен");
-  const livingIntent = createLivingIntent(text);
-  updateLivingIntent(livingIntent, "context");
   setProcessingStage("context", "RAG ищет релевантный контекст");
   input.value = "";
   input.style.height = "auto";
@@ -1237,85 +1227,38 @@ form.addEventListener("submit", async (event) => {
     }
 
     state.conversationId = data.conversation_id;
-    updateLivingIntent(livingIntent, "actions");
     setProcessingStage("work", "Анализирую и выполняю шаги");
     addMessage("assistant", data.answer);
+
+    // Технические данные обновляются внутри системы, но не добавляются в пользовательский чат.
     if (data.brain) {
-      brainState.textContent = "ready";
-      brainPlan.innerHTML = data.brain.plan.map(
-        (item, index) => "<div>" + (index + 1) + ". " + escapeHtml(item) + "</div>"
-      ).join("");
-
-      if (data.brain.plan?.length) {
-        const planCard = addActivityCard("План Brain", null, "neutral");
-        const planBody = document.createElement("div");
-        planBody.className = "activity-body plan-result";
-        data.brain.plan.forEach((item, index) => {
-          const row = document.createElement("div");
-          row.className = "plan-row";
-          row.innerHTML = '<span>' + (index + 1) + '</span><div>' + escapeHtml(item) + '</div>';
-          planBody.appendChild(row);
-        });
-        planCard.appendChild(planBody);
-      }
-
-      if (data.rag?.items?.length) {
-        const sourceCard = addActivityCard("RAG · найденный контекст", null, "neutral");
-        const sourceBody = document.createElement("div");
-        sourceBody.className = "activity-body source-list";
-        data.rag.items.forEach((source) => {
-          const item = document.createElement("div");
-          item.className = "source-card";
-          item.innerHTML =
-            '<strong>' + escapeHtml(source.source_type) + ' · ' +
-            escapeHtml(source.title || "Источник") + '</strong>' +
-            '<p>' + escapeHtml(source.content || "") + '</p>' +
-            '<small>' + escapeHtml(source.locator || "") +
-            ' · score ' + Number(source.score || 0).toFixed(5) + '</small>';
-          sourceBody.appendChild(item);
-        });
-        sourceCard.appendChild(sourceBody);
+      if (brainState) brainState.textContent = "ready";
+      if (brainPlan) {
+        brainPlan.innerHTML = (data.brain.plan || []).map(
+          (item, index) => "<div>" + (index + 1) + ". " + escapeHtml(item) + "</div>"
+        ).join("");
       }
     }
+
     if (data.agent) {
-      agentBudget.textContent = data.agent.steps_used + "/" + data.agent.max_steps;
-      agentTrace.innerHTML = data.agent.actions.map((action) => {
-        const tool = action.tool_name ? escapeHtml(action.tool_name) : "без инструмента";
-        return '<div class="agent-step"><strong>Шаг ' + action.step_index + ' · ' + tool +
-          '</strong><span>' + escapeHtml(action.reason) + '</span><small>' +
-          escapeHtml(action.status) + '</small></div>';
-      }).join("");
-
-      const completedActions = data.agent.actions.filter((action) => action.status === "completed");
-      if (completedActions.length) {
-        addActivityCard(
-          "Agent Core · действия",
-          completedActions.map((action) => ({
-            step: action.step_index,
-            tool: action.tool_name || "без инструмента",
-            status: action.status
-          })),
-          "neutral"
-        );
+      if (agentBudget) agentBudget.textContent = data.agent.steps_used + "/" + data.agent.max_steps;
+      if (agentTrace) {
+        agentTrace.innerHTML = (data.agent.actions || []).map((action) => {
+          const tool = action.tool_name ? escapeHtml(action.tool_name) : "без инструмента";
+          return '<div class="agent-step"><strong>Шаг ' + action.step_index + ' · ' + tool +
+            '</strong><span>' + escapeHtml(action.reason) + '</span><small>' +
+            escapeHtml(action.status) + '</small></div>';
+        }).join("");
       }
     }
-    addContextOrbit(data.brain, data.agent, data.epistemic, data.rag);
+
     setProcessingStage("result", "Результат готов");
-    updateLivingIntent(
-      livingIntent,
-      "done",
-      "готово",
-      "Готово · RAG " +
-        (data.rag?.items?.length || 0) + " фрагм. · " +
-        ((data.agent?.actions || []).filter((item) => item.status === "completed").length) + " действ."
-    );
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
       loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
     ]);
   } catch (error) {
     setProcessingStage("result", "Нужно внимание");
-    updateLivingIntent(livingIntent, "error", "нужно внимание", error.message || "Не удалось завершить задачу.");
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
   } finally {
@@ -1767,6 +1710,32 @@ if (menuMobileApp) menuMobileApp.onclick = renderMobileWorkspace;
 if (menuDocumentsHub) menuDocumentsHub.onclick = renderDocumentsWorkspace;
 if (menuWorkProjects) menuWorkProjects.onclick = () => renderProjectsWorkspace("work");
 if (menuHomeProjects) menuHomeProjects.onclick = () => renderProjectsWorkspace("home");
+
+const systemStatusOverlay = el("systemStatusOverlay");
+const openSystemStatus = el("openSystemStatus");
+const closeSystemStatus = el("closeSystemStatus");
+
+function openSystemStatusModal() {
+  if (!systemStatusOverlay) return;
+  systemStatusOverlay.hidden = false;
+  document.body.classList.add("sheet-open");
+  loadStatus();
+  if (state.projectId) loadNexus();
+}
+
+function closeSystemStatusModal() {
+  if (!systemStatusOverlay) return;
+  systemStatusOverlay.hidden = true;
+  document.body.classList.remove("sheet-open");
+}
+
+if (openSystemStatus) openSystemStatus.onclick = openSystemStatusModal;
+if (closeSystemStatus) closeSystemStatus.onclick = closeSystemStatusModal;
+if (systemStatusOverlay) {
+  systemStatusOverlay.addEventListener("click", (event) => {
+    if (event.target === systemStatusOverlay) closeSystemStatusModal();
+  });
+}
 
 async function boot() {
   showWelcome();
