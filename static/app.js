@@ -1,4 +1,4 @@
-const state = { projectId: null, conversationId: null, busy: false, tools: {} };
+const state = { projectId: null, conversationId: null, busy: false, tools: {}, pulse: "ready" };
 
 const el = (id) => document.getElementById(id);
 const messages = el("messages");
@@ -41,12 +41,28 @@ function showError(text) {
   errorBox.hidden = !text;
 }
 
+function setPulse(mode, label) {
+  state.pulse = mode;
+  document.querySelectorAll("[data-pulse]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.pulse === mode);
+  });
+  const text = el("pulseText");
+  if (text) text.textContent = label || ({
+    ready: "готова",
+    thinking: "думаю",
+    reading: "читаю",
+    acting: "действую",
+    waiting: "жду решения"
+  }[mode] || mode);
+}
+
 function setBusy(value) {
   state.busy = value;
   sendButton.disabled = value;
   input.disabled = value;
   projectSelect.disabled = value;
   sendButton.textContent = value ? "Думаю…" : "Отправить";
+  setPulse(value ? "thinking" : "ready");
 }
 
 function addMessage(role, text) {
@@ -67,18 +83,31 @@ function showWelcome() {
   article.className = "message assistant welcome-message";
 
   const avatar = document.createElement("div");
-  avatar.className = "avatar";
+  avatar.className = "avatar nexus-avatar";
   avatar.textContent = "狐";
 
   const bubble = document.createElement("div");
-  bubble.className = "bubble welcome-bubble";
+  bubble.className = "bubble welcome-bubble nexus-card";
   bubble.innerHTML =
-    '<strong>Миёри</strong>' +
-    '<p>Здравствуйте, Господин. Я готова. Выберите разговор или начните новый.</p>' +
+    '<div class="nexus-top">' +
+      '<div><strong>Миёри</strong><p>Здравствуйте, Господин. Я готова.</p></div>' +
+      '<div class="pulse-mini"><span class="pulse-dot"></span><span id="pulseText">готова</span></div>' +
+    '</div>' +
+    '<div class="miyori-pulse" aria-label="Состояние Миёри">' +
+      '<span data-pulse="thinking"><i></i>думаю</span>' +
+      '<span data-pulse="reading"><i></i>читаю</span>' +
+      '<span data-pulse="acting"><i></i>действую</span>' +
+      '<span data-pulse="waiting"><i></i>жду решения</span>' +
+      '<span data-pulse="ready" class="active"><i></i>готова</span>' +
+    '</div>' +
+    '<div id="nexusSnapshot" class="nexus-snapshot">' +
+      '<div class="nexus-loading">Собираю состояние проекта…</div>' +
+    '</div>' +
+    '<div id="nexusSuggestions" class="nexus-suggestions"></div>' +
     '<div class="welcome-abilities">' +
       '<div class="welcome-abilities-head">' +
-        '<span>Что я могу сделать прямо сейчас</span>' +
-        '<small>Нажмите действие или просто напишите задачу своими словами</small>' +
+        '<span>Способности</span>' +
+        '<small>или просто опишите задачу своими словами</small>' +
       '</div>' +
       '<div id="chatActionBar" class="chat-action-bar welcome-action-bar"></div>' +
     '</div>';
@@ -87,6 +116,74 @@ function showWelcome() {
   messages.appendChild(article);
   conversationTitle.textContent = "Новый разговор";
   messages.scrollTop = 0;
+  setPulse("ready");
+}
+
+async function loadNexus() {
+  if (!state.projectId) return;
+  const snapshot = el("nexusSnapshot");
+  const suggestions = el("nexusSuggestions");
+  if (!snapshot || !suggestions) return;
+
+  try {
+    const data = await api("/api/projects/" + state.projectId + "/nexus");
+    const c = data.counts;
+    snapshot.innerHTML =
+      '<div class="nexus-metric"><span>Память</span><strong>' + c.verified_memory + '</strong><small>подтверждено</small></div>' +
+      '<div class="nexus-metric"><span>Документы</span><strong>' + c.documents + '</strong><small>в проекте</small></div>' +
+      '<div class="nexus-metric ' + (c.pending_permissions ? "attention" : "") + '"><span>Решения</span><strong>' +
+      c.pending_permissions + '</strong><small>ожидают вас</small></div>' +
+      '<div class="nexus-metric ' + (c.active_tasks ? "working" : "") + '"><span>Задачи</span><strong>' +
+      c.active_tasks + '</strong><small>активны</small></div>';
+
+    suggestions.innerHTML = "";
+    for (const suggestion of data.suggestions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "nexus-suggestion";
+      button.innerHTML =
+        '<span class="nexus-suggestion-mark">↗</span><span><strong>' +
+        escapeHtml(suggestion.label) + '</strong><small>' +
+        escapeHtml(suggestion.detail) + '</small></span>';
+      button.onclick = () => {
+        if (suggestion.kind === "documents") {
+          input.value = "Проанализируй материалы текущего проекта и скажи, что важно.";
+        } else if (suggestion.kind === "permission") {
+          activateInspectorTab("data");
+          document.body.classList.remove("inspector-hidden");
+        } else if (suggestion.kind === "tasks" || suggestion.kind === "failed_tasks") {
+          activateInspectorTab("system");
+          document.body.classList.remove("inspector-hidden");
+        } else {
+          input.value = "";
+        }
+        input.focus();
+      };
+      suggestions.appendChild(button);
+    }
+  } catch (error) {
+    snapshot.innerHTML = '<div class="nexus-loading">' + escapeHtml(error.message) + '</div>';
+  }
+}
+
+function addContextOrbit(brain, agent) {
+  const chips = [];
+  if (brain?.memory_items) chips.push({icon: "✦", text: brain.memory_items + " память"});
+  if (brain?.document_items) chips.push({icon: "▤", text: brain.document_items + " источника"});
+  const actions = agent?.actions?.filter((item) => item.status === "completed").length || 0;
+  if (actions) chips.push({icon: "✋", text: actions + " действия"});
+  if (brain?.plan?.length) chips.push({icon: "◎", text: brain.plan.length + " шага"});
+  if (!chips.length) return;
+
+  const orbit = document.createElement("div");
+  orbit.className = "context-orbit";
+  for (const chip of chips) {
+    const item = document.createElement("span");
+    item.innerHTML = '<b>' + chip.icon + '</b>' + escapeHtml(chip.text);
+    orbit.appendChild(item);
+  }
+  messages.appendChild(orbit);
+  messages.scrollTop = messages.scrollHeight;
 }
 
 async function api(url, options = {}) {
@@ -132,7 +229,7 @@ async function loadProjects() {
   updateProjectLabel();
   await Promise.all([
     loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadPermissions(), loadTasks(), loadDevelopment()
+    loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus(), loadNexus()
   ]);
 }
 
@@ -386,6 +483,7 @@ function addToolResultCard(toolName, result) {
 async function runChatTool(tool, providedArgs = null) {
   if (!tool) return;
   const args = providedArgs || askToolArguments(tool.name);
+  setPulse(tool.permission === "read" ? "reading" : "acting");
   if (args === null) return;
 
   addActivityCard(toolLabel(tool.name), "Запускаю действие…", "working");
@@ -419,17 +517,20 @@ async function runChatTool(tool, providedArgs = null) {
           }
         ]
       );
+      setPulse("waiting");
       await loadPermissions();
       return;
     }
 
     addToolResultCard(tool.name, result.result);
+    setPulse("ready");
   } catch (error) {
     addActivityCard(
       "Ошибка · " + toolLabel(tool.name),
       error.message,
       "error"
     );
+    setPulse("ready");
   }
 }
 
@@ -490,7 +591,8 @@ async function decidePermission(requestId, approved, fromChat = false) {
         addActivityCard("Действие отклонено", "Изменений не внесено.", "neutral");
       }
     }
-    await Promise.all([loadPermissions(), loadTools()]);
+    setPulse("ready");
+    await Promise.all([loadPermissions(), loadTools(), loadNexus()]);
   } catch (error) {
     if (fromChat) addActivityCard("Ошибка разрешения", error.message, "error");
     else showError(error.message);
@@ -778,7 +880,7 @@ function startNewChat() {
   brainPlan.innerHTML = '<span class="empty-copy">План появится после запроса.</span>';
   agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
   agentBudget.textContent = "0/3";
-  Promise.all([loadConversations(), loadTools()]);
+  Promise.all([loadConversations(), loadTools(), loadNexus()]);
   input.focus();
 }
 
@@ -879,9 +981,10 @@ form.addEventListener("submit", async (event) => {
         );
       }
     }
+    addContextOrbit(data.brain, data.agent);
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
-      loadTools(), loadPermissions(), loadTasks(), loadDevelopment()
+      loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
     ]);
   } catch (error) {
     showError(error.message || "Не удалось получить ответ.");
@@ -899,7 +1002,7 @@ projectSelect.addEventListener("change", async () => {
   showWelcome();
   await Promise.all([
     loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadPermissions(), loadTasks(), loadDevelopment()
+    loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
   ]);
 });
 
