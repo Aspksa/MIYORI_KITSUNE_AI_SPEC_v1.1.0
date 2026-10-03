@@ -35,6 +35,8 @@ from miyori.db import (
     create_counterparty,
     create_contract,
     create_invoice_offer,
+    create_home_device,
+    create_parental_profile,
     create_task,
     delete_employee,
     delete_counterparty,
@@ -49,6 +51,8 @@ from miyori.db import (
     list_counterparties,
     list_contracts,
     list_invoice_offers,
+    list_home_devices,
+    list_parental_profiles,
     list_project_modules,
     list_projects,
     list_memory_facts,
@@ -68,6 +72,8 @@ from miyori.db import (
     update_counterparty,
     update_contract,
     update_invoice_offer,
+    update_home_device,
+    update_parental_profile,
     update_memory_status,
     upsert_device_session,
     verified_memory_context,
@@ -218,6 +224,24 @@ class AiPreferencesRequest(BaseModel):
     show_uncertainty: bool = True
     priority_mode: str = Field(pattern="^(accuracy|balanced|speed)$")
     operating_mode: str = Field(pattern="^(personal|work|analyst|research|developer)$")
+
+
+class HomeDeviceRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    device_type: str = Field(default="device", max_length=80)
+    address: str = Field(default="", max_length=180)
+    status: str = Field(default="offline", max_length=40)
+    notes: str = Field(default="", max_length=1000)
+
+
+class ParentalProfileRequest(BaseModel):
+    child_name: str = Field(min_length=1, max_length=160)
+    device_name: str = Field(min_length=1, max_length=160)
+    daily_limit_minutes: int = Field(default=120, ge=0, le=1440)
+    bedtime_start: str = Field(default="21:00", max_length=10)
+    bedtime_end: str = Field(default="07:00", max_length=10)
+    blocked_categories: str = Field(default="", max_length=1000)
+    status: str = Field(default="draft", max_length=40)
 
 
 class CounterpartyRequest(BaseModel):
@@ -640,6 +664,78 @@ def project_modules(project_id: int) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     return {"modules": list_project_modules(project_id)}
+
+
+@app.get("/api/projects/{project_id}/home-devices")
+def home_devices_get(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"items": list_home_devices(project_id)}
+
+
+@app.post("/api/projects/{project_id}/home-devices")
+def home_devices_create(project_id: int, request: HomeDeviceRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        item = create_home_device(project_id, **request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"item": item}
+
+
+@app.put("/api/projects/{project_id}/home-devices/{item_id}")
+def home_devices_update(project_id: int, item_id: int, request: HomeDeviceRequest) -> dict:
+    try:
+        item = update_home_device(project_id, item_id, **request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not item:
+        raise HTTPException(status_code=404, detail="Устройство не найдено.")
+    return {"item": item}
+
+
+@app.delete("/api/projects/{project_id}/home-devices/{item_id}")
+def home_devices_delete(project_id: int, item_id: int) -> dict:
+    if not delete_home_device(project_id, item_id):
+        raise HTTPException(status_code=404, detail="Устройство не найдено.")
+    return {"ok": True}
+
+
+@app.get("/api/projects/{project_id}/parental-controls")
+def parental_controls_get(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"items": list_parental_profiles(project_id)}
+
+
+@app.post("/api/projects/{project_id}/parental-controls")
+def parental_controls_create(project_id: int, request: ParentalProfileRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        item = create_parental_profile(project_id, **request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"item": item}
+
+
+@app.put("/api/projects/{project_id}/parental-controls/{item_id}")
+def parental_controls_update(project_id: int, item_id: int, request: ParentalProfileRequest) -> dict:
+    try:
+        item = update_parental_profile(project_id, item_id, **request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not item:
+        raise HTTPException(status_code=404, detail="Профиль контроля не найден.")
+    return {"item": item}
+
+
+@app.delete("/api/projects/{project_id}/parental-controls/{item_id}")
+def parental_controls_delete(project_id: int, item_id: int) -> dict:
+    if not delete_parental_profile(project_id, item_id):
+        raise HTTPException(status_code=404, detail="Профиль контроля не найден.")
+    return {"ok": True}
 
 
 @app.get("/api/projects/{project_id}/business-folders")
