@@ -1028,6 +1028,16 @@ async def send_message(request: ChatRequest) -> dict:
     brain = build_context(request.project_id, text)
     epistemic = trusted_claim_context(request.project_id, text, limit=6)
     rag = rag_retrieve(request.project_id, text, limit=8)
+    ai_preferences = get_ai_preferences()
+    rag_payload = rag.to_dict()
+    if not ai_preferences.get("use_rag", 1):
+        rag_payload = None
+    elif not ai_preferences.get("use_verified_memory", 1):
+        rag_payload["items"] = [
+            item
+            for item in rag_payload.get("items", [])
+            if item.get("source_type") != "memory"
+        ]
     agent = run_agent(request.project_id, conversation_id, text)
     try:
         answer = await chat(
@@ -1037,7 +1047,7 @@ async def send_message(request: ChatRequest) -> dict:
             brain_plan=brain.plan,
             tool_context=agent.tool_context,
             epistemic_context=None,
-            rag_context=rag.to_dict(),
+            rag_context=rag_payload,
         )
     except ProviderError as exc:
         raise HTTPException(
@@ -1067,7 +1077,13 @@ async def send_message(request: ChatRequest) -> dict:
                 for item in brain.documents
             ],
         },
-        "rag": rag.to_dict(),
+        "rag": rag_payload or {
+            "query": text,
+            "items": [],
+            "retrieval_mode": "disabled_by_ai_preferences",
+            "total_chars": 0,
+            "candidates_seen": 0,
+        },
         "epistemic": {
             "used_claims": [
                 {
