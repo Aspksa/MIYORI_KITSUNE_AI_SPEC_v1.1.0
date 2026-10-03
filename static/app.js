@@ -1393,6 +1393,7 @@ const cloudruModelId = el("cloudruModelId");
 const cloudruBaseUrl = el("cloudruBaseUrl");
 const cloudruKeyState = el("cloudruKeyState");
 const cloudruResult = el("cloudruResult");
+const cloudruModelOptions = el("cloudruModelOptions");
 const updateResult = el("updateResult");
 
 function openSheet(overlay) {
@@ -1472,13 +1473,22 @@ async function testCloudruProfile() {
         base_url: cloudruBaseUrl.value.trim() || null
       })
     });
-    let message = "Cloud.ru отвечает. Доступных моделей: " + data.models_found + ".";
-    if (data.selected_model) {
-      message += data.selected_model_found === false
-        ? " Выбранная модель не найдена в ответе /models."
-        : " Model ID принят для проверки.";
+    if (cloudruModelOptions) {
+      cloudruModelOptions.innerHTML = "";
+      for (const model of (data.chat_models || [])) {
+        const option = document.createElement("option");
+        option.value = model.id;
+        option.label = model.name || model.id;
+        cloudruModelOptions.appendChild(option);
+      }
     }
-    setSheetResult(cloudruResult, message, "success");
+    let message = "Cloud.ru отвечает. Доступных моделей: " + data.models_found + ".";
+    if (data.selected_model && data.chat_ok) {
+      message += " Chat completions для «" + data.selected_model + "» работает.";
+    } else if (!data.selected_model) {
+      message += " Выберите Model ID из подсказок и повторите проверку.";
+    }
+    setSheetResult(cloudruResult, message, data.chat_ok || !data.selected_model ? "success" : "warning");
   } catch (error) {
     setSheetResult(cloudruResult, error.message, "error");
   }
