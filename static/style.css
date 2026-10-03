@@ -3052,3 +3052,17 @@ body.sheet-open { overflow: hidden; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* 00.00.27 — Primavtodor modules */
+.project-submodule-card {
+  border-color: #d9cfee;
+  background: linear-gradient(145deg, #f8f4ff, #ffffff);
+}
+.project-submodule-card:hover {
+  border-color: #cdbcf0;
+  background: #f2ebff;
+}
+.primavtodor-module-view {
+  width: min(760px, 100%);
+}
