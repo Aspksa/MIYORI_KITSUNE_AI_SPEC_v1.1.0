@@ -22,7 +22,7 @@ const projectLabel = el("projectLabel");
 const conversationTitle = el("conversationTitle");
 const brainPlan = el("brainPlan");
 const brainState = el("brainState");
-const toolList = el("toolList");
+const chatActionBar = el("chatActionBar");
 const taskList = el("taskList");
 const developmentStats = el("developmentStats");
 const agentTrace = el("agentTrace");
@@ -192,76 +192,182 @@ async function uploadDocument(file) {
   }
 }
 
-async function loadTools() {
-  try {
-    const data = await api("/api/tools");
-    toolList.innerHTML = "";
-    for (const tool of data.tools) {
-      const row = document.createElement("div");
-      row.className = "tool-item";
-      const mode = tool.permission === "read" ? "авто" : "с подтверждением";
-      row.innerHTML =
-        "<strong>" + escapeHtml(tool.name) + "</strong>" +
-        "<small>" + escapeHtml(tool.description) + "</small>" +
-        '<div class="tool-meta">' + escapeHtml(mode) + "</div>";
+function addActivityCard(title, details, tone = "neutral", actions = []) {
+  const article = document.createElement("article");
+  article.className = "message activity";
+  const card = document.createElement("div");
+  card.className = "activity-card tone-" + tone;
+
+  const head = document.createElement("div");
+  head.className = "activity-head";
+  head.innerHTML = '<span class="activity-icon">✋</span><div><strong>' +
+    escapeHtml(title) + '</strong><small>Действие Миёри</small></div>';
+  card.appendChild(head);
+
+  if (details) {
+    const body = document.createElement("div");
+    body.className = "activity-body";
+    if (typeof details === "string") {
+      body.textContent = details;
+    } else {
+      const pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(details, null, 2);
+      body.appendChild(pre);
+    }
+    card.appendChild(body);
+  }
+
+  if (actions.length) {
+    const actionRow = document.createElement("div");
+    actionRow.className = "activity-actions";
+    for (const item of actions) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "mini-button";
-      button.textContent = "Запустить";
-      button.onclick = async () => {
-        let argumentsPayload = {};
-        if (tool.name === "project_memory_search" || tool.name === "project_document_search") {
-          const query = prompt("Что искать?");
-          if (!query || !query.trim()) return;
-          argumentsPayload = {query: query.trim()};
-        } else if (tool.name === "workspace_read") {
-          const path = prompt("Путь к файлу в workspace:");
-          if (!path || !path.trim()) return;
-          argumentsPayload = {path: path.trim()};
-        } else if (tool.name === "workspace_create" || tool.name === "workspace_modify") {
-          const path = prompt("Путь к файлу в workspace:");
-          if (!path || !path.trim()) return;
-          const content = prompt("Содержимое файла:");
-          if (content === null) return;
-          argumentsPayload = {path: path.trim(), content};
-        }
-        try {
-          const result = await api("/api/projects/" + state.projectId + "/tools/execute", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({name: tool.name, arguments: argumentsPayload})
-          });
-          const output = document.createElement("pre");
-          output.className = "tool-output";
-          if (result.status === "approval_required") {
-            output.textContent = "Требуется подтверждение пользователя.";
-            await loadPermissions();
-          } else {
-            output.textContent = JSON.stringify(result.result, null, 2);
-          }
-          row.appendChild(output);
-        } catch (error) {
-          showError(error.message);
-        }
-      };
-      row.appendChild(button);
-      toolList.appendChild(row);
+      button.textContent = item.label;
+      if (item.primary) button.classList.add("primary");
+      button.onclick = item.onClick;
+      actionRow.appendChild(button);
     }
+    card.appendChild(actionRow);
+  }
+
+  article.appendChild(card);
+  messages.appendChild(article);
+  messages.scrollTop = messages.scrollHeight;
+  return card;
+}
+
+function askToolArguments(toolName) {
+  if (toolName === "project_memory_search" || toolName === "project_document_search") {
+    const query = prompt("Что искать?");
+    if (!query || !query.trim()) return null;
+    return {query: query.trim()};
+  }
+  if (toolName === "workspace_read") {
+    const path = prompt("Путь к файлу в workspace:");
+    if (!path || !path.trim()) return null;
+    return {path: path.trim()};
+  }
+  if (toolName === "workspace_create" || toolName === "workspace_modify") {
+    const path = prompt("Путь к файлу в workspace:");
+    if (!path || !path.trim()) return null;
+    const content = prompt("Содержимое файла:");
+    if (content === null) return null;
+    return {path: path.trim(), content};
+  }
+  return {};
+}
+
+function toolLabel(name) {
+  const labels = {
+    project_memory_search: "Память",
+    project_document_search: "Документы",
+    project_status: "Статус",
+    workspace_list: "Файлы",
+    workspace_read: "Прочитать",
+    workspace_create: "Создать файл",
+    workspace_modify: "Изменить файл"
+  };
+  return labels[name] || name;
+}
+
+async function runChatTool(tool) {
+  const args = askToolArguments(tool.name);
+  if (args === null) return;
+
+  addActivityCard(toolLabel(tool.name), "Запускаю действие…", "working");
+
+  try {
+    const result = await api("/api/projects/" + state.projectId + "/tools/execute", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name: tool.name, arguments: args})
+    });
+
+    if (result.status === "approval_required") {
+      const req = result.permission_request;
+      addActivityCard(
+        "Нужно подтверждение · " + toolLabel(tool.name),
+        req.reason || "Это действие изменит workspace проекта.",
+        "warning",
+        [
+          {
+            label: "Разрешить",
+            primary: true,
+            onClick: async () => {
+              await decidePermission(req.id, true, true);
+            }
+          },
+          {
+            label: "Отклонить",
+            onClick: async () => {
+              await decidePermission(req.id, false, true);
+            }
+          }
+        ]
+      );
+      await loadPermissions();
+      return;
+    }
+
+    addActivityCard(
+      "Готово · " + toolLabel(tool.name),
+      result.result,
+      "success"
+    );
   } catch (error) {
-    toolList.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + '</div>';
+    addActivityCard(
+      "Ошибка · " + toolLabel(tool.name),
+      error.message,
+      "error"
+    );
   }
 }
 
-async function decidePermission(requestId, approved) {
+async function loadTools() {
   try {
-    await api("/api/projects/" + state.projectId + "/permissions/" + requestId + "/decision", {
+    const data = await api("/api/tools");
+    chatActionBar.innerHTML = "";
+    for (const tool of data.tools) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "chat-action";
+      button.innerHTML =
+        '<span class="chat-action-icon">' +
+        (tool.permission === "read" ? "↗" : "✎") +
+        '</span><span><strong>' + escapeHtml(toolLabel(tool.name)) +
+        '</strong><small>' + (tool.permission === "read" ? "авто" : "подтверждение") +
+        "</small></span>";
+      button.onclick = () => runChatTool(tool);
+      chatActionBar.appendChild(button);
+    }
+  } catch (error) {
+    chatActionBar.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + "</div>";
+  }
+}
+
+async function decidePermission(requestId, approved, fromChat = false) {
+  try {
+    const result = await api("/api/projects/" + state.projectId + "/permissions/" + requestId + "/decision", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({approved})
     });
+    if (fromChat) {
+      if (approved) {
+        addActivityCard(
+          "Разрешение выполнено",
+          result.execution?.result || "Действие выполнено.",
+          "success"
+        );
+      } else {
+        addActivityCard("Действие отклонено", "Изменений не внесено.", "neutral");
+      }
+    }
     await Promise.all([loadPermissions(), loadTools()]);
   } catch (error) {
-    showError(error.message);
+    if (fromChat) addActivityCard("Ошибка разрешения", error.message, "error");
+    else showError(error.message);
   }
 }
 
@@ -604,7 +710,6 @@ memorySearch.addEventListener("input", loadMemory);
 documentSearch.addEventListener("input", searchDocuments);
 documentInput.addEventListener("change", () => uploadDocument(documentInput.files[0]));
 el("refreshMemory").addEventListener("click", loadMemory);
-el("refreshTools").addEventListener("click", loadTools);
 el("refreshPermissions").addEventListener("click", loadPermissions);
 el("refreshTasks").addEventListener("click", loadTasks);
 el("runSelfCheckTask").addEventListener("click", () => createBackgroundTask("self_check"));
