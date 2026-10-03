@@ -53,6 +53,19 @@ class ToolRegistryV2Tests(unittest.TestCase):
         ):
             self.assertIn(key, move)
 
+    def test_registry_exposes_exhaustive_document_tools(self) -> None:
+        tools = {item["name"]: item for item in list_tools()}
+        exhaustive = tools["project_document_exhaustive_question"]
+        status = tools["project_document_question_status"]
+        self.assertEqual(exhaustive["category"], "document_intelligence")
+        self.assertEqual(exhaustive["permission"], "read")
+        self.assertTrue(exhaustive["idempotent"])
+        self.assertEqual(
+            exhaustive["parameters"]["document_id"]["scope_entity"],
+            "document",
+        )
+        self.assertEqual(status["category"], "document_intelligence")
+
     def test_schema_validation_happens_before_permission(self) -> None:
         with self.assertRaises(ValueError):
             execute_tool(

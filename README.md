@@ -2,8 +2,23 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.39.**  
+**Внутренняя версия приложения: 00.00.40.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.40
+
+`00.00.40` — **Exhaustive Document Q&A**.
+
+Miyori теперь различает быстрый retrieval и доказуемую проверку всего документа. Обычный RAG выбирает наиболее релевантные фрагменты; exhaustive-режим последовательно проверяет **каждое окно извлечённого текста** по конкретному вопросу и только после этого строит итоговый ответ.
+
+- отдельные persistent `document_questions` и `document_question_windows`;
+- собственный `coverage_ratio` для каждого вопроса;
+- evidence обязательно сохраняет locator к месту документа;
+- нерелевантное окно тоже считается проверенным, а не пропущенным;
+- после сбоя уже проверенные окна переиспользуются по SHA-256 fingerprint содержимого;
+- одинаковый вопрос к неизменному оригиналу переиспользует готовый/активный run;
+- в Drive блок «Спросить по всему документу» показывает прогресс, ответ и доказательства;
+- сканированные PDF без текстового слоя по-прежнему честно требуют OCR.
 
 ## Состояние релиза 00.00.39
 
@@ -135,6 +150,7 @@ data/
 - `miyori/brain.py` — публичный операционный план;
 - `miyori/context_router.py` — маршрутизация памяти, документов, знаний и tools;
 - `miyori/document_intelligence.py` — document graph, outline, coverage, глубокий поиск и hierarchical map→reduce;
+- `miyori/document_questions.py` — exhaustive Q&A по всему документу, evidence, per-question coverage и fingerprint recovery;
 - `miyori/planner.py` — Planner schema, fallback и безопасная валидация решений;
 - `miyori/agent.py` — persistent/resumable Agent Workflow Engine;
 - `miyori/sources.py` — манифест источников ответа;
@@ -257,6 +273,7 @@ Document Intelligence дополнительно проверяет:
 - `00.00.36` — физический Miyori Drive проекта + оригиналы + безопасная корзина + восстановление + поиск по содержимому;
 - `00.00.37` — Miyori AI Core v2: Context Router + Planner + Agent loop + layered memory + sources + epistemic assessments + tool safety tests;
 - `00.00.38` — AI Reliability & Workflow Engine: persistent workflows + permission resume + idempotency + Tool Registry v2 + audit + crash recovery + CI;
-- `00.00.39` — Document Intelligence: structural document graph + hierarchical full-text analysis + coverage tracking + deep search + Drive UI + Agent/RAG integration.
+- `00.00.39` — Document Intelligence: structural document graph + hierarchical full-text analysis + coverage tracking + deep search + Drive UI + Agent/RAG integration;
+- `00.00.40` — Exhaustive Document Q&A: all-window verification + evidence/locators + question coverage + fingerprint recovery.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

@@ -61,6 +61,7 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
   let documents = [];
   let ragStatus = {};
   let storageRoot = "";
+  let documentQuestionPoll = null;
 
   const fileType = (name) => {
     const ext = String(name || "").split(".").pop().toLowerCase();
@@ -199,11 +200,19 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
     resultNode.innerHTML = workspaceResult("Загружаю карту документа…", "working");
 
     try {
-      const data = await api(
-        "/api/projects/" + state.projectId + "/documents/" +
-        documentId + "/intelligence"
-      );
+      clearTimeout(documentQuestionPoll);
+      const [data, questionData] = await Promise.all([
+        api(
+          "/api/projects/" + state.projectId + "/documents/" +
+          documentId + "/intelligence"
+        ),
+        api(
+          "/api/projects/" + state.projectId + "/documents/" +
+          documentId + "/questions?limit=12"
+        )
+      ]);
       const profile = data.intelligence || {};
+      const questions = questionData.questions || [];
       const coverage = Math.max(0, Math.min(100, Math.round(
         Number(profile.coverage_ratio || 0) * 100
       )));
@@ -247,6 +256,51 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
             ? '<section class="drive-intelligence-section"><h4>Целостная сводка</h4><p>' +
               escapeHtml(profile.summary_long || profile.summary_short) + '</p></section>'
             : '') +
+          '<section class="drive-intelligence-section drive-exhaustive-question">' +
+            '<h4>Спросить по всему документу</h4>' +
+            '<p class="drive-intelligence-help">Этот режим проверяет весь извлечённый текст от начала до конца, а не только найденные RAG-фрагменты.</p>' +
+            '<div class="drive-exhaustive-form">' +
+              '<input id="driveExhaustiveQuestion" type="text" maxlength="5000" placeholder="Например: перечисли все сроки и условия расторжения">' +
+              '<button id="driveExhaustiveAsk" class="primary-sheet-button" type="button"' +
+                (status === "needs_ocr" || status === "unsupported" ? " disabled" : "") +
+                '>Проверить весь документ</button>' +
+            '</div>' +
+            '<div class="drive-exhaustive-history">' +
+              (questions.length
+                ? questions.slice(0, 8).map(item => {
+                    const qCoverage = Math.max(0, Math.min(100, Math.round(Number(item.coverage_ratio || 0) * 100)));
+                    const answer = item.answer || {};
+                    const evidence = Array.isArray(answer.evidence) ? answer.evidence : [];
+                    const stateLabel = ({
+                      queued: "в очереди",
+                      analyzing: "проверяется",
+                      complete: "готово",
+                      partial: "частично",
+                      cancelled: "отменено",
+                      failed: "ошибка"
+                    }[item.status] || item.status || "");
+                    return '<article class="drive-exhaustive-run status-' + escapeHtml(item.status || "") + '">' +
+                      '<header><div><strong>' + escapeHtml(item.question || "") + '</strong>' +
+                      '<small>' + escapeHtml(stateLabel) + ' · покрытие ' + qCoverage + '%</small></div>' +
+                      (answer.confidence ? '<span>' + escapeHtml(String(answer.confidence)) + '</span>' : '') +
+                      '</header>' +
+                      (answer.answer
+                        ? '<p>' + escapeHtml(answer.answer) + '</p>'
+                        : item.last_error
+                          ? '<p class="error-copy">' + escapeHtml(item.last_error) + '</p>'
+                          : '<p>Полная проверка ещё выполняется.</p>') +
+                      (evidence.length
+                        ? '<div class="drive-exhaustive-evidence">' +
+                          evidence.slice(0, 16).map(ev =>
+                            '<div><strong>' + escapeHtml(ev.text || "") + '</strong>' +
+                            '<small>' + escapeHtml(ev.locator || "") + '</small></div>'
+                          ).join("") + '</div>'
+                        : '') +
+                    '</article>';
+                  }).join("")
+                : '<div class="workspace-empty">Полных вопросов по этому документу ещё не было.</div>') +
+            '</div>' +
+          '</section>' +
           '<section class="drive-intelligence-section"><h4>Структура документа</h4>' +
             (outline.length
               ? '<div class="drive-intelligence-outline">' +
@@ -305,7 +359,58 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
           '</div>' +
         '</section>';
 
-      el("driveIntelligenceClose").onclick = () => { resultNode.innerHTML = ""; };
+      el("driveIntelligenceClose").onclick = () => {
+        clearTimeout(documentQuestionPoll);
+        resultNode.innerHTML = "";
+      };
+      const askExhaustive = async () => {
+        const input = el("driveExhaustiveQuestion");
+        const question = (input?.value || "").trim();
+        if (!question) return;
+        const button = el("driveExhaustiveAsk");
+        if (button) {
+          button.disabled = true;
+          button.textContent = "Запускаю…";
+        }
+        try {
+          const queued = await api(
+            "/api/projects/" + state.projectId + "/documents/" +
+            documentId + "/questions",
+            {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({question, force: false})
+            }
+          );
+          resultNode.insertAdjacentHTML(
+            "afterbegin",
+            workspaceResult(
+              queued.question?.existing
+                ? "Такой полный вопрос уже есть — открываю сохранённый результат/прогресс."
+                : "Miyori проверит весь документ по этому вопросу. Задача выполняется в фоне.",
+              "success"
+            )
+          );
+          if (typeof loadTasks === "function") loadTasks();
+          await renderIntelligencePanel(documentId);
+        } catch (error) {
+          resultNode.insertAdjacentHTML("afterbegin", workspaceResult(error.message, "error"));
+          if (button) {
+            button.disabled = false;
+            button.textContent = "Проверить весь документ";
+          }
+        }
+      };
+      if (el("driveExhaustiveAsk")) el("driveExhaustiveAsk").onclick = askExhaustive;
+      if (el("driveExhaustiveQuestion")) {
+        el("driveExhaustiveQuestion").onkeydown = event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            askExhaustive();
+          }
+        };
+      }
+
       el("driveIntelligenceRefresh").onclick = () => renderIntelligencePanel(documentId);
       el("driveIntelligenceRebuild").onclick = async () => {
         resultNode.innerHTML = workspaceResult("Перестраиваю локальную карту документа…", "working");
@@ -351,6 +456,14 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
           resultNode.innerHTML = workspaceResult(error.message, "error");
         }
       };
+
+      if (questions.some(item => ["queued", "analyzing"].includes(item.status))) {
+        documentQuestionPoll = setTimeout(() => {
+          if (document.body.contains(resultNode)) {
+            renderIntelligencePanel(documentId);
+          }
+        }, 2500);
+      }
     } catch (error) {
       resultNode.innerHTML = workspaceResult(error.message, "error");
     }

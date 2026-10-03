@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections import Counter
@@ -108,6 +109,7 @@ def init_document_intelligence_db() -> None:
                 start_node_index INTEGER NOT NULL,
                 end_node_index INTEGER NOT NULL,
                 source_chars INTEGER NOT NULL,
+                source_fingerprint TEXT NOT NULL DEFAULT '',
                 locator_start TEXT,
                 locator_end TEXT,
                 summary TEXT,
@@ -129,6 +131,19 @@ def init_document_intelligence_db() -> None:
                 ON document_analysis_windows(document_id, window_index);
             """
         )
+        window_columns = {
+            row["name"]
+            for row in conn.execute(
+                "PRAGMA table_info(document_analysis_windows)"
+            ).fetchall()
+        }
+        if "source_fingerprint" not in window_columns:
+            conn.execute(
+                """
+                ALTER TABLE document_analysis_windows
+                ADD COLUMN source_fingerprint TEXT NOT NULL DEFAULT ''
+                """
+            )
 
 
 def _loads(value: str | None, fallback):
@@ -794,6 +809,45 @@ def _pack_windows(segments: list[dict]) -> list[dict]:
     return windows
 
 
+def document_window_fingerprint(window: dict) -> str:
+    return hashlib.sha256(
+        str(window.get("content") or "").encode("utf-8")
+    ).hexdigest()
+
+
+def build_document_windows(project_id: int, document_id: int) -> tuple[dict, list[dict]]:
+    profile = get_document_intelligence(project_id, document_id)
+    if not profile:
+        profile = rebuild_document_intelligence(project_id, document_id)
+    if profile.get("status") in {"needs_ocr", "unsupported"}:
+        raise ValueError(
+            profile.get("last_error")
+            or "Документ нельзя читать полностью без извлечённого текста."
+        )
+
+    nodes = get_document_nodes(project_id, document_id, offset=0, limit=1000)
+    expected = int(profile.get("node_count") or 0)
+    offset = len(nodes)
+    while offset < expected:
+        part = get_document_nodes(
+            project_id,
+            document_id,
+            offset=offset,
+            limit=1000,
+        )
+        if not part:
+            break
+        nodes.extend(part)
+        offset += len(part)
+
+    windows = _pack_windows(_analysis_segments(nodes))
+    if not windows:
+        raise ValueError("В документе нет текста для полного анализа.")
+    for window in windows:
+        window["source_fingerprint"] = document_window_fingerprint(window)
+    return profile, windows
+
+
 def _save_window(
     project_id: int,
     document_id: int,
@@ -806,13 +860,15 @@ def _save_window(
             """
             INSERT INTO document_analysis_windows(
                 project_id, document_id, window_index, start_node_index,
-                end_node_index, source_chars, locator_start, locator_end,
-                summary, analysis_json, model_id, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                end_node_index, source_chars, source_fingerprint,
+                locator_start, locator_end, summary, analysis_json,
+                model_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(document_id, window_index) DO UPDATE SET
                 start_node_index = excluded.start_node_index,
                 end_node_index = excluded.end_node_index,
                 source_chars = excluded.source_chars,
+                source_fingerprint = excluded.source_fingerprint,
                 locator_start = excluded.locator_start,
                 locator_end = excluded.locator_end,
                 summary = excluded.summary,
@@ -827,6 +883,7 @@ def _save_window(
                 int(window["start_node_index"]),
                 int(window["end_node_index"]),
                 int(window["source_chars"]),
+                window.get("source_fingerprint") or document_window_fingerprint(window),
                 window.get("locator_start"),
                 window.get("locator_end"),
                 str(analysis.get("summary") or "")[:6000],
@@ -895,21 +952,7 @@ async def deep_analyze_document(
     if profile.get("status") in {"needs_ocr", "unsupported"}:
         raise ValueError(profile.get("last_error") or "Документ нельзя анализировать без извлечённого текста.")
 
-    nodes = get_document_nodes(project_id, document_id, offset=0, limit=1000)
-    if int(profile.get("node_count") or 0) > len(nodes):
-        # Fetch remaining nodes without silently truncating long books.
-        offset = len(nodes)
-        while offset < int(profile["node_count"]):
-            part = get_document_nodes(project_id, document_id, offset=offset, limit=1000)
-            if not part:
-                break
-            nodes.extend(part)
-            offset += len(part)
-
-    segments = _analysis_segments(nodes)
-    windows = _pack_windows(segments)
-    if not windows:
-        raise ValueError("В документе нет текста для глубокого анализа.")
+    profile, windows = build_document_windows(project_id, document_id)
 
     reusable: dict[int, dict] = {}
     with connect() as conn:
@@ -949,17 +992,10 @@ async def deep_analyze_document(
             saved = reusable.get(index)
             if (
                 saved
-                and int(saved.get("source_chars") or -1) == int(window["source_chars"])
-                and int(
-                    saved["start_node_index"]
-                    if saved.get("start_node_index") is not None else -1
-                ) == int(window["start_node_index"])
-                and int(
-                    saved["end_node_index"]
-                    if saved.get("end_node_index") is not None else -1
-                ) == int(window["end_node_index"])
-                and str(saved.get("locator_start") or "") == str(window.get("locator_start") or "")
-                and str(saved.get("locator_end") or "") == str(window.get("locator_end") or "")
+                and str(saved.get("source_fingerprint") or "")
+                    == str(window.get("source_fingerprint") or "")
+                and int(saved.get("source_chars") or -1)
+                    == int(window["source_chars"])
             ):
                 analysis = _loads(saved.get("analysis_json"), {})
                 if analysis:

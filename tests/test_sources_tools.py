@@ -74,6 +74,39 @@ class SourcesAndToolSafetyTests(unittest.TestCase):
             "/api/projects/9/documents/5/download",
         )
 
+    def test_exhaustive_question_source_keeps_document_and_locator(self) -> None:
+        sources = build_answer_sources(
+            self.project["id"],
+            {"items": []},
+            [
+                {
+                    "tool": "project_document_question_status",
+                    "result": {
+                        "document": {
+                            "id": 17,
+                            "filename": "book.pdf",
+                        },
+                        "question": {
+                            "answer": {
+                                "evidence": [
+                                    {
+                                        "text": "Найденный факт.",
+                                        "locator": "pdf:page:42:lines:3-8",
+                                    }
+                                ]
+                            }
+                        },
+                    },
+                }
+            ],
+        )
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["document_id"], 17)
+        self.assertEqual(
+            sources[0]["locator"],
+            "pdf:page:42:lines:3-8",
+        )
+
     def test_invalid_write_arguments_do_not_create_permission_request(self) -> None:
         with self.assertRaises(ValueError):
             execute_tool(

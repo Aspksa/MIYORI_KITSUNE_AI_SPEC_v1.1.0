@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.39"
+PROJECT_VERSION = "00.00.40"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.2.0",
+        "version": "2.3.0",
         "status": "active",
-        "description": "AI Core v2.2: persistent workflows, Document Intelligence tools, hierarchical document context и проверяемые источники.",
+        "description": "AI Core v2.3: persistent workflows, Document Intelligence, различение retrieval и exhaustive verification, проверяемые источники.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -35,15 +35,15 @@ MODULES = {
     },
     "drive": {
         "name": "Документы / Облако / Miyori",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "status": "active",
         "description": "Miyori Drive: оригиналы, структура документов, безопасная корзина, восстановление, Document Intelligence, поиск и RAG.",
     },
     "document_intelligence": {
         "name": "Document Intelligence",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "active",
-        "description": "Полное структурное понимание документов и книг: outline, locators, hierarchical map-reduce, coverage tracking и глубокий поиск.",
+        "description": "Структурное понимание и exhaustive Q&A: полный проход документа, evidence с locator-ами, coverage tracking, recovery и hierarchical synthesis.",
     },
     "projects": {
         "name": "Проекты",
@@ -132,6 +132,46 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.40",
+        "title": "Exhaustive Document Q&A · проверка всего документа по вопросу",
+        "summary": "Добавлен отдельный режим полной проверки: конкретный вопрос проходит через все окна извлечённого текста, а итоговый ответ строится только из сохранённых evidence с locator-ами. RAG/top-K больше не используется как доказательство того, что проверена вся книга.",
+        "modules": [
+            {
+                "key": "document_intelligence",
+                "version": "1.1.0",
+                "changes": [
+                    "Добавлены persistent document_questions и document_question_windows.",
+                    "Каждый полный вопрос сканирует все окна документа и отдельно считает coverage_ratio.",
+                    "Нерелевантные окна тоже отмечаются как проверенные; отсутствие совпадения не означает пропуск окна.",
+                    "Итоговый ответ синтезируется только из evidence/answer_fragment, найденных при полном проходе.",
+                    "Каждое evidence ограничено по размеру и сохраняет locator; внешний контекст модели запрещён.",
+                    "После сбоя уже проверенные окна переиспользуются по SHA-256 fingerprint содержимого.",
+                    "Fingerprint также усилен для обычного глубокого анализа документа."
+                ],
+            },
+            {
+                "key": "drive",
+                "version": "1.7.0",
+                "changes": [
+                    "В «Понимании документа» появился режим «Спросить по всему документу».",
+                    "Показываются отдельный статус вопроса, фактическое покрытие, ответ и доказательства с locator-ами.",
+                    "Одинаковый вопрос к неизменному оригиналу переиспользует готовый или уже выполняющийся run.",
+                    "Полные вопросы выполняются фоново и не блокируют браузер."
+                ],
+            },
+            {
+                "key": "miyori_ai",
+                "version": "2.3.0",
+                "changes": [
+                    "В архитектуре явно разделены быстрый retrieval и exhaustive verification.",
+                    "Top-K RAG предназначен для обычных быстрых ответов; утверждение «проверен весь документ» допустимо только для exhaustive run с полным coverage.",
+                    "Agent Core получил инструменты project_document_exhaustive_question и project_document_question_status для запуска и чтения полного прохода из чата.",
+                    "Полные проверки записываются в Audit Trail как отдельные document.question события."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.39",
         "title": "Document Intelligence · полное понимание документов и книг",

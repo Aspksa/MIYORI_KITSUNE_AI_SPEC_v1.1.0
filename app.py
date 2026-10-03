@@ -138,6 +138,13 @@ from miyori.document_intelligence import (
     rebuild_document_intelligence,
     search_document_nodes,
 )
+from miyori.document_questions import (
+    enqueue_exhaustive_document_question,
+    get_document_question,
+    init_document_questions_db,
+    list_document_questions,
+    list_document_question_windows,
+)
 from miyori.provider import ProviderError, chat
 from miyori.persona import persona_metadata
 from miyori.epistemic import (
@@ -222,6 +229,7 @@ def _sync_project_drive(project_id: int) -> None:
 async def lifespan(app: FastAPI):
     init_db()
     init_document_intelligence_db()
+    init_document_questions_db()
     recovery_marked = mark_interrupted_runtime_for_recovery()
     recovery_checked = reconcile_recoverable_operations(allow_retry=False)
     init_epistemic_db()
@@ -240,7 +248,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.39", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.40", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -287,12 +295,17 @@ class ToolExecuteRequest(BaseModel):
 
 class TaskCreateRequest(BaseModel):
     task_type: str = Field(
-        pattern="^(self_check|memory_consolidation|epistemic_review|document_intelligence)$"
+        pattern="^(self_check|memory_consolidation|epistemic_review|document_intelligence|document_question)$"
     )
     payload: dict = Field(default_factory=dict)
 
 
 class DocumentAnalysisRequest(BaseModel):
+    force: bool = False
+
+
+class DocumentQuestionRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=5000)
     force: bool = False
 
 
@@ -437,7 +450,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.39",
+        "version": "00.00.40",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -679,7 +692,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.39",
+        "project_version": "00.00.40",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1407,6 +1420,68 @@ def document_intelligence_analyze(
         "task": task,
         "intelligence": get_document_intelligence(project_id, document_id),
     }
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/questions")
+def document_questions_list(
+    project_id: int,
+    document_id: int,
+    limit: int = 30,
+) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    return {
+        "questions": list_document_questions(
+            project_id,
+            document_id,
+            limit=max(1, min(limit, 100)),
+        )
+    }
+
+
+@app.post("/api/projects/{project_id}/documents/{document_id}/questions")
+def document_question_create(
+    project_id: int,
+    document_id: int,
+    request: DocumentQuestionRequest,
+) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        question = enqueue_exhaustive_document_question(
+            project_id,
+            document_id,
+            request.question,
+            force=request.force,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    wake_worker()
+    return {"question": question}
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/questions/{question_id}")
+def document_question_get(
+    project_id: int,
+    document_id: int,
+    question_id: int,
+    include_windows: bool = False,
+) -> dict:
+    question = get_document_question(
+        project_id,
+        document_id,
+        question_id,
+    )
+    if not question:
+        raise HTTPException(status_code=404, detail="Полный вопрос по документу не найден.")
+    response = {"question": question}
+    if include_windows:
+        response["windows"] = list_document_question_windows(
+            project_id,
+            document_id,
+            question_id,
+        )
+    return response
 
 
 @app.get("/api/projects/{project_id}/documents/{document_id}/download")

@@ -35,6 +35,10 @@ from .document_intelligence import (
     rebuild_document_intelligence,
     search_document_nodes,
 )
+from .document_questions import (
+    enqueue_exhaustive_document_question,
+    get_document_question,
+)
 from .documents import (
     ensure_drive_folder,
     move_active_document,
@@ -233,6 +237,67 @@ def project_document_deep_search(
             "filename": document["filename"],
         },
         "nodes": nodes,
+    }
+
+
+def project_document_exhaustive_question(
+    project_id: int,
+    document_id: int,
+    question: str,
+) -> dict:
+    document = get_document(project_id, int(document_id))
+    if not document:
+        raise ValueError("Документ не найден в текущем проекте.")
+    run = enqueue_exhaustive_document_question(
+        project_id,
+        int(document_id),
+        question,
+        force=False,
+    )
+    if run.get("status") in {"queued", "analyzing"}:
+        from .tasks import wake_worker
+        wake_worker()
+    return {
+        "document": {
+            "id": document["id"],
+            "filename": document["filename"],
+        },
+        "question": {
+            "id": run["id"],
+            "status": run.get("status"),
+            "coverage_ratio": run.get("coverage_ratio", 0.0),
+            "answer": run.get("answer") or {},
+            "existing": bool(run.get("existing")),
+            "retrying": bool(run.get("retrying")),
+        },
+        "note": (
+            "Это exhaustive-проверка всего извлечённого текста. "
+            "Если статус queued/analyzing, результат будет доступен после фоновой задачи."
+        ),
+    }
+
+
+def project_document_question_status(
+    project_id: int,
+    document_id: int,
+    question_id: int,
+) -> dict:
+    document = get_document(project_id, int(document_id))
+    if not document:
+        raise ValueError("Документ не найден в текущем проекте.")
+    run = get_document_question(
+        project_id,
+        int(document_id),
+        int(question_id),
+    )
+    if not run:
+        raise ValueError("Полный вопрос по документу не найден.")
+    return {
+        "document": {
+            "id": document["id"],
+            "filename": document["filename"],
+        },
+        "question": run,
     }
 
 
@@ -669,6 +734,56 @@ TOOLS: dict[str, ToolSpec] = {
         },
         category="document_intelligence",
         version="1.0",
+    ),
+    "project_document_exhaustive_question": ToolSpec(
+        name="project_document_exhaustive_question",
+        description=(
+            "Запускает exhaustive-проверку ВСЕГО извлечённого текста конкретного документа "
+            "по одному вопросу. Используй только когда пользователь явно просит проверить "
+            "документ целиком, найти все случаи/сроки/обязательства/противоречия или подтвердить "
+            "отсутствие чего-либо во всём документе. Для обычных вопросов используй RAG/deep search."
+        ),
+        permission="read",
+        handler=project_document_exhaustive_question,
+        parameters={
+            "document_id": {
+                "type": "integer", "required": True, "minimum": 1,
+                "scope_entity": "document",
+            },
+            "question": {
+                "type": "string", "required": True,
+                "min_length": 1, "max_length": 5000, "normalize": "strip",
+            },
+        },
+        category="document_intelligence",
+        version="1.1",
+        risk_level="low",
+        destructive=False,
+        idempotent=True,
+        timeout_seconds=15,
+        rollback_capability="none",
+        recovery_strategy="verify_only",
+    ),
+    "project_document_question_status": ToolSpec(
+        name="project_document_question_status",
+        description=(
+            "Читает статус и результат ранее запущенной exhaustive-проверки документа. "
+            "Используй после project_document_exhaustive_question, если пользователь "
+            "спрашивает о готовности или результате полного прохода."
+        ),
+        permission="read",
+        handler=project_document_question_status,
+        parameters={
+            "document_id": {
+                "type": "integer", "required": True, "minimum": 1,
+                "scope_entity": "document",
+            },
+            "question_id": {
+                "type": "integer", "required": True, "minimum": 1,
+            },
+        },
+        category="document_intelligence",
+        version="1.1",
     ),
     "drive_folder_create": ToolSpec(
         name="drive_folder_create",

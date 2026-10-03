@@ -1161,3 +1161,121 @@
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
 }
+
+
+/* 00.00.40 — Exhaustive Document Q&A */
+.drive-exhaustive-question {
+  padding: 14px;
+  border: 1px solid #ddd3ef;
+  border-radius: 14px;
+  background: linear-gradient(145deg,#faf7ff,#fff);
+}
+.drive-intelligence-help {
+  color: #81758d;
+  font-size: 11px !important;
+}
+.drive-exhaustive-form {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 8px;
+}
+.drive-exhaustive-form input {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid #ded6eb;
+  border-radius: 10px;
+  outline: 0;
+  background: #fff;
+  color: #4d4258;
+  font-size: 11px;
+}
+.drive-exhaustive-history {
+  display: grid;
+  gap: 9px;
+}
+.drive-exhaustive-run {
+  padding: 12px 13px;
+  border: 1px solid #e8e1f0;
+  border-radius: 12px;
+  background: #fff;
+}
+.drive-exhaustive-run.status-analyzing,
+.drive-exhaustive-run.status-queued {
+  border-color: #d8caef;
+  background: #fbf8ff;
+}
+.drive-exhaustive-run.status-complete {
+  border-color: #d5e6da;
+  background: #fbfffc;
+}
+.drive-exhaustive-run.status-failed,
+.drive-exhaustive-run.status-partial {
+  border-color: #ead8c9;
+  background: #fffaf6;
+}
+.drive-exhaustive-run header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.drive-exhaustive-run header strong,
+.drive-exhaustive-run header small {
+  display: block;
+}
+.drive-exhaustive-run header strong {
+  color: #493d56;
+  font-size: 11px;
+}
+.drive-exhaustive-run header small {
+  margin-top: 3px;
+  color: #91869b;
+  font-size: 9px;
+}
+.drive-exhaustive-run header > span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f0ebf7;
+  color: #705b8b;
+  font-size: 8px;
+  font-weight: 800;
+}
+.drive-exhaustive-run > p {
+  margin: 9px 0 0 !important;
+  color: #62576c;
+  font-size: 11px !important;
+  line-height: 1.55 !important;
+}
+.drive-exhaustive-run > p.error-copy {
+  color: #9c5e4c;
+}
+.drive-exhaustive-evidence {
+  display: grid;
+  gap: 6px;
+  margin-top: 9px;
+}
+.drive-exhaustive-evidence > div {
+  padding: 8px 9px;
+  border-left: 2px solid #d9cdee;
+  border-radius: 0 8px 8px 0;
+  background: #fbf9fe;
+}
+.drive-exhaustive-evidence strong,
+.drive-exhaustive-evidence small {
+  display: block;
+}
+.drive-exhaustive-evidence strong {
+  color: #5a4e65;
+  font-size: 10px;
+}
+.drive-exhaustive-evidence small {
+  margin-top: 3px;
+  color: #9a90a4;
+  font-size: 8px;
+}
+@media (max-width: 620px) {
+  .drive-exhaustive-form {
+    grid-template-columns: 1fr;
+  }
+}

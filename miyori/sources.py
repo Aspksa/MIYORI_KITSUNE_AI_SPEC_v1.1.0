@@ -56,6 +56,8 @@ def build_answer_sources(
             "project_document_understanding",
             "project_document_outline",
             "project_document_deep_search",
+            "project_document_exhaustive_question",
+            "project_document_question_status",
         }:
             continue
         result = action.get("result") or {}
@@ -84,6 +86,27 @@ def build_answer_sources(
                 "document_id": document.get("id"),
                 "filename": document.get("filename"),
                 "locator": locator,
+            }]
+        elif tool_name in {
+            "project_document_exhaustive_question",
+            "project_document_question_status",
+        }:
+            document = result.get("document") or {}
+            question = result.get("question") or {}
+            answer = question.get("answer") or {}
+            evidence = answer.get("evidence") or []
+            locator = next(
+                (
+                    item.get("locator")
+                    for item in evidence
+                    if isinstance(item, dict) and item.get("locator")
+                ),
+                None,
+            )
+            candidates = [{
+                "document_id": document.get("id"),
+                "filename": document.get("filename"),
+                "locator": locator or f"document:{document.get('id')}:exhaustive",
             }]
         else:
             candidates = (

@@ -6,6 +6,7 @@ from .db import list_memory_facts
 from .epistemic import epistemic_snapshot, list_claims, verify_claim
 from .development import run_project_self_check
 from .document_intelligence import deep_analyze_document
+from .document_questions import run_exhaustive_document_question
 from .tasks import register_task_handler
 
 
@@ -52,6 +53,20 @@ def document_intelligence_handler(project_id: int, payload: dict) -> dict:
     )
 
 
+def document_question_handler(project_id: int, payload: dict) -> dict:
+    question_id = int(payload.get("question_id") or 0)
+    if question_id <= 0:
+        raise ValueError("Для полного вопроса по документу нужен question_id.")
+    task_id = payload.get("_task_id")
+    return asyncio.run(
+        run_exhaustive_document_question(
+            project_id,
+            question_id,
+            task_id=int(task_id) if task_id is not None else None,
+        )
+    )
+
+
 def epistemic_review_handler(project_id: int, payload: dict) -> dict:
     reviewed = []
     for claim in list_claims(project_id, limit=300):
@@ -77,3 +92,4 @@ def register_background_handlers() -> None:
     register_task_handler("memory_consolidation", memory_consolidation_handler)
     register_task_handler("epistemic_review", epistemic_review_handler)
     register_task_handler("document_intelligence", document_intelligence_handler)
+    register_task_handler("document_question", document_question_handler)
