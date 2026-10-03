@@ -7,6 +7,7 @@ import httpx
 from .config import settings
 from .persona import build_persona_context
 from .account import list_cloudru_models
+from .db import get_account_profile
 
 
 SYSTEM_PROMPT = """Ты Миёри — личная AI-помощница с канонической художественной личностью из Persona Pack.
@@ -57,6 +58,19 @@ async def chat(
         raise ProviderError(f"Не удалось загрузить Persona Pack Миёри: {exc}") from exc
 
     system_prompt = SYSTEM_PROMPT + "\n\n" + persona_context
+
+    profile = get_account_profile()
+    if profile:
+        address = (profile.get("miyori_address") or "Господин").strip()
+        owner_name = (profile.get("owner_name") or "").strip()
+        language = (profile.get("language") or "ru-RU").strip()
+        system_prompt += (
+            "\n\nЛОКАЛЬНЫЙ ПРОФИЛЬ ВЛАДЕЛЬЦА:\n"
+            f"- имя владельца: {owner_name or 'не указано'}\n"
+            f"- предпочтительное обращение: {address}\n"
+            f"- язык интерфейса/общения: {language}\n"
+            "Используй предпочтительное обращение владельца естественно и не подменяй его каноническим обращением Persona Pack."
+        )
 
     if brain_plan:
         system_prompt += (
