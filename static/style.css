@@ -2819,3 +2819,23 @@ body.sheet-open { overflow: hidden; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* 00.00.22 — Cloud.ru model selector */
+.settings-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #ded6ef;
+  border-radius: 12px;
+  outline: none;
+  background: #fff;
+  color: #413852;
+}
+.settings-form select:focus {
+  border-color: #a78be8;
+  box-shadow: 0 0 0 3px rgba(139,107,230,.10);
+}
+.settings-form select:disabled {
+  opacity: .65;
+}
