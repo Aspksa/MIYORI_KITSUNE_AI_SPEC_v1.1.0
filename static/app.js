@@ -212,13 +212,14 @@ async function loadNexus() {
 }
 
 
-function addContextOrbit(brain, agent) {
+function addContextOrbit(brain, agent, epistemic) {
   const actions = agent?.actions?.filter((item) => item.status === "completed") || [];
   const sources = brain?.sources || [];
   const memoryCount = brain?.memory_items || 0;
   const plan = brain?.plan || [];
+  const knowledge = epistemic?.used_claims || [];
 
-  if (!memoryCount && !sources.length && !actions.length && !plan.length) return;
+  if (!memoryCount && !sources.length && !actions.length && !plan.length && !knowledge.length) return;
 
   const drawer = document.createElement("section");
   drawer.className = "response-context collapsed";
@@ -226,6 +227,7 @@ function addContextOrbit(brain, agent) {
   const summaryBits = [];
   if (sources.length) summaryBits.push(sources.length + " источн.");
   if (memoryCount) summaryBits.push(memoryCount + " память");
+  if (knowledge.length) summaryBits.push(knowledge.length + " знан.");
   if (actions.length) summaryBits.push(actions.length + " действ.");
   if (plan.length) summaryBits.push(plan.length + " шага");
 
@@ -263,6 +265,25 @@ function addContextOrbit(brain, agent) {
     section.innerHTML =
       '<h4>Память</h4><div class="context-stat">Использовано подтверждённых фактов: <strong>' +
       memoryCount + '</strong></div>';
+    body.appendChild(section);
+  }
+
+  if (knowledge.length) {
+    const section = document.createElement("div");
+    section.className = "context-section";
+    section.innerHTML = '<h4>Проверенные знания</h4>';
+    for (const claim of knowledge) {
+      const item = document.createElement("div");
+      item.className = "context-item";
+      const confidence = typeof claim.confidence === "number"
+        ? Math.round(claim.confidence * 100) + "%"
+        : "—";
+      item.innerHTML =
+        '<strong>' + escapeHtml(claim.status || "knowledge") +
+        ' · ' + confidence + '</strong>' +
+        '<p>' + escapeHtml(claim.statement || "") + '</p>';
+      section.appendChild(item);
+    }
     body.appendChild(section);
   }
 
@@ -1263,7 +1284,7 @@ form.addEventListener("submit", async (event) => {
         );
       }
     }
-    addContextOrbit(data.brain, data.agent);
+    addContextOrbit(data.brain, data.agent, data.epistemic);
     setProcessingStage("result", "Результат готов");
     updateLivingIntent(
       livingIntent,
