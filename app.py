@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -24,9 +24,11 @@ from miyori.db import (
     get_project,
     init_db,
     add_document,
+    create_document_folder,
     create_task,
     development_snapshot,
     list_conversations,
+    list_document_folders,
     list_documents,
     list_projects,
     list_memory_facts,
@@ -87,7 +89,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.24", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.25", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -99,6 +101,12 @@ class ChatRequest(BaseModel):
 
 class ProjectCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+    kind: str = Field(default="home", pattern="^(home|work)$")
+
+
+class DocumentFolderCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    parent_id: int | None = None
 
 
 class MemoryStatusRequest(BaseModel):
@@ -180,7 +188,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.24",
+        "version": "00.00.25",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -281,7 +289,7 @@ def projects() -> dict:
 @app.post("/api/projects")
 def project_create(request: ProjectCreateRequest) -> dict:
     try:
-        project = create_project(request.name)
+        project = create_project(request.name, kind=request.kind)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"project": project}
@@ -349,16 +357,42 @@ def memory_replace(project_id: int, fact_id: int, request: MemoryReplaceRequest)
 
 
 @app.get("/api/projects/{project_id}/documents")
-def documents(project_id: int) -> dict:
+def documents(project_id: int, folder_id: int | None = None) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
-    return {"documents": list_documents(project_id)}
+    return {
+        "documents": list_documents(project_id, folder_id=folder_id),
+        "folders": list_document_folders(project_id),
+    }
+
+
+@app.get("/api/projects/{project_id}/document-folders")
+def document_folders(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"folders": list_document_folders(project_id)}
+
+
+@app.post("/api/projects/{project_id}/document-folders")
+def document_folder_create(project_id: int, request: DocumentFolderCreateRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        folder = create_document_folder(
+            project_id,
+            request.name,
+            parent_id=request.parent_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"folder": folder}
 
 
 @app.post("/api/projects/{project_id}/documents")
 async def document_upload(
     project_id: int,
     file: UploadFile = File(...),
+    folder_id: int | None = Form(default=None),
 ) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
@@ -385,6 +419,7 @@ async def document_upload(
         sha256=digest,
         size_bytes=len(data),
         chunks=chunks,
+        folder_id=folder_id,
     )
     init_rag()
     return {
