@@ -653,6 +653,19 @@ form.addEventListener("submit", async (event) => {
           '</strong><span>' + escapeHtml(action.reason) + '</span><small>' +
           escapeHtml(action.status) + '</small></div>';
       }).join("");
+
+      const completedActions = data.agent.actions.filter((action) => action.status === "completed");
+      if (completedActions.length) {
+        addActivityCard(
+          "Agent Core · действия",
+          completedActions.map((action) => ({
+            step: action.step_index,
+            tool: action.tool_name || "без инструмента",
+            status: action.status
+          })),
+          "neutral"
+        );
+      }
     }
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
