@@ -45,7 +45,7 @@ def init_db() -> None:
                 miyori_address TEXT NOT NULL DEFAULT 'Господин',
                 avatar_path TEXT,
                 language TEXT NOT NULL DEFAULT 'ru-RU',
-                timezone TEXT NOT NULL DEFAULT 'Europe/Amsterdam',
+                timezone TEXT NOT NULL DEFAULT 'UTC',
                 profile_kind TEXT NOT NULL DEFAULT 'personal',
                 updated_at TEXT NOT NULL
             );
@@ -291,7 +291,7 @@ def init_db() -> None:
                 INSERT INTO account_profile(
                     id, owner_name, miyori_address, avatar_path,
                     language, timezone, profile_kind, updated_at
-                ) VALUES (1, '', 'Господин', NULL, 'ru-RU', 'Europe/Amsterdam', 'personal', ?)
+                ) VALUES (1, '', 'Господин', NULL, 'ru-RU', 'UTC', 'personal', ?)
                 """,
                 (utc_now(),),
             )
