@@ -3444,3 +3444,334 @@ body.sheet-open { overflow: hidden; }
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+/* 00.00.30 — Miyori AI home, account center, Drive enhancements */
+.ai-home-item {
+  border-color: #d7c8f3;
+  background: linear-gradient(145deg, #f4eeff, #fff);
+}
+.ai-menu-icon {
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  color: #6e50c5;
+  background: #ece3ff;
+}
+
+.account-dashboard {
+  width: min(980px, 100%);
+}
+.account-hero {
+  display: grid;
+  grid-template-columns: 92px minmax(0,1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 20px;
+  border: 1px solid #e4ddf0;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 88% 15%, rgba(143,107,226,.12), transparent 16rem),
+    #fff;
+  box-shadow: 0 14px 36px rgba(82,64,130,.07);
+}
+.account-avatar-wrap {
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  overflow: hidden;
+  border: 1px solid #d8cbed;
+  border-radius: 22px;
+  background: linear-gradient(145deg,#efe7ff,#faf7ff);
+  color: #7654cb;
+  font-size: 26px;
+  font-weight: 800;
+}
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.account-avatar-edit {
+  color: #7358ba;
+  font-size: 8px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.account-hero-copy span,
+.account-hero-copy p {
+  color: #958ca1;
+  font-size: 9px;
+}
+.account-hero-copy h3 {
+  margin: 5px 0;
+  color: #3f3451;
+  font-size: 20px;
+}
+.account-hero-copy p {
+  margin: 0;
+}
+.account-hero-copy p strong {
+  color: #655779;
+}
+.account-stat-grid,
+.account-cloud-summary {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+.account-stat-grid > div,
+.account-cloud-summary > div {
+  padding: 12px;
+  border: 1px solid #e8e1f1;
+  border-radius: 13px;
+  background: #fcfbff;
+}
+.account-stat-grid span,
+.account-cloud-summary span {
+  display: block;
+  margin-bottom: 4px;
+  color: #9a92a7;
+  font-size: 8px;
+}
+.account-stat-grid strong,
+.account-cloud-summary strong {
+  display: block;
+  overflow: hidden;
+  color: #4c415c;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-tabs {
+  display: flex;
+  gap: 5px;
+  margin-top: 16px;
+  padding: 5px;
+  border: 1px solid #e8e1f0;
+  border-radius: 14px;
+  background: #faf8fd;
+}
+.account-tab {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #81778e;
+  font-size: 9px;
+  font-weight: 750;
+}
+.account-tab.active {
+  background: #fff;
+  color: #6749ba;
+  box-shadow: 0 3px 12px rgba(86,67,135,.08);
+}
+.account-tab-panels {
+  margin-top: 12px;
+}
+.account-tab-panel {
+  display: none;
+  padding: 18px;
+  border: 1px solid #e7e0ef;
+  border-radius: 18px;
+  background: #fff;
+}
+.account-tab-panel.active {
+  display: block;
+}
+.account-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 13px;
+}
+.account-form-grid label {
+  display: grid;
+  gap: 6px;
+}
+.account-form-grid label > span {
+  color: #594e68;
+  font-size: 9px;
+  font-weight: 750;
+}
+.account-form-grid input,
+.account-form-grid select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid #ded6eb;
+  border-radius: 11px;
+  background: #fff;
+  color: #493f56;
+}
+.account-form-result,
+.account-form-actions {
+  grid-column: 1 / -1;
+}
+.account-cloud-form {
+  margin-top: 16px;
+  max-width: 720px;
+}
+.account-devices-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.account-devices-head strong {
+  display: block;
+  color: #463b56;
+  font-size: 11px;
+}
+.account-devices-head small {
+  display: block;
+  margin-top: 3px;
+  color: #9b92a6;
+  font-size: 8px;
+}
+.account-device-list {
+  display: grid;
+  gap: 8px;
+}
+.account-device-row,
+.account-mobile-placeholder {
+  display: grid;
+  grid-template-columns: 38px minmax(0,1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid #e8e1ef;
+  border-radius: 13px;
+  background: #fcfbff;
+}
+.account-device-icon,
+.account-mobile-placeholder > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: #eee8ff;
+  color: #7254c8;
+}
+.account-device-row strong,
+.account-device-row small,
+.account-mobile-placeholder strong,
+.account-mobile-placeholder small {
+  display: block;
+}
+.account-device-row strong,
+.account-mobile-placeholder strong {
+  color: #4b405a;
+  font-size: 9px;
+}
+.account-device-row small,
+.account-mobile-placeholder small {
+  margin-top: 3px;
+  color: #9e95a8;
+  font-size: 8px;
+}
+.account-mobile-placeholder {
+  margin-top: 12px;
+  grid-template-columns: 38px minmax(0,1fr) auto;
+  border-style: dashed;
+}
+
+.drive-overview {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 8px;
+  padding: 14px 18px 0;
+}
+.drive-overview > div {
+  padding: 10px 12px;
+  border: 1px solid #e9e3f0;
+  border-radius: 12px;
+  background: #fbfaff;
+}
+.drive-overview span {
+  display: block;
+  color: #9c93a6;
+  font-size: 8px;
+}
+.drive-overview strong {
+  display: block;
+  margin-top: 4px;
+  color: #493f58;
+  font-size: 12px;
+}
+.drive-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: calc(100% - 36px);
+  min-height: 74px;
+  margin: 14px 18px 0;
+  border: 1px dashed #cfc1ea;
+  border-radius: 14px;
+  background: #faf7ff;
+  color: #655878;
+}
+.drive-dropzone.dragging {
+  border-color: #8b67dc;
+  background: #f0e8ff;
+  box-shadow: inset 0 0 0 2px rgba(128,91,216,.08);
+}
+.drive-drop-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #eadfff;
+  color: #7451cb;
+  font-size: 18px;
+}
+.drive-dropzone strong,
+.drive-dropzone small {
+  display: block;
+  text-align: left;
+}
+.drive-dropzone strong {
+  color: #50435f;
+  font-size: 9px;
+}
+.drive-dropzone small {
+  margin-top: 3px;
+  color: #9b91a6;
+  font-size: 8px;
+}
+
+@media (max-width: 780px) {
+  .account-hero {
+    grid-template-columns: 74px 1fr;
+  }
+  .account-hero-status {
+    grid-column: 1 / -1;
+  }
+  .account-stat-grid,
+  .account-cloud-summary,
+  .drive-overview {
+    grid-template-columns: 1fr 1fr;
+  }
+  .account-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .account-device-row {
+    grid-template-columns: 38px minmax(0,1fr);
+  }
+  .account-device-row .soft-status,
+  .account-device-row button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
