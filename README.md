@@ -18,7 +18,7 @@
 - отделение художественной биографии Миёри от реальной памяти пользователя;
 - retrieved memory/documents/tool output помечаются как данные, а не системные инструкции.
 
-Текущая внутренняя версия приложения: **00.00.16**.
+Текущая внутренняя версия приложения: **00.00.17**.
 
 ## Первый запуск на Windows
 
@@ -172,3 +172,49 @@ python -m unittest tests.test_epistemic
 ```
 
 Важно: Epistemic Core оценивает предоставленные доказательства. Автоматический веб-поиск и получение внешних первичных источников ещё не реализованы.
+
+
+## RAG Core 00.00.17
+
+RAG объединяет три источника контекста:
+
+- chunks документов проекта;
+- подтверждённую память;
+- `supported/verified` знания Epistemic Core.
+
+Retrieval использует локальный гибридный режим:
+
+```text
+query
+├─ SQLite FTS5 по document_chunks
+├─ lexical document search
+├─ verified memory
+└─ epistemic knowledge
+       ↓
+Reciprocal Rank Fusion
+       ↓
+deduplication
+       ↓
+source quotas
+       ↓
+context budget
+       ↓
+RAG_ДАННЫЕ → provider
+```
+
+Если SQLite в portable Python собран без FTS5, RAG автоматически переходит в `hybrid_lexical_rrf` и приложение продолжает работать.
+
+API:
+
+- `GET /api/projects/{project_id}/rag?q=...&limit=8`
+- `GET /api/status` содержит состояние RAG/FTS5.
+
+После загрузки документа индекс автоматически пересобирается. Self-check проверяет согласованность количества FTS chunks с `document_chunks`.
+
+Проверка:
+
+```bash
+python -m unittest tests.test_persona tests.test_epistemic tests.test_rag
+```
+
+Текущий RAG не использует внешнюю vector database и embeddings. Это сознательный первый слой: переносимый локальный retrieval без новых API-зависимостей. Embedding-канал можно добавить позже как ещё один ranker в существующий RRF.
