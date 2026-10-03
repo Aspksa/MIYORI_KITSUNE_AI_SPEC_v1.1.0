@@ -46,12 +46,13 @@ from miyori.brain import build_context
 from miyori.development import run_project_self_check
 from miyori.documents import chunk_text, decode_document, safe_filename, save_original, sha256_bytes
 from miyori.provider import ProviderError, chat
+from miyori.persona import persona_metadata
 from miyori.tasks import wake_worker
 from miyori.tools import execute_approved_request, execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.14")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.15")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -103,7 +104,8 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.14",
+        "version": "00.00.15",
+        "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
