@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import threading
 import webbrowser
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
@@ -63,7 +64,7 @@ from miyori.epistemic import (
 from miyori.tasks import wake_worker
 from miyori.rag import init_rag, rag_status, retrieve as rag_retrieve
 from miyori.tools import execute_approved_request, execute_tool, list_tools
-from miyori.account import cloudru_profile, save_cloudru_profile, test_cloudru
+from miyori.account import cloudru_profile, list_cloudru_models, save_cloudru_profile, test_cloudru
 from miyori.updater import (
     UpdateError,
     apply_update,
@@ -74,7 +75,19 @@ from miyori.updater import (
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.21")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    init_epistemic_db()
+    init_rag()
+    register_background_handlers()
+    wake_worker()
+    clear_restart_required()
+    start_update_monitor()
+    yield
+
+
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.22", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -145,17 +158,6 @@ class CloudRuTestRequest(BaseModel):
     model_id: str | None = Field(default=None, max_length=300)
 
 
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
-    init_epistemic_db()
-    init_rag()
-    register_background_handlers()
-    wake_worker()
-    clear_restart_required()
-    start_update_monitor()
-
-
 def _require_local_admin(request: Request) -> None:
     host = request.client.host if request.client else ""
     try:
@@ -178,7 +180,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.21",
+        "version": "00.00.22",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -197,9 +199,21 @@ def account_cloudru_get(request: Request) -> dict:
 
 
 @app.put("/api/account/cloudru")
-def account_cloudru_save(request: CloudRuProfileRequest, http_request: Request) -> dict:
+async def account_cloudru_save(request: CloudRuProfileRequest, http_request: Request) -> dict:
     _require_local_admin(http_request)
     try:
+        model = (request.model_id or "").strip()
+        if model:
+            catalog = await list_cloudru_models(
+                api_key=request.api_key,
+                base_url=request.base_url,
+            )
+            chat_ids = {item["id"] for item in catalog["chat_models"]}
+            if model not in chat_ids:
+                raise ValueError(
+                    f"«{model}» не является доступной чат-моделью Cloud.ru. "
+                    "Выберите Model ID из загруженного списка."
+                )
         profile = save_cloudru_profile(
             api_key=request.api_key,
             base_url=request.base_url,
@@ -207,7 +221,20 @@ def account_cloudru_save(request: CloudRuProfileRequest, http_request: Request) 
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     return {"cloudru": profile}
+
+
+@app.get("/api/account/cloudru/models")
+async def account_cloudru_models(request: Request) -> dict:
+    _require_local_admin(request)
+    try:
+        return await list_cloudru_models()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.post("/api/account/cloudru/test")
