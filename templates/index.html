@@ -30,6 +30,18 @@
         <div id="conversationList" class="conversation-list"></div>
       </div>
 
+      <div class="panel documents-panel">
+        <div class="panel-header">
+          <span class="eyebrow">Документы</span>
+          <label class="text-button upload-label">Добавить
+            <input id="documentInput" type="file" accept=".txt,.md,.markdown,.json" hidden>
+          </label>
+        </div>
+        <input id="documentSearch" class="memory-search" type="search" placeholder="Поиск по документам…">
+        <div id="documentList" class="document-list"></div>
+        <div id="documentSearchResults" class="document-results"></div>
+      </div>
+
       <div class="panel memory-panel">
         <div class="panel-header">
           <span class="eyebrow">Память</span>
@@ -50,7 +62,7 @@
 
       <div class="panel compact">
         <span class="eyebrow">Версия</span>
-        <strong id="versionText">00.00.04</strong>
+        <strong id="versionText">00.00.05</strong>
       </div>
 
       <div class="sidebar-note">
