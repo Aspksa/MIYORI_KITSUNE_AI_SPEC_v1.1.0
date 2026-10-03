@@ -63,6 +63,13 @@
       <section id="messages" class="messages" aria-live="polite"></section>
 
       <footer class="composer-wrap">
+        <div class="chat-actions-wrap">
+          <div class="chat-actions-head">
+            <span>Действия</span>
+            <small>Руки Миёри · безопасные действия выполняются сразу</small>
+          </div>
+          <div id="chatActionBar" class="chat-action-bar"></div>
+        </div>
         <form id="chatForm" class="composer">
           <div class="composer-field">
             <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Сообщение Миёри…" required></textarea>
@@ -132,15 +139,6 @@
             <input id="documentSearch" class="search-field" type="search" placeholder="Поиск по документам…">
             <div id="documentList" class="document-list"></div>
             <div id="documentSearchResults" class="document-results"></div>
-          </section>
-
-          <section class="module-card">
-            <div class="module-head">
-              <div class="module-icon">✋</div>
-              <div class="module-title"><span>Руки</span><small>Инструменты и workspace</small></div>
-              <button id="refreshTools" class="card-action" type="button">↻</button>
-            </div>
-            <div id="toolList" class="tool-list"></div>
           </section>
 
           <section class="module-card">
