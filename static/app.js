@@ -27,6 +27,7 @@ const taskList = el("taskList");
 const developmentStats = el("developmentStats");
 const agentTrace = el("agentTrace");
 const agentBudget = el("agentBudget");
+const permissionList = el("permissionList");
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -107,7 +108,7 @@ async function loadProjects() {
   updateProjectLabel();
   await Promise.all([
     loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadTasks(), loadDevelopment()
+    loadTools(), loadPermissions(), loadTasks(), loadDevelopment()
   ]);
 }
 
@@ -208,6 +209,16 @@ async function loadTools() {
           const query = prompt("Что искать?");
           if (!query || !query.trim()) return;
           argumentsPayload = {query: query.trim()};
+        } else if (tool.name === "workspace_read") {
+          const path = prompt("Путь к файлу в workspace:");
+          if (!path || !path.trim()) return;
+          argumentsPayload = {path: path.trim()};
+        } else if (tool.name === "workspace_create" || tool.name === "workspace_modify") {
+          const path = prompt("Путь к файлу в workspace:");
+          if (!path || !path.trim()) return;
+          const content = prompt("Содержимое файла:");
+          if (content === null) return;
+          argumentsPayload = {path: path.trim(), content};
         }
         try {
           const result = await api("/api/projects/" + state.projectId + "/tools/execute", {
@@ -217,7 +228,12 @@ async function loadTools() {
           });
           const output = document.createElement("pre");
           output.className = "tool-output";
-          output.textContent = JSON.stringify(result.result, null, 2);
+          if (result.status === "approval_required") {
+            output.textContent = "Требуется подтверждение пользователя.";
+            await loadPermissions();
+          } else {
+            output.textContent = JSON.stringify(result.result, null, 2);
+          }
           row.appendChild(output);
         } catch (error) {
           showError(error.message);
@@ -228,6 +244,58 @@ async function loadTools() {
     }
   } catch (error) {
     toolList.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + '</div>';
+  }
+}
+
+async function decidePermission(requestId, approved) {
+  try {
+    await api("/api/projects/" + state.projectId + "/permissions/" + requestId + "/decision", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({approved})
+    });
+    await Promise.all([loadPermissions(), loadTools()]);
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+async function loadPermissions() {
+  if (!state.projectId) return;
+  try {
+    const data = await api("/api/projects/" + state.projectId + "/permissions");
+    permissionList.innerHTML = "";
+    if (!data.requests.length) {
+      permissionList.innerHTML = '<div class="conversation-empty">Запросов нет</div>';
+      return;
+    }
+
+    for (const req of data.requests.slice(0, 12)) {
+      const row = document.createElement("div");
+      row.className = "permission-item status-" + req.status;
+      row.innerHTML =
+        "<div><strong>#" + req.id + " " + escapeHtml(req.tool_name) + "</strong>" +
+        "<small>" + escapeHtml(req.status) + "</small></div>";
+
+      if (req.status === "pending") {
+        const actions = document.createElement("div");
+        actions.className = "permission-actions";
+        const allow = document.createElement("button");
+        allow.type = "button";
+        allow.textContent = "Разрешить";
+        allow.onclick = () => decidePermission(req.id, true);
+        const deny = document.createElement("button");
+        deny.type = "button";
+        deny.textContent = "Отклонить";
+        deny.onclick = () => decidePermission(req.id, false);
+        actions.append(allow, deny);
+        row.appendChild(actions);
+      }
+
+      permissionList.appendChild(row);
+    }
+  } catch (error) {
+    permissionList.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + "</div>";
   }
 }
 
@@ -529,6 +597,7 @@ documentSearch.addEventListener("input", searchDocuments);
 documentInput.addEventListener("change", () => uploadDocument(documentInput.files[0]));
 el("refreshMemory").addEventListener("click", loadMemory);
 el("refreshTools").addEventListener("click", loadTools);
+el("refreshPermissions").addEventListener("click", loadPermissions);
 el("refreshTasks").addEventListener("click", loadTasks);
 el("runSelfCheckTask").addEventListener("click", () => createBackgroundTask("self_check"));
 el("runMemoryTask").addEventListener("click", () => createBackgroundTask("memory_consolidation"));
