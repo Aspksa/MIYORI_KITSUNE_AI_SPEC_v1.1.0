@@ -877,3 +877,57 @@ body.inspector-hidden .inspector { display: none; }
 .source-card strong { display: block; margin-bottom: 4px; color: #b99ccb; font-size: 9px; }
 .source-card p { margin: 0 0 7px; color: #929ca9; font-size: 9px; line-height: 1.45; }
 .chat-action.special { border-color: #3a3342; background: #17151d; }
+
+
+.action-launcher {
+  position: relative;
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid #2c3340;
+  border-radius: 14px;
+  background: rgba(14, 18, 24, .98);
+  box-shadow: 0 16px 40px rgba(0,0,0,.28);
+}
+.action-launcher[hidden] { display: none; }
+.action-launcher-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.action-launcher-head strong {
+  display: block;
+  color: #e1e4e9;
+  font-size: 10px;
+}
+.action-launcher-head small {
+  display: block;
+  margin-top: 2px;
+  color: #6f7885;
+  font-size: 8px;
+}
+.action-launcher-head button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #343b47;
+  border-radius: 8px;
+  background: #191f28;
+  color: #aeb5c0;
+  font-size: 16px;
+}
+.ability-button {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 1px solid #3c3345;
+  border-radius: 12px;
+  background: #1b1720;
+  color: #d8c3e3;
+  font-size: 22px;
+  line-height: 1;
+}
+.ability-button:hover {
+  border-color: #665174;
+  background: #241b2a;
+}
