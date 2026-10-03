@@ -1744,6 +1744,14 @@ async function renderUpdateWorkspace(refresh = false) {
       '<div id="workspaceUpdateStatus" class="workspace-loading">Проверяю состояние…</div>' +
       '<div class="sheet-actions"><button id="workspaceUpdateCheck" class="secondary-sheet-button" type="button">Проверить GitHub</button>' +
       '<button id="workspaceUpdateApply" class="primary-sheet-button" type="button">Обновить сейчас</button></div>' +
+    '</section>' +
+    '<section class="workspace-card workspace-card-wide update-release-card">' +
+      '<div class="workspace-card-head"><div><strong>Версии модулей</strong><small>Видно, какие части Miyori развиваются и в каком они состоянии</small></div></div>' +
+      '<div id="workspaceModuleVersions" class="module-version-grid"><div class="workspace-loading">Загружаю версии…</div></div>' +
+    '</section>' +
+    '<section class="workspace-card workspace-card-wide update-release-card">' +
+      '<div class="workspace-card-head"><div><strong>Описание обновлений</strong><small>Полный журнал изменений по релизам и модулям</small></div></div>' +
+      '<div id="workspaceChangelog" class="update-changelog"><div class="workspace-loading">Загружаю историю…</div></div>' +
     '</section>';
 
   const container = el("workspaceUpdateStatus");
@@ -1806,7 +1814,45 @@ async function renderUpdateWorkspace(refresh = false) {
     }
   };
 
-  await load(refresh);
+  const loadChangelog = async () => {
+    const modulesNode = el("workspaceModuleVersions");
+    const changelogNode = el("workspaceChangelog");
+    try {
+      const data = await api("/api/update/changelog");
+      const modules = data.manifest?.modules || [];
+      modulesNode.innerHTML = modules.map(module => {
+        const statusLabel = module.status === "active" ? "Развивается" :
+          module.status === "foundation" ? "Основа" :
+          module.status === "planned" ? "Запланирован" : module.status;
+        return '<article class="module-version-card">' +
+          '<div><strong>' + escapeHtml(module.name) + '</strong><small>' + escapeHtml(module.description) + '</small></div>' +
+          '<span class="module-version-number">v' + escapeHtml(module.version) + '</span>' +
+          '<span class="module-development-status ' + escapeHtml(module.status) + '">' + escapeHtml(statusLabel) + '</span>' +
+        '</article>';
+      }).join("");
+
+      changelogNode.innerHTML = (data.releases || []).map((release, releaseIndex) =>
+        '<article class="release-entry ' + (releaseIndex === 0 ? 'current' : '') + '">' +
+          '<header><div><span>Релиз ' + escapeHtml(release.version) + '</span><strong>' + escapeHtml(release.title) + '</strong></div>' +
+          (releaseIndex === 0 ? '<span class="soft-status ok">Текущий</span>' : '') + '</header>' +
+          '<p>' + escapeHtml(release.summary) + '</p>' +
+          '<div class="release-module-list">' +
+          (release.modules || []).map(item => {
+            const module = modules.find(candidate => candidate.key === item.key);
+            return '<div class="release-module-change"><div><strong>' +
+              escapeHtml(module?.name || item.key) + '</strong><span>v' + escapeHtml(item.version || module?.version || "—") + '</span></div>' +
+              '<ul>' + (item.changes || []).map(change => '<li>' + escapeHtml(change) + '</li>').join("") + '</ul></div>';
+          }).join("") +
+          '</div>' +
+        '</article>'
+      ).join("");
+    } catch (error) {
+      modulesNode.innerHTML = workspaceResult(error.message, "error");
+      changelogNode.innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  await Promise.all([load(refresh), loadChangelog()]);
 }
 
 async function renderDocumentsWorkspace() {
@@ -2110,7 +2156,124 @@ async function renderDocumentsWorkspace() {
   await renderDrive();
 }
 
+async function renderEmployeesModule(project, module) {
+  showWorkspaceShell("work", 'АО "Примавтодор"', "Сотрудники", "Кадровые сведения сотрудников проекта.");
+  workspaceBody.innerHTML =
+    '<section class="workspace-card workspace-card-wide employee-module">' +
+      '<div class="workspace-card-head"><div><strong>Сотрудники</strong><small>ФИО, отдел, должность и номер топливной карты</small></div>' +
+      '<span id="employeeCount" class="soft-status neutral">0 сотрудников</span></div>' +
+      '<form id="employeeForm" class="employee-form">' +
+        '<input id="employeeId" type="hidden">' +
+        '<label><span>ФИО</span><input id="employeeFullName" type="text" required placeholder="Иванов Иван Иванович"></label>' +
+        '<label><span>Отдел</span><input id="employeeDepartment" type="text" placeholder="Отдел"></label>' +
+        '<label><span>Должность</span><input id="employeePosition" type="text" placeholder="Должность"></label>' +
+        '<label><span>Номер топливной карты</span><input id="employeeFuelCard" type="text" placeholder="0000 0000"></label>' +
+        '<div class="employee-form-actions"><button id="employeeCancelEdit" class="secondary-sheet-button" type="button" hidden>Отмена</button>' +
+        '<button class="primary-sheet-button" type="submit">Сохранить сотрудника</button></div>' +
+      '</form>' +
+      '<div id="employeeResult"></div>' +
+      '<div class="employee-table-wrap"><table class="employee-table"><thead><tr><th>ФИО</th><th>Отдел</th><th>Должность</th><th>Топливная карта</th><th></th></tr></thead><tbody id="employeeTableBody"></tbody></table></div>' +
+      '<div class="sheet-actions employee-footer-actions"><button id="employeeBackProject" class="secondary-sheet-button" type="button">← К проекту</button></div>' +
+    '</section>';
+
+  let employees = [];
+  const result = el("employeeResult");
+
+  const resetForm = () => {
+    el("employeeId").value = "";
+    el("employeeFullName").value = "";
+    el("employeeDepartment").value = "";
+    el("employeePosition").value = "";
+    el("employeeFuelCard").value = "";
+    el("employeeCancelEdit").hidden = true;
+  };
+
+  const renderTable = () => {
+    el("employeeCount").textContent = employees.length + " сотрудников";
+    el("employeeTableBody").innerHTML = employees.length ? employees.map(employee =>
+      '<tr><td><strong>' + escapeHtml(employee.full_name) + '</strong></td>' +
+      '<td>' + escapeHtml(employee.department || "—") + '</td>' +
+      '<td>' + escapeHtml(employee.position || "—") + '</td>' +
+      '<td><code>' + escapeHtml(employee.fuel_card_number || "—") + '</code></td>' +
+      '<td class="employee-row-actions"><button type="button" data-employee-edit="' + employee.id + '">Изменить</button>' +
+      '<button type="button" class="danger" data-employee-delete="' + employee.id + '">Удалить</button></td></tr>'
+    ).join("") : '<tr><td colspan="5"><div class="workspace-empty">Сотрудников пока нет. Добавьте первого сотрудника.</div></td></tr>';
+
+    workspaceBody.querySelectorAll("[data-employee-edit]").forEach(button => {
+      button.onclick = () => {
+        const employee = employees.find(item => item.id === Number(button.dataset.employeeEdit));
+        if (!employee) return;
+        el("employeeId").value = employee.id;
+        el("employeeFullName").value = employee.full_name || "";
+        el("employeeDepartment").value = employee.department || "";
+        el("employeePosition").value = employee.position || "";
+        el("employeeFuelCard").value = employee.fuel_card_number || "";
+        el("employeeCancelEdit").hidden = false;
+        el("employeeFullName").focus();
+      };
+    });
+
+    workspaceBody.querySelectorAll("[data-employee-delete]").forEach(button => {
+      button.onclick = async () => {
+        if (!confirm("Удалить сотрудника?")) return;
+        try {
+          await api("/api/projects/" + project.id + "/employees/" + button.dataset.employeeDelete, {method:"DELETE"});
+          await loadEmployees();
+          result.innerHTML = workspaceResult("Сотрудник удалён.", "success");
+        } catch (error) {
+          result.innerHTML = workspaceResult(error.message, "error");
+        }
+      };
+    });
+  };
+
+  const loadEmployees = async () => {
+    try {
+      const data = await api("/api/projects/" + project.id + "/employees");
+      employees = data.employees || [];
+      renderTable();
+    } catch (error) {
+      result.innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  el("employeeForm").onsubmit = async (event) => {
+    event.preventDefault();
+    const employeeId = el("employeeId").value;
+    const payload = {
+      full_name: el("employeeFullName").value.trim(),
+      department: el("employeeDepartment").value.trim(),
+      position: el("employeePosition").value.trim(),
+      fuel_card_number: el("employeeFuelCard").value.trim()
+    };
+    try {
+      await api(
+        "/api/projects/" + project.id + "/employees" + (employeeId ? "/" + employeeId : ""),
+        {
+          method: employeeId ? "PUT" : "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(payload)
+        }
+      );
+      resetForm();
+      await loadEmployees();
+      result.innerHTML = workspaceResult(employeeId ? "Данные сотрудника обновлены." : "Сотрудник добавлен.", "success");
+    } catch (error) {
+      result.innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  el("employeeCancelEdit").onclick = resetForm;
+  el("employeeBackProject").onclick = () => renderProjectModule(project);
+  await loadEmployees();
+}
+
+
 async function renderPrimavtodorSubmodule(project, module) {
+  if (module.module_key === "employees") {
+    await renderEmployeesModule(project, module);
+    return;
+  }
   showWorkspaceShell(
     "work",
     'АО "Примавтодор"',
