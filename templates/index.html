@@ -3,145 +3,191 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d12">
   <title>Miyori Kitsune AI</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="shell">
-    <aside class="sidebar">
+  <div class="app-shell">
+    <aside class="left-rail">
       <div class="brand">
-        <div class="mark">狐</div>
-        <div><h1>Миёри</h1><p>Miyori Kitsune AI</p></div>
+        <div class="mark" aria-hidden="true">狐</div>
+        <div class="brand-copy">
+          <div class="brand-row">
+            <h1>Миёри</h1>
+            <span class="version-pill" id="versionText">00.00.08</span>
+          </div>
+          <p>Miyori Kitsune AI</p>
+        </div>
       </div>
 
-      <div class="panel">
-        <span class="eyebrow">Проект</span>
+      <section class="project-card">
+        <div class="section-caption">Текущий проект</div>
         <div class="project-row">
           <select id="projectSelect" aria-label="Выбор проекта"></select>
-          <button id="addProject" class="icon-button" type="button" title="Создать проект">+</button>
+          <button id="addProject" class="icon-button" type="button" title="Создать проект" aria-label="Создать проект">+</button>
         </div>
-      </div>
+      </section>
 
-      <div class="panel conversations-panel">
-        <div class="panel-header">
-          <span class="eyebrow">Разговоры</span>
-          <button id="newChatSide" class="text-button" type="button">Новый</button>
-        </div>
-        <div id="conversationList" class="conversation-list"></div>
+      <div class="rail-heading">
+        <span>Разговоры</span>
+        <button id="newChatSide" class="ghost-button" type="button">+ Новый</button>
       </div>
+      <div id="conversationList" class="conversation-list"></div>
 
-      <div class="panel documents-panel">
-        <div class="panel-header">
-          <span class="eyebrow">Документы</span>
-          <label class="text-button upload-label">Добавить
-            <input id="documentInput" type="file" accept=".txt,.md,.markdown,.json" hidden>
-          </label>
-        </div>
-        <input id="documentSearch" class="memory-search" type="search" placeholder="Поиск по документам…">
-        <div id="documentList" class="document-list"></div>
-        <div id="documentSearchResults" class="document-results"></div>
-      </div>
+      <div class="rail-spacer"></div>
 
-      <div class="panel memory-panel">
-        <div class="panel-header">
-          <span class="eyebrow">Память</span>
-          <button id="refreshMemory" class="text-button" type="button">Обновить</button>
-        </div>
-        <input id="memorySearch" class="memory-search" type="search" placeholder="Поиск в памяти…">
-        <div id="memoryList" class="memory-list"></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <span class="eyebrow">Мозг</span>
-          <span id="brainState" class="mini-status">ready</span>
-        </div>
-        <div id="brainPlan" class="brain-plan muted">План появится после запроса.</div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <span class="eyebrow">Agent Core</span>
-          <span id="agentBudget" class="mini-status">0/3</span>
-        </div>
-        <div id="agentTrace" class="agent-trace muted">Автоматических действий ещё не было.</div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <span class="eyebrow">Руки / инструменты</span>
-          <button id="refreshTools" class="text-button" type="button">Обновить</button>
-        </div>
-        <div id="toolList" class="tool-list"></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <span class="eyebrow">Разрешения</span>
-          <button id="refreshPermissions" class="text-button" type="button">Обновить</button>
-        </div>
-        <div id="permissionList" class="permission-list"></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <span class="eyebrow">Фоновые задачи</span>
-          <button id="refreshTasks" class="text-button" type="button">Обновить</button>
-        </div>
-        <div class="task-actions">
-          <button id="runSelfCheckTask" class="mini-button" type="button">Самопроверка</button>
-          <button id="runMemoryTask" class="mini-button" type="button">Память</button>
-        </div>
-        <div id="taskList" class="task-list"></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <span class="eyebrow">Развитие</span>
-          <button id="runDevelopmentCheck" class="text-button" type="button">Проверить</button>
-        </div>
-        <div id="developmentStats" class="development-stats muted">Нет данных.</div>
-      </div>
-
-      <div class="panel">
-        <span class="eyebrow">Состояние</span>
+      <section class="connection-card">
         <div class="status-line">
           <span id="statusDot" class="dot"></span>
-          <span id="statusText">Проверяю…</span>
+          <div>
+            <strong id="statusText">Проверяю…</strong>
+            <div id="modelText" class="subtle">Модель не выбрана</div>
+          </div>
         </div>
-        <div id="modelText" class="muted">Модель не выбрана</div>
-      </div>
-
-      <div class="panel compact">
-        <span class="eyebrow">Версия</span>
-        <strong id="versionText">00.00.08</strong>
-      </div>
-
-      <div class="sidebar-note">
-        Подтверждённая память ищется по смысловым словам текущего запроса. Устаревшие записи сохраняются в истории, но не передаются модели.
-      </div>
+      </section>
     </aside>
 
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <span class="eyebrow" id="projectLabel">Личная AI-помощница</span>
+    <main class="chat-area">
+      <header class="chat-header">
+        <div class="chat-title">
+          <span class="section-caption" id="projectLabel">Личная AI-помощница</span>
           <h2 id="conversationTitle">Разговор с Миёри</h2>
         </div>
-        <button id="newChat" class="secondary" type="button">Новый разговор</button>
+        <div class="header-actions">
+          <button id="toggleInspector" class="icon-action" type="button" title="Показать или скрыть панель" aria-label="Показать или скрыть панель">☷</button>
+          <button id="newChat" class="primary-soft" type="button">Новый разговор</button>
+        </div>
       </header>
 
       <section id="messages" class="messages" aria-live="polite"></section>
 
       <footer class="composer-wrap">
         <form id="chatForm" class="composer">
-          <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Напишите Миёри…" required></textarea>
-          <button id="sendButton" type="submit">Отправить</button>
+          <div class="composer-field">
+            <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Сообщение Миёри…" required></textarea>
+            <div class="composer-hint">Enter — отправить · Shift+Enter — новая строка</div>
+          </div>
+          <button id="sendButton" class="send-button" type="submit" aria-label="Отправить">↑</button>
         </form>
         <div id="errorBox" class="error" hidden></div>
       </footer>
     </main>
+
+    <aside class="inspector" id="inspector">
+      <div class="inspector-head">
+        <div>
+          <span class="section-caption">Центр управления</span>
+          <h3>Состояние Миёри</h3>
+        </div>
+        <span class="live-badge"><i></i> live</span>
+      </div>
+
+      <nav class="inspector-tabs" aria-label="Разделы панели">
+        <button class="inspector-tab active" type="button" data-tab="context">Контекст</button>
+        <button class="inspector-tab" type="button" data-tab="data">Данные</button>
+        <button class="inspector-tab" type="button" data-tab="system">Система</button>
+      </nav>
+
+      <div class="inspector-scroll">
+        <div class="inspector-page active" data-page="context">
+          <section class="module-card">
+            <div class="module-head">
+              <div class="module-icon">◎</div>
+              <div class="module-title"><span>Мозг</span><small>Рабочий план</small></div>
+              <span id="brainState" class="state-chip ok">ready</span>
+            </div>
+            <div id="brainPlan" class="brain-plan empty-copy">План появится после запроса.</div>
+          </section>
+
+          <section class="module-card">
+            <div class="module-head">
+              <div class="module-icon">⌘</div>
+              <div class="module-title"><span>Agent Core</span><small>Автоматические действия</small></div>
+              <span id="agentBudget" class="state-chip">0/3</span>
+            </div>
+            <div id="agentTrace" class="agent-trace empty-copy">Действий ещё не было.</div>
+          </section>
+
+          <section class="module-card">
+            <div class="module-head">
+              <div class="module-icon">✦</div>
+              <div class="module-title"><span>Память</span><small>Факты текущего проекта</small></div>
+              <button id="refreshMemory" class="card-action" type="button">↻</button>
+            </div>
+            <input id="memorySearch" class="search-field" type="search" placeholder="Поиск в памяти…">
+            <div id="memoryList" class="memory-list"></div>
+          </section>
+        </div>
+
+        <div class="inspector-page" data-page="data">
+          <section class="module-card">
+            <div class="module-head">
+              <div class="module-icon">▤</div>
+              <div class="module-title"><span>Документы</span><small>Материалы проекта</small></div>
+              <label class="card-action upload-label" title="Добавить документ">+
+                <input id="documentInput" type="file" accept=".txt,.md,.markdown,.json" hidden>
+              </label>
+            </div>
+            <input id="documentSearch" class="search-field" type="search" placeholder="Поиск по документам…">
+            <div id="documentList" class="document-list"></div>
+            <div id="documentSearchResults" class="document-results"></div>
+          </section>
+
+          <section class="module-card">
+            <div class="module-head">
+              <div class="module-icon">✋</div>
+              <div class="module-title"><span>Руки</span><small>Инструменты и workspace</small></div>
+              <button id="refreshTools" class="card-action" type="button">↻</button>
+            </div>
+            <div id="toolList" class="tool-list"></div>
+          </section>
+
+          <section class="module-card">
+            <div class="module-head">
+              <div class="module-icon">◇</div>
+              <div class="module-title"><span>Разрешения</span><small>Действия, ожидающие решения</small></div>
+              <button id="refreshPermissions" class="card-action" type="button">↻</button>
+            </div>
+            <div id="permissionList" class="permission-list"></div>
+          </section>
+        </div>
+
+        <div class="inspector-page" data-page="system">
+          <section class="module-card">
+            <div class="module-head">
+              <div class="module-icon">⟳</div>
+              <div class="module-title"><span>Фоновые задачи</span><small>Очередь и выполнение</small></div>
+              <button id="refreshTasks" class="card-action" type="button">↻</button>
+            </div>
+            <div class="quick-actions">
+              <button id="runSelfCheckTask" class="compact-button" type="button">Самопроверка</button>
+              <button id="runMemoryTask" class="compact-button" type="button">Консолидация памяти</button>
+            </div>
+            <div id="taskList" class="task-list"></div>
+          </section>
+
+          <section class="module-card">
+            <div class="module-head">
+              <div class="module-icon">↗</div>
+              <div class="module-title"><span>Развитие</span><small>Проверяемые метрики</small></div>
+              <button id="runDevelopmentCheck" class="card-action" type="button">✓</button>
+            </div>
+            <div id="developmentStats" class="development-stats empty-copy">Нет данных.</div>
+          </section>
+
+          <section class="module-card compact-status-card">
+            <div class="module-head">
+              <div class="module-icon">●</div>
+              <div class="module-title"><span>Система</span><small>Cloud.ru · SQLite · локальный UI</small></div>
+            </div>
+            <div class="system-note">Интерфейс показывает только реальные состояния модулей и подтверждённые действия.</div>
+          </section>
+        </div>
+      </div>
+    </aside>
   </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
