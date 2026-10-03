@@ -18,7 +18,7 @@
 - отделение художественной биографии Миёри от реальной памяти пользователя;
 - retrieved memory/documents/tool output помечаются как данные, а не системные инструкции.
 
-Текущая внутренняя версия приложения: **00.00.15**.
+Текущая внутренняя версия приложения: **00.00.16**.
 
 ## Первый запуск на Windows
 
@@ -134,3 +134,41 @@ Browser
 ```bash
 python -m unittest tests.test_persona
 ```
+
+
+## Epistemic Core 00.00.16
+
+Миёри хранит проверяемое знание отдельно от обычной памяти:
+
+```text
+Claim
+├─ status: candidate | supported | verified | disputed | rejected | superseded
+├─ type: fact | preference | hypothesis | strategy
+├─ confidence
+├─ Evidence[]
+└─ Contradictions[]
+```
+
+Каждое свидетельство связано с источником и позицией `supports / contradicts / neutral`.
+Внешний факт из одного сообщения пользователя не становится истинным автоматически.
+Прямое пользовательское предпочтение может быть подтверждено самим пользователем.
+Для внешнего факта статус `verified` требует нескольких независимых подтверждений достаточного качества.
+
+Фоновая задача `epistemic_review` переоценивает статусы только по уже сохранённым свидетельствам и не выдумывает новые источники.
+
+API:
+
+- `GET /api/projects/{project_id}/epistemic`
+- `POST /api/projects/{project_id}/epistemic/claims`
+- `GET /api/projects/{project_id}/epistemic/claims/{claim_id}`
+- `POST /api/projects/{project_id}/epistemic/sources`
+- `POST /api/projects/{project_id}/epistemic/claims/{claim_id}/evidence`
+- `POST /api/projects/{project_id}/epistemic/claims/{claim_id}/verify`
+
+Проверка:
+
+```bash
+python -m unittest tests.test_epistemic
+```
+
+Важно: Epistemic Core оценивает предоставленные доказательства. Автоматический веб-поиск и получение внешних первичных источников ещё не реализованы.
