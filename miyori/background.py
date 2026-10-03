@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .db import list_memory_facts
+from .epistemic import epistemic_snapshot, list_claims, verify_claim
 from .development import run_project_self_check
 from .tasks import register_task_handler
 
@@ -33,6 +34,27 @@ def memory_consolidation_handler(project_id: int, payload: dict) -> dict:
     }
 
 
+def epistemic_review_handler(project_id: int, payload: dict) -> dict:
+    reviewed = []
+    for claim in list_claims(project_id, limit=300):
+        if claim["status"] == "superseded":
+            continue
+        result = verify_claim(project_id, int(claim["id"]))
+        reviewed.append({
+            "claim_id": result.claim_id,
+            "status": result.status,
+            "confidence": result.confidence,
+            "reason": result.reason,
+        })
+    return {
+        "reviewed": len(reviewed),
+        "snapshot": epistemic_snapshot(project_id),
+        "items": reviewed[:100],
+        "note": "Ревизия переоценивает только по уже сохранённым свидетельствам; новых внешних фактов не выдумывает.",
+    }
+
+
 def register_background_handlers() -> None:
     register_task_handler("self_check", self_check_handler)
     register_task_handler("memory_consolidation", memory_consolidation_handler)
+    register_task_handler("epistemic_review", epistemic_review_handler)
