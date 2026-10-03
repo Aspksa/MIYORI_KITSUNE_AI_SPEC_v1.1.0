@@ -18,6 +18,22 @@
       </div>
 
       <div class="panel">
+        <span class="eyebrow">Проект</span>
+        <div class="project-row">
+          <select id="projectSelect" aria-label="Выбор проекта"></select>
+          <button id="addProject" class="icon-button" type="button" title="Создать проект">+</button>
+        </div>
+      </div>
+
+      <div class="panel conversations-panel">
+        <div class="panel-header">
+          <span class="eyebrow">Разговоры</span>
+          <button id="newChatSide" class="text-button" type="button">Новый</button>
+        </div>
+        <div id="conversationList" class="conversation-list"></div>
+      </div>
+
+      <div class="panel">
         <span class="eyebrow">Состояние</span>
         <div class="status-line">
           <span id="statusDot" class="dot"></span>
@@ -28,32 +44,24 @@
 
       <div class="panel compact">
         <span class="eyebrow">Версия</span>
-        <strong>00.00.01</strong>
+        <strong id="versionText">00.00.02</strong>
       </div>
 
       <div class="sidebar-note">
-        Ключ провайдера хранится только на локальном сервере приложения и не передаётся в браузер.
+        Проекты изолируют историю диалогов. Контекст выбранного проекта не смешивается с другими проектами.
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div>
-          <span class="eyebrow">Личная AI-помощница</span>
-          <h2>Разговор с Миёри</h2>
+          <span class="eyebrow" id="projectLabel">Личная AI-помощница</span>
+          <h2 id="conversationTitle">Разговор с Миёри</h2>
         </div>
         <button id="newChat" class="secondary" type="button">Новый разговор</button>
       </header>
 
-      <section id="messages" class="messages" aria-live="polite">
-        <article class="message assistant">
-          <div class="avatar">狐</div>
-          <div class="bubble">
-            <strong>Миёри</strong>
-            <p>Здравствуйте, Господин. Я готова к первому запуску. После настройки Cloud.ru мы сможем проверить настоящий диалог.</p>
-          </div>
-        </article>
-      </section>
+      <section id="messages" class="messages" aria-live="polite"></section>
 
       <footer class="composer-wrap">
         <form id="chatForm" class="composer">
