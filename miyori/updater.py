@@ -115,6 +115,7 @@ def local_status(*, fetch: bool = False) -> dict:
 
     result = {
         "repository": EXPECTED_REPO,
+        "install_mode": "git",
         "repository_url": f"https://github.com/{EXPECTED_REPO}",
         "branch": DEFAULT_BRANCH,
         "auto_update": AUTO_UPDATE,
