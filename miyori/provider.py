@@ -19,6 +19,7 @@ class ProviderError(RuntimeError):
 async def chat(
     messages: list[dict[str, str]],
     memory_context: list[str] | None = None,
+    document_context: list[dict] | None = None,
 ) -> str:
     if not settings.cloudru_api_key:
         raise ProviderError(
@@ -37,6 +38,21 @@ async def chat(
             f"{memory_block}\n"
             "Используй эти сведения как подтверждённый контекст текущего проекта. "
             "Не переноси их в другие проекты."
+        )
+
+    if document_context:
+        blocks = []
+        for item in document_context:
+            blocks.append(
+                f"[Документ: {item['filename']}; фрагмент: {item['chunk_index']}]\n"
+                f"{item['content']}"
+            )
+        system_prompt += (
+            "\n\nНайденные фрагменты документов текущего проекта:\n"
+            + "\n\n".join(blocks)
+            + "\nИспользуй их только если они относятся к вопросу. "
+              "Если утверждение основано на документе, укажи имя документа и номер фрагмента. "
+              "Не придумывай содержание, которого в этих фрагментах нет."
         )
 
     payload = {
