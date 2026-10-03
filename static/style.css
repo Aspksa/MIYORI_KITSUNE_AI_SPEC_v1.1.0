@@ -478,3 +478,20 @@ select {
 .agent-step strong { color: #d9dce3; font-size: 10px; }
 .agent-step span { color: #aeb6c2; font-size: 10px; line-height: 1.35; }
 .agent-step small { color: #6f7987; font-size: 9px; text-transform: uppercase; }
+
+.permission-list { display: grid; gap: 6px; max-height: 190px; overflow-y: auto; }
+.permission-item {
+  display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  padding: 8px 9px; border: 1px solid #303744; border-radius: 9px; background: #171c24;
+}
+.permission-item strong { display: block; color: #d9dce3; font-size: 10px; }
+.permission-item small { color: #7f8996; font-size: 9px; text-transform: uppercase; }
+.permission-item.status-pending { border-color: #6d5631; }
+.permission-item.status-executed { border-color: #315744; }
+.permission-item.status-denied,
+.permission-item.status-failed { border-color: #664040; }
+.permission-actions { display: flex; gap: 5px; }
+.permission-actions button {
+  padding: 5px 7px; border: 1px solid #3b4350; border-radius: 8px;
+  background: #202631; color: #dce1e8; font-size: 9px;
+}
