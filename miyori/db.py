@@ -76,9 +76,20 @@ def init_db() -> None:
                 FOREIGN KEY(supersedes_fact_id) REFERENCES memory_facts(id)
             );
 
+            CREATE TABLE IF NOT EXISTS document_folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                parent_id INTEGER,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id),
+                FOREIGN KEY(parent_id) REFERENCES document_folders(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
+                folder_id INTEGER,
                 filename TEXT NOT NULL,
                 stored_path TEXT NOT NULL,
                 mime_type TEXT,
@@ -86,7 +97,8 @@ def init_db() -> None:
                 size_bytes INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
                 UNIQUE(project_id, sha256),
-                FOREIGN KEY(project_id) REFERENCES projects(id)
+                FOREIGN KEY(project_id) REFERENCES projects(id),
+                FOREIGN KEY(folder_id) REFERENCES document_folders(id) ON DELETE SET NULL
             );
 
             CREATE TABLE IF NOT EXISTS document_chunks (
@@ -192,6 +204,38 @@ def init_db() -> None:
         if "project_id" not in columns:
             conn.execute("ALTER TABLE conversations ADD COLUMN project_id INTEGER")
 
+        project_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(projects)").fetchall()
+        }
+        if "kind" not in project_columns:
+            conn.execute("ALTER TABLE projects ADD COLUMN kind TEXT NOT NULL DEFAULT 'home'")
+
+        document_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(documents)").fetchall()
+        }
+        if "folder_id" not in document_columns:
+            conn.execute("ALTER TABLE documents ADD COLUMN folder_id INTEGER")
+
+        conn.execute(
+            "UPDATE projects SET kind = 'home' WHERE name = 'Личное'"
+        )
+        primavtodor = conn.execute(
+            "SELECT id FROM projects WHERE name = ?",
+            ('АО "Примавтодор"',),
+        ).fetchone()
+        if primavtodor:
+            conn.execute(
+                "UPDATE projects SET kind = 'work' WHERE id = ?",
+                (int(primavtodor["id"]),),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO projects(name, kind, created_at) VALUES (?, 'work', ?)",
+                ('АО "Примавтодор"', utc_now()),
+            )
+
         row = conn.execute(
             "SELECT id FROM projects WHERE name = ?", ("Личное",)
         ).fetchone()
@@ -217,6 +261,7 @@ def list_projects() -> list[dict]:
             SELECT
                 p.id,
                 p.name,
+                p.kind,
                 p.created_at,
                 COUNT(c.id) AS conversation_count
             FROM projects p
@@ -228,22 +273,24 @@ def list_projects() -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def create_project(name: str) -> dict:
+def create_project(name: str, kind: str = "home") -> dict:
     clean = name.strip()
+    if kind not in {"home", "work"}:
+        raise ValueError("Недопустимый тип проекта.")
     if not clean:
         raise ValueError("Название проекта пустое.")
 
     with connect() as conn:
         try:
             cur = conn.execute(
-                "INSERT INTO projects(name, created_at) VALUES (?, ?)",
-                (clean, utc_now()),
+                "INSERT INTO projects(name, kind, created_at) VALUES (?, ?, ?)",
+                (clean, kind, utc_now()),
             )
         except sqlite3.IntegrityError as exc:
             raise ValueError("Проект с таким названием уже существует.") from exc
 
         row = conn.execute(
-            "SELECT id, name, created_at FROM projects WHERE id = ?",
+            "SELECT id, name, kind, created_at FROM projects WHERE id = ?",
             (cur.lastrowid,),
         ).fetchone()
     return dict(row)
@@ -252,7 +299,7 @@ def create_project(name: str) -> dict:
 def get_project(project_id: int) -> dict | None:
     with connect() as conn:
         row = conn.execute(
-            "SELECT id, name, created_at FROM projects WHERE id = ?",
+            "SELECT id, name, kind, created_at FROM projects WHERE id = ?",
             (project_id,),
         ).fetchone()
     return dict(row) if row else None
@@ -651,6 +698,69 @@ def recent_messages(conversation_id: int, limit: int = 30) -> list[dict[str, str
     ]
 
 
+def create_document_folder(
+    project_id: int,
+    name: str,
+    parent_id: int | None = None,
+) -> dict:
+    clean = " ".join(name.strip().split())
+    if not clean:
+        raise ValueError("Название папки пустое.")
+    if len(clean) > 120:
+        raise ValueError("Название папки слишком длинное.")
+
+    with connect() as conn:
+        if parent_id is not None:
+            parent = conn.execute(
+                "SELECT id FROM document_folders WHERE id = ? AND project_id = ?",
+                (parent_id, project_id),
+            ).fetchone()
+            if not parent:
+                raise ValueError("Родительская папка не найдена.")
+
+        duplicate = conn.execute(
+            """
+            SELECT id FROM document_folders
+            WHERE project_id = ? AND name = ?
+              AND ((parent_id IS NULL AND ? IS NULL) OR parent_id = ?)
+            """,
+            (project_id, clean, parent_id, parent_id),
+        ).fetchone()
+        if duplicate:
+            raise ValueError("Папка с таким названием уже существует.")
+
+        cur = conn.execute(
+            """
+            INSERT INTO document_folders(project_id, parent_id, name, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (project_id, parent_id, clean, utc_now()),
+        )
+        row = conn.execute(
+            "SELECT id, project_id, parent_id, name, created_at FROM document_folders WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+    return dict(row)
+
+
+def list_document_folders(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                f.id, f.project_id, f.parent_id, f.name, f.created_at,
+                COUNT(d.id) AS document_count
+            FROM document_folders f
+            LEFT JOIN documents d ON d.folder_id = f.id
+            WHERE f.project_id = ?
+            GROUP BY f.id
+            ORDER BY f.parent_id IS NOT NULL, f.name COLLATE NOCASE
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def add_document(
     project_id: int,
     filename: str,
@@ -659,11 +769,20 @@ def add_document(
     sha256: str,
     size_bytes: int,
     chunks: list[str],
+    folder_id: int | None = None,
 ) -> dict:
     with connect() as conn:
+        if folder_id is not None:
+            folder = conn.execute(
+                "SELECT id FROM document_folders WHERE id = ? AND project_id = ?",
+                (folder_id, project_id),
+            ).fetchone()
+            if not folder:
+                raise ValueError("Папка не найдена.")
+
         existing = conn.execute(
             """
-            SELECT id, project_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
+            SELECT id, project_id, folder_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
             FROM documents WHERE project_id = ? AND sha256 = ?
             """,
             (project_id, sha256),
@@ -674,11 +793,11 @@ def add_document(
         cur = conn.execute(
             """
             INSERT INTO documents(
-                project_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                project_id, folder_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                project_id, filename, stored_path, mime_type,
+                project_id, folder_id, filename, stored_path, mime_type,
                 sha256, size_bytes, utc_now(),
             ),
         )
@@ -695,7 +814,7 @@ def add_document(
 
         row = conn.execute(
             """
-            SELECT id, project_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
+            SELECT id, project_id, folder_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
             FROM documents WHERE id = ?
             """,
             (document_id,),
@@ -703,20 +822,28 @@ def add_document(
     return dict(row)
 
 
-def list_documents(project_id: int) -> list[dict]:
+def list_documents(project_id: int, folder_id: int | None = None) -> list[dict]:
+    where = "WHERE d.project_id = ?"
+    params: list[object] = [project_id]
+    if folder_id is not None:
+        where += " AND d.folder_id = ?"
+        params.append(folder_id)
+
     with connect() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
-                d.id, d.filename, d.mime_type, d.sha256, d.size_bytes, d.created_at,
+                d.id, d.folder_id, d.filename, d.mime_type, d.sha256, d.size_bytes, d.created_at,
+                f.name AS folder_name,
                 COUNT(c.id) AS chunk_count
             FROM documents d
+            LEFT JOIN document_folders f ON f.id = d.folder_id
             LEFT JOIN document_chunks c ON c.document_id = d.id
-            WHERE d.project_id = ?
+            {where}
             GROUP BY d.id
             ORDER BY d.id DESC
             """,
-            (project_id,),
+            params,
         ).fetchall()
     return [dict(row) for row in rows]
 
