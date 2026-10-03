@@ -74,7 +74,7 @@ from miyori.updater import (
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.20")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.21")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -178,7 +178,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.20",
+        "version": "00.00.21",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
