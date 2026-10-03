@@ -16,6 +16,7 @@ from miyori.db import (
     conversation_messages,
     create_project,
     ensure_conversation,
+    get_agent_trace,
     get_project,
     init_db,
     add_document,
@@ -36,6 +37,7 @@ from miyori.db import (
     update_memory_status,
     verified_memory_context,
 )
+from miyori.agent import run_agent
 from miyori.background import register_background_handlers
 from miyori.brain import build_context
 from miyori.development import run_project_self_check
@@ -46,7 +48,7 @@ from miyori.tools import execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.06")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.07")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -94,7 +96,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.06",
+        "version": "00.00.07",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -297,6 +299,14 @@ def development_check(project_id: int) -> dict:
     }
 
 
+@app.get("/api/agent-runs/{run_id}")
+def agent_trace(run_id: int) -> dict:
+    trace = get_agent_trace(run_id)
+    if not trace:
+        raise HTTPException(status_code=404, detail="Agent run не найден.")
+    return {"run": trace}
+
+
 @app.post("/api/chat")
 async def send_message(request: ChatRequest) -> dict:
     text = request.message.strip()
@@ -323,12 +333,14 @@ async def send_message(request: ChatRequest) -> dict:
 
     context = recent_messages(conversation_id)
     brain = build_context(request.project_id, text)
+    agent = run_agent(request.project_id, conversation_id, text)
     try:
         answer = await chat(
             context,
             memory_context=brain.memory,
             document_context=brain.documents,
             brain_plan=brain.plan,
+            tool_context=agent.tool_context,
         )
     except ProviderError as exc:
         raise HTTPException(
@@ -349,6 +361,12 @@ async def send_message(request: ChatRequest) -> dict:
             "memory_items": len(brain.memory),
             "document_items": len(brain.documents),
             "tools_allowed": brain.tools_allowed,
+        },
+        "agent": {
+            "run_id": agent.run_id,
+            "actions": agent.actions,
+            "steps_used": len(agent.actions),
+            "max_steps": 3,
         },
     }
 
