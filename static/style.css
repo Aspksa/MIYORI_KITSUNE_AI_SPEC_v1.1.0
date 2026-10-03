@@ -673,3 +673,14 @@ body.inspector-hidden .inspector { display: none; }
   .inspector-tabs { position: sticky; top: 0; z-index: 2; padding: 0 10px 10px; background: #0e1117; }
   .inspector-scroll { padding: 10px; }
 }
+
+.tool-meta {
+  width: fit-content;
+  padding: 2px 5px;
+  border: 1px solid #313844;
+  border-radius: 999px;
+  color: #788291;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
