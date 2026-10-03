@@ -2924,3 +2924,131 @@ body.sheet-open { overflow: hidden; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* 00.00.25 — document folders and strict workspace switching */
+.workspace-view[hidden] {
+  display: none !important;
+}
+.document-hub-card {
+  width: min(980px, 100%);
+}
+.document-hub-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.document-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.document-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  margin-bottom: 12px;
+  color: #9187a3;
+  font-size: 9px;
+}
+.document-breadcrumb-button {
+  border: 0;
+  background: transparent;
+  color: #7254c8;
+  font-size: 9px;
+  font-weight: 750;
+}
+.document-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.document-folder-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0,1fr);
+  column-gap: 9px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid #e6dff2;
+  border-radius: 14px;
+  background: #fbf9ff;
+  text-align: left;
+}
+.document-folder-card:hover {
+  border-color: #d5c7f4;
+  background: #f4efff;
+}
+.document-folder-icon {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #eee8ff;
+  color: #7657ce;
+}
+.document-folder-card strong {
+  overflow: hidden;
+  color: #493e60;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.document-folder-card small {
+  color: #9e95ab;
+  font-size: 8px;
+}
+.document-file-list {
+  display: grid;
+  gap: 7px;
+}
+.document-file-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0,1fr);
+  gap: 9px;
+  align-items: center;
+  padding: 10px 11px;
+  border: 1px solid #ebe5f3;
+  border-radius: 13px;
+  background: #fff;
+}
+.document-file-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #f2edff;
+  color: #795bd0;
+}
+.document-file-row strong {
+  display: block;
+  color: #4a405e;
+  font-size: 9px;
+}
+.document-file-row small {
+  display: block;
+  margin-top: 2px;
+  color: #a29aaa;
+  font-size: 8px;
+}
+.primavtodor-project-card {
+  border-color: #d6caef;
+  background: linear-gradient(145deg, #f5f0ff, #ffffff);
+  box-shadow: 0 10px 24px rgba(93,72,151,.08);
+}
+
+@media (max-width: 980px) {
+  .document-folder-grid {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+}
+@media (max-width: 620px) {
+  .document-folder-grid {
+    grid-template-columns: 1fr;
+  }
+}
