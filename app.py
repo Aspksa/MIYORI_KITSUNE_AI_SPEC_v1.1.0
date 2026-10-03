@@ -482,6 +482,20 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
     _require_local_admin(request)
     checks = run_project_self_check(project_id) if get_project(project_id) else []
     update = update_status(fetch=False)
+    failed_tasks = []
+    if get_project(project_id):
+        failed_tasks = [
+            item for item in list_tasks(project_id)
+            if item.get("status") == "failed"
+        ][:10]
+    errors = []
+    if update.get("last_error"):
+        errors.append("Updater: " + str(update["last_error"]))
+    for item in failed_tasks:
+        result = item.get("result") or {}
+        message = result.get("error") if isinstance(result, dict) else str(result)
+        if message:
+            errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
         "project_version": "00.00.32",
@@ -493,11 +507,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             {"name": item.name, "passed": item.passed, "details": item.details}
             for item in checks
         ],
-        "last_errors": [
-            error for error in [
-                update.get("last_error"),
-            ] if error
-        ],
+        "last_errors": errors[:12],
     }
 
 
