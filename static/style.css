@@ -455,3 +455,17 @@ select {
 .task-item.status-completed { border-color: #315744; }
 .development-stats { line-height: 1.55; }
 .development-stats b { color: #e9ecf1; }
+
+.tool-output {
+  margin: 7px 0 0;
+  padding: 7px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid #2f3743;
+  border-radius: 8px;
+  background: #0f141a;
+  color: #aeb7c3;
+  font-size: 9px;
+  line-height: 1.4;
+}
