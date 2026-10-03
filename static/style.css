@@ -1441,3 +1441,189 @@ body.inspector-hidden .inspector { display: none; }
   .intent-track { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .living-intent { width: 94%; }
 }
+
+
+/* 00.00.12 — quiet shell + Miyori Thread */
+.quiet-welcome {
+  max-width: min(720px, 88%);
+  padding: 17px 18px 15px;
+  border-color: #312a38;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(178,138,200,.08), transparent 18rem),
+    linear-gradient(180deg, rgba(24,21,29,.97), rgba(17,20,27,.97));
+}
+.quiet-welcome-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+.quiet-welcome-top p {
+  margin: 4px 0 0;
+  color: #d5d9df;
+  font-size: 13px;
+}
+.quiet-suggestions {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+.quiet-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #292f38;
+  border-radius: 11px;
+  background: rgba(15,19,25,.84);
+  color: #d8dce2;
+  text-align: left;
+}
+.quiet-suggestion:hover {
+  border-color: #584565;
+  background: #19161e;
+  transform: translateY(-1px);
+}
+.quiet-suggestion-icon {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  flex: 0 0 27px;
+  border-radius: 9px;
+  background: #211a26;
+  color: #c5a6d5;
+}
+.quiet-suggestion strong {
+  display: block;
+  font-size: 10px;
+}
+.quiet-suggestion small {
+  display: block;
+  margin-top: 2px;
+  color: #717b88;
+  font-size: 8px;
+}
+.inner-world-link {
+  margin-top: 11px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8d7a98;
+  font-size: 9px;
+}
+.inner-world-link:hover { color: #c5a6d5; }
+
+.miyori-console {
+  border-color: #282f39;
+  background:
+    radial-gradient(circle at 0 0, rgba(178,138,200,.055), transparent 20rem),
+    linear-gradient(180deg, rgba(16,20,27,.98), rgba(12,15,20,.98));
+}
+.console-symbol {
+  border-color: #3b3144;
+  background: #1b1720;
+}
+.console-title strong { font-size: 11px; }
+.console-title small { color: #68727f; }
+.console-summary {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.console-pages .module-card {
+  border-color: #262d36;
+  background: linear-gradient(180deg, #12171e, #0f1319);
+}
+
+.intent-message { margin-top: -2px; }
+.living-intent {
+  border-color: #332b3b;
+  background:
+    radial-gradient(circle at 0 0, rgba(178,138,200,.08), transparent 16rem),
+    #10141a;
+}
+.intent-head {
+  padding: 11px 12px;
+}
+.intent-title small {
+  color: #8d749a;
+  letter-spacing: .08em;
+}
+.intent-thread {
+  display: grid;
+  grid-template-columns: auto minmax(20px,1fr) auto minmax(20px,1fr) auto minmax(20px,1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding-top: 11px;
+}
+.thread-step {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-width: 58px;
+  color: #626d79;
+}
+.thread-step i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #48515c;
+  box-shadow: 0 0 0 4px rgba(72,81,92,.10);
+}
+.thread-step span {
+  font-size: 8px;
+  white-space: nowrap;
+}
+.thread-line {
+  height: 1px;
+  background: #2a3038;
+}
+.thread-step.active { color: #d7c3e2; }
+.thread-step.active i {
+  background: #b28ac8;
+  box-shadow: 0 0 0 4px rgba(178,138,200,.12), 0 0 12px rgba(178,138,200,.32);
+}
+.thread-step.completed { color: #83b796; }
+.thread-step.completed i {
+  background: #72d49b;
+  box-shadow: 0 0 0 4px rgba(114,212,155,.10);
+}
+.intent-detail {
+  margin-top: 11px;
+  padding: 8px 9px;
+  border: 1px solid #252c35;
+  border-radius: 9px;
+  background: #0d1218;
+  color: #89939f;
+  font-size: 9px;
+  line-height: 1.45;
+}
+.intent-recovery {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.intent-recovery button {
+  padding: 6px 9px;
+  border: 1px solid #343b46;
+  border-radius: 8px;
+  background: #191f27;
+  color: #c8ced6;
+  font-size: 8px;
+}
+.intent-recovery button:hover {
+  border-color: #594866;
+  background: #211a26;
+}
+
+@media (max-width: 620px) {
+  .intent-thread {
+    grid-template-columns: repeat(4, minmax(0,1fr));
+  }
+  .thread-line { display: none; }
+  .thread-step { min-width: 0; }
+  .thread-step span { white-space: normal; text-align: center; }
+}
