@@ -11,18 +11,33 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from miyori.config import settings
-from miyori.db import add_message, ensure_conversation, init_db, recent_messages
+from miyori.db import (
+    add_message,
+    conversation_messages,
+    create_project,
+    ensure_conversation,
+    get_project,
+    init_db,
+    list_conversations,
+    list_projects,
+    recent_messages,
+)
 from miyori.provider import ProviderError, chat
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.01")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.02")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
+    project_id: int
     conversation_id: int | None = None
+
+
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
 
 
 @app.on_event("startup")
@@ -39,7 +54,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.01",
+        "version": "00.00.02",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -49,13 +64,59 @@ def status() -> dict:
     }
 
 
+@app.get("/api/projects")
+def projects() -> dict:
+    return {"projects": list_projects()}
+
+
+@app.post("/api/projects")
+def project_create(request: ProjectCreateRequest) -> dict:
+    try:
+        project = create_project(request.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"project": project}
+
+
+@app.get("/api/projects/{project_id}/conversations")
+def conversations(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"conversations": list_conversations(project_id)}
+
+
+@app.get("/api/projects/{project_id}/conversations/{conversation_id}")
+def conversation(project_id: int, conversation_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+
+    items = conversation_messages(conversation_id, project_id)
+    if not items:
+        raise HTTPException(status_code=404, detail="Разговор не найден.")
+
+    return {
+        "conversation_id": conversation_id,
+        "project_id": project_id,
+        "messages": items,
+    }
+
+
 @app.post("/api/chat")
 async def send_message(request: ChatRequest) -> dict:
     text = request.message.strip()
     if not text:
         raise HTTPException(status_code=422, detail="Сообщение пустое.")
+    if not get_project(request.project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
 
-    conversation_id = ensure_conversation(request.conversation_id)
+    try:
+        conversation_id = ensure_conversation(
+            request.conversation_id,
+            request.project_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
     add_message(conversation_id, "user", text)
 
     context = recent_messages(conversation_id)
@@ -73,6 +134,7 @@ async def send_message(request: ChatRequest) -> dict:
     add_message(conversation_id, "assistant", answer)
     return {
         "conversation_id": conversation_id,
+        "project_id": request.project_id,
         "answer": answer,
     }
 
