@@ -135,6 +135,34 @@ def init_db() -> None:
                 FOREIGN KEY(contract_id) REFERENCES contracts(id) ON DELETE SET NULL
             );
 
+            CREATE TABLE IF NOT EXISTS home_devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                device_type TEXT NOT NULL DEFAULT 'device',
+                address TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'offline',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS parental_control_profiles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                child_name TEXT NOT NULL,
+                device_name TEXT NOT NULL,
+                daily_limit_minutes INTEGER NOT NULL DEFAULT 120,
+                bedtime_start TEXT NOT NULL DEFAULT '21:00',
+                bedtime_end TEXT NOT NULL DEFAULT '07:00',
+                blocked_categories TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'draft',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER,
@@ -415,6 +443,19 @@ def init_db() -> None:
                 ("Личное", utc_now()),
             )
             personal_id = int(cur.lastrowid)
+
+        for module_key, module_name in (
+            ("home_network", "Домашняя сеть"),
+            ("parental_control", "Детский контроль Miyori"),
+        ):
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO project_modules(
+                    project_id, module_key, name, created_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (personal_id, module_key, module_name, utc_now()),
+            )
 
         conn.execute(
             "UPDATE conversations SET project_id = ? WHERE project_id IS NULL",
@@ -946,6 +987,147 @@ def update_invoice_offer(project_id: int, item_id: int, **values) -> dict | None
 def delete_invoice_offer(project_id: int, item_id: int) -> bool:
     with connect() as conn:
         cur = conn.execute("DELETE FROM invoice_offers WHERE id=? AND project_id=?", (item_id, project_id))
+    return cur.rowcount == 1
+
+
+def list_home_devices(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, name, device_type, address, status, notes,
+                   created_at, updated_at
+            FROM home_devices WHERE project_id = ?
+            ORDER BY name COLLATE NOCASE
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_home_device(project_id: int, **values) -> dict:
+    name = " ".join(str(values.get("name", "")).strip().split())
+    if not name:
+        raise ValueError("Название устройства обязательно.")
+    now = utc_now()
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO home_devices(
+                project_id, name, device_type, address, status, notes,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id, name, str(values.get("device_type", "device")).strip() or "device",
+                str(values.get("address", "")).strip(),
+                str(values.get("status", "offline")).strip() or "offline",
+                str(values.get("notes", "")).strip(), now, now,
+            ),
+        )
+        row = conn.execute("SELECT * FROM home_devices WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def update_home_device(project_id: int, item_id: int, **values) -> dict | None:
+    name = " ".join(str(values.get("name", "")).strip().split())
+    if not name:
+        raise ValueError("Название устройства обязательно.")
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE home_devices SET name=?, device_type=?, address=?, status=?,
+                notes=?, updated_at=? WHERE id=? AND project_id=?
+            """,
+            (
+                name, str(values.get("device_type", "device")).strip() or "device",
+                str(values.get("address", "")).strip(),
+                str(values.get("status", "offline")).strip() or "offline",
+                str(values.get("notes", "")).strip(), utc_now(), item_id, project_id,
+            ),
+        )
+        if cur.rowcount != 1: return None
+        row = conn.execute("SELECT * FROM home_devices WHERE id = ?", (item_id,)).fetchone()
+    return dict(row)
+
+
+def delete_home_device(project_id: int, item_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM home_devices WHERE id=? AND project_id=?", (item_id, project_id))
+    return cur.rowcount == 1
+
+
+def list_parental_profiles(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, child_name, device_name, daily_limit_minutes,
+                   bedtime_start, bedtime_end, blocked_categories, status,
+                   created_at, updated_at
+            FROM parental_control_profiles WHERE project_id = ?
+            ORDER BY child_name COLLATE NOCASE
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_parental_profile(project_id: int, **values) -> dict:
+    child = " ".join(str(values.get("child_name", "")).strip().split())
+    device = " ".join(str(values.get("device_name", "")).strip().split())
+    if not child or not device:
+        raise ValueError("Укажите ребёнка и устройство.")
+    now = utc_now()
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO parental_control_profiles(
+                project_id, child_name, device_name, daily_limit_minutes,
+                bedtime_start, bedtime_end, blocked_categories, status,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id, child, device, max(0, int(values.get("daily_limit_minutes") or 0)),
+                str(values.get("bedtime_start", "21:00")).strip() or "21:00",
+                str(values.get("bedtime_end", "07:00")).strip() or "07:00",
+                str(values.get("blocked_categories", "")).strip(),
+                str(values.get("status", "draft")).strip() or "draft", now, now,
+            ),
+        )
+        row = conn.execute("SELECT * FROM parental_control_profiles WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def update_parental_profile(project_id: int, item_id: int, **values) -> dict | None:
+    child = " ".join(str(values.get("child_name", "")).strip().split())
+    device = " ".join(str(values.get("device_name", "")).strip().split())
+    if not child or not device:
+        raise ValueError("Укажите ребёнка и устройство.")
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE parental_control_profiles
+            SET child_name=?, device_name=?, daily_limit_minutes=?,
+                bedtime_start=?, bedtime_end=?, blocked_categories=?,
+                status=?, updated_at=? WHERE id=? AND project_id=?
+            """,
+            (
+                child, device, max(0, int(values.get("daily_limit_minutes") or 0)),
+                str(values.get("bedtime_start", "21:00")).strip() or "21:00",
+                str(values.get("bedtime_end", "07:00")).strip() or "07:00",
+                str(values.get("blocked_categories", "")).strip(),
+                str(values.get("status", "draft")).strip() or "draft",
+                utc_now(), item_id, project_id,
+            ),
+        )
+        if cur.rowcount != 1: return None
+        row = conn.execute("SELECT * FROM parental_control_profiles WHERE id = ?", (item_id,)).fetchone()
+    return dict(row)
+
+
+def delete_parental_profile(project_id: int, item_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM parental_control_profiles WHERE id=? AND project_id=?", (item_id, project_id))
     return cur.rowcount == 1
 
 
