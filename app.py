@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import ipaddress
+import platform
+import socket
 import threading
 import webbrowser
 from contextlib import asynccontextmanager
@@ -19,6 +22,8 @@ from miyori.db import (
     create_project,
     ensure_conversation,
     decide_permission_request,
+    disconnect_device_session,
+    get_account_profile,
     get_agent_trace,
     get_permission_request,
     get_project,
@@ -28,6 +33,7 @@ from miyori.db import (
     create_task,
     development_snapshot,
     list_conversations,
+    list_device_sessions,
     list_document_folders,
     list_documents,
     list_project_modules,
@@ -42,7 +48,10 @@ from miyori.db import (
     recent_development_checks,
     request_task_cancel,
     search_verified_memory,
+    update_account_avatar,
+    update_account_profile,
     update_memory_status,
+    upsert_device_session,
     verified_memory_context,
 )
 from miyori.agent import run_agent
@@ -165,6 +174,14 @@ class EvidenceCreateRequest(BaseModel):
     weight: float = Field(default=1.0, ge=0.0, le=2.0)
 
 
+class AccountProfileRequest(BaseModel):
+    owner_name: str = Field(default="", max_length=120)
+    miyori_address: str = Field(default="Господин", max_length=80)
+    language: str = Field(default="ru-RU", max_length=20)
+    timezone: str = Field(default="UTC", max_length=80)
+    profile_kind: str = Field(default="personal", pattern="^(personal|work)$")
+
+
 class CloudRuProfileRequest(BaseModel):
     api_key: str | None = Field(default=None, max_length=500)
     base_url: str | None = Field(default=None, max_length=500)
@@ -209,6 +226,116 @@ def status() -> dict:
         "storage": "SQLite",
         "rag": rag_status(),
     }
+
+
+def _touch_current_device() -> dict:
+    host = socket.gethostname() or "Local computer"
+    platform_name = f"{platform.system()} {platform.release()}".strip()
+    raw_key = f"{host}|{platform.machine()}|{platform.system()}"
+    device_key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:24]
+    return upsert_device_session(
+        device_key=device_key,
+        device_name=host,
+        platform_name=platform_name,
+        session_kind="desktop",
+    )
+
+
+@app.get("/api/account/profile")
+def account_profile_get(request: Request) -> dict:
+    _require_local_admin(request)
+    current_device = _touch_current_device()
+    profile = get_account_profile()
+    profile["avatar_url"] = (
+        "/api/account/profile/avatar"
+        if profile.get("avatar_path")
+        else None
+    )
+    return {
+        "profile": profile,
+        "current_device": current_device,
+        "devices": list_device_sessions(),
+    }
+
+
+@app.put("/api/account/profile")
+def account_profile_save(request: AccountProfileRequest, http_request: Request) -> dict:
+    _require_local_admin(http_request)
+    try:
+        profile = update_account_profile(
+            owner_name=request.owner_name,
+            miyori_address=request.miyori_address,
+            language=request.language,
+            timezone_name=request.timezone,
+            profile_kind=request.profile_kind,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    profile["avatar_url"] = (
+        "/api/account/profile/avatar"
+        if profile.get("avatar_path")
+        else None
+    )
+    return {"profile": profile}
+
+
+@app.post("/api/account/profile/avatar")
+async def account_profile_avatar_upload(
+    request: Request,
+    file: UploadFile = File(...),
+) -> dict:
+    _require_local_admin(request)
+    allowed = {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/webp": ".webp",
+    }
+    suffix = allowed.get(file.content_type or "")
+    if not suffix:
+        raise HTTPException(
+            status_code=422,
+            detail="Аватар должен быть PNG, JPEG или WEBP.",
+        )
+    data = await file.read()
+    if len(data) > 2 * 1024 * 1024:
+        raise HTTPException(
+            status_code=422,
+            detail="Аватар слишком большой. Максимум 2 МБ.",
+        )
+    profile_dir = settings.data_dir / "profile"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    for old in profile_dir.glob("avatar.*"):
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    target = profile_dir / f"avatar{suffix}"
+    target.write_bytes(data)
+    relative = str(target.relative_to(settings.data_dir))
+    profile = update_account_avatar(relative)
+    profile["avatar_url"] = "/api/account/profile/avatar"
+    return {"profile": profile}
+
+
+@app.get("/api/account/profile/avatar")
+def account_profile_avatar(request: Request) -> FileResponse:
+    _require_local_admin(request)
+    profile = get_account_profile()
+    avatar_path = profile.get("avatar_path")
+    if not avatar_path:
+        raise HTTPException(status_code=404, detail="Аватар не задан.")
+    path = settings.data_dir / avatar_path
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Файл аватара не найден.")
+    return FileResponse(path)
+
+
+@app.post("/api/account/devices/{session_id}/disconnect")
+def account_device_disconnect(session_id: int, request: Request) -> dict:
+    _require_local_admin(request)
+    if not disconnect_device_session(session_id):
+        raise HTTPException(status_code=404, detail="Сессия не найдена.")
+    return {"ok": True, "devices": list_device_sessions()}
 
 
 @app.get("/api/account/cloudru")
