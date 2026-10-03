@@ -30,6 +30,9 @@ const agentBudget = el("agentBudget");
 const permissionList = el("permissionList");
 const inspector = el("inspector");
 const toggleInspector = el("toggleInspector");
+const actionLauncher = el("actionLauncher");
+const openActions = el("openActions");
+const closeActions = el("closeActions");
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -361,8 +364,17 @@ function addToolResultCard(toolName, result) {
   messages.scrollTop = messages.scrollHeight;
 }
 
+function setActionLauncher(open) {
+  if (!actionLauncher) return;
+  actionLauncher.hidden = !open;
+  if (open) {
+    actionLauncher.scrollIntoView({block: "nearest"});
+  }
+}
+
 async function runChatTool(tool, providedArgs = null) {
   if (!tool) return;
+  setActionLauncher(false);
   const args = providedArgs || askToolArguments(tool.name);
   if (args === null) return;
 
@@ -948,3 +960,29 @@ if (toggleInspector) {
     input.focus();
   });
 }
+
+
+if (openActions) {
+  openActions.addEventListener("click", () => {
+    setActionLauncher(actionLauncher.hidden);
+  });
+}
+if (closeActions) {
+  closeActions.addEventListener("click", () => setActionLauncher(false));
+}
+
+document.addEventListener("click", (event) => {
+  if (!actionLauncher || actionLauncher.hidden) return;
+  if (actionLauncher.contains(event.target) || openActions?.contains(event.target)) return;
+  setActionLauncher(false);
+});
+
+input.addEventListener("keydown", (event) => {
+  if (event.key === "/" && input.value.trim() === "") {
+    event.preventDefault();
+    setActionLauncher(true);
+  }
+  if (event.key === "Escape") {
+    setActionLauncher(false);
+  }
+});
