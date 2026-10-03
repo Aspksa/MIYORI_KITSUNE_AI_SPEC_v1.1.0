@@ -53,18 +53,41 @@ function showError(text) {
   errorBox.hidden = !text;
 }
 
+let processingHideTimer = null;
+
 function setProcessingStage(stage, detail = null) {
-  const order = ["accepted", "context", "work", "result"];
+  const box = el("chatProcessStatus");
+  const title = el("chatProcessTitle");
+  const detailNode = el("chatProcessDetail");
+  if (!box || !title || !detailNode) return;
+
+  const labels = {
+    typing: ["Пишет текст", "Подготовка запроса"],
+    accepted: ["Запрос принят", "Запрос получен"],
+    context: ["Сбор контекста", "Память, документы и RAG"],
+    work: ["Работа", "Миёри формирует ответ"],
+    result: ["Результат", "Ответ готов"]
+  };
+  const order = ["typing", "accepted", "context", "work", "result"];
+  if (!order.includes(stage)) {
+    box.hidden = true;
+    return;
+  }
+
+  clearTimeout(processingHideTimer);
+  box.hidden = false;
+  title.textContent = labels[stage][0];
+  detailNode.textContent = detail || labels[stage][1];
   const current = order.indexOf(stage);
-  document.querySelectorAll(".processing-step").forEach((row) => {
-    const index = order.indexOf(row.dataset.stage);
-    row.classList.toggle("active", index === current);
-    row.classList.toggle("completed", current >= 0 && index < current);
-    if (index === current && detail) {
-      const small = row.querySelector("small");
-      if (small) small.textContent = detail;
-    }
+  box.querySelectorAll("[data-chat-stage]").forEach(node => {
+    const index = order.indexOf(node.dataset.chatStage);
+    node.classList.toggle("active", index === current);
+    node.classList.toggle("completed", index < current);
   });
+
+  if (stage === "result") {
+    processingHideTimer = setTimeout(() => { box.hidden = true; }, 1000);
+  }
 }
 
 function setPulse(mode, label) {
@@ -1187,7 +1210,7 @@ function startNewChat() {
   state.conversationId = null;
   showError("");
   showWelcome();
-  setProcessingStage("accepted", "Ожидаю задачу");
+  setProcessingStage("idle");
   brainPlan.innerHTML = '<span class="empty-copy">План появится после запроса.</span>';
   agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
   agentBudget.textContent = "0/3";
@@ -1204,7 +1227,8 @@ form.addEventListener("submit", async (event) => {
   showError("");
   addMessage("user", text);
   setProcessingStage("accepted", "Запрос получен");
-  setProcessingStage("context", "RAG ищет релевантный контекст");
+  const contextTimer = setTimeout(() => setProcessingStage("context", "Память, документы и RAG"), 220);
+  const workTimer = setTimeout(() => setProcessingStage("work", "Миёри формирует ответ"), 750);
   input.value = "";
   input.style.height = "auto";
   setBusy(true);
@@ -1226,8 +1250,10 @@ form.addEventListener("submit", async (event) => {
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
 
+    clearTimeout(contextTimer);
+    clearTimeout(workTimer);
     state.conversationId = data.conversation_id;
-    setProcessingStage("work", "Анализирую и выполняю шаги");
+    setProcessingStage("work", "Миёри формирует ответ");
     addMessage("assistant", data.answer);
 
     // Технические данные обновляются внутри системы, но не добавляются в пользовательский чат.
@@ -1252,12 +1278,14 @@ form.addEventListener("submit", async (event) => {
       }
     }
 
-    setProcessingStage("result", "Результат готов");
+    setProcessingStage("result", "Ответ готов");
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
       loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
     ]);
   } catch (error) {
+    clearTimeout(contextTimer);
+    clearTimeout(workTimer);
     setProcessingStage("result", "Нужно внимание");
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
@@ -1300,6 +1328,10 @@ el("addProject").addEventListener("click", async () => {
 input.addEventListener("input", () => {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 180) + "px";
+  if (!state.busy) {
+    if (input.value.trim()) setProcessingStage("typing", "Подготовка запроса");
+    else setProcessingStage("idle");
+  }
 });
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
@@ -1855,7 +1887,7 @@ async function renderUpdateWorkspace(refresh = false) {
   await Promise.all([load(refresh), loadChangelog()]);
 }
 
-async function renderDocumentsWorkspace() {
+async function renderDocumentsWorkspace(initialFolderId = null) {
   showWorkspaceShell("documents", "Miyori Drive", "Документы / Облако / Miyori", "Файловое пространство проекта.");
   workspaceBody.innerHTML =
     '<section class="miyori-drive">' +
@@ -1897,7 +1929,7 @@ async function renderDocumentsWorkspace() {
       '<input id="driveFileInput" type="file" accept=".txt,.md,.markdown,.json,.pdf,.docx,.xlsx,.pptx" multiple hidden>' +
     '</section>';
 
-  let activeFolderId = null;
+  let activeFolderId = initialFolderId ? Number(initialFolderId) : null;
   let activeScope = "files";
   let viewMode = "grid";
   let folders = [];
@@ -2269,9 +2301,119 @@ async function renderEmployeesModule(project, module) {
 }
 
 
+async function renderPrimavtodorBusinessModule(project, module) {
+  const config = {
+    counterparties: {
+      title: "Контрагенты", endpoint: "counterparties", folder: "Контрагенты",
+      fields: [
+        ["name","Название","text"],["inn","ИНН","text"],["kpp","КПП","text"],
+        ["legal_address","Юридический адрес","text"],["contact_person","Контактное лицо","text"],
+        ["phone","Телефон","text"],["email","E-mail","email"]
+      ]
+    },
+    contracts: {
+      title: "Договоры", endpoint: "contracts", folder: "Договоры",
+      fields: [
+        ["contract_number","Номер договора","text"],["contract_date","Дата","date"],
+        ["subject","Предмет договора","text"],["amount","Сумма","number"],["status","Статус","text"]
+      ]
+    },
+    invoice_offers: {
+      title: "Счёт-Оферта", endpoint: "invoice-offers", folder: "Счёт-Оферта",
+      fields: [
+        ["offer_number","Номер","text"],["issue_date","Дата","date"],
+        ["amount","Сумма","number"],["terms","Краткие условия договора","text"],["status","Статус","text"]
+      ]
+    }
+  }[module.module_key];
+  if (!config) return;
+
+  showWorkspaceShell("work", 'АО "Примавтодор"', config.title, "Деловой модуль проекта и связанные документы.");
+  workspaceBody.innerHTML =
+    '<section class="workspace-card workspace-card-wide business-module">' +
+      '<div class="workspace-card-head"><div><strong>' + escapeHtml(config.title) + '</strong><small>Данные проекта АО «Примавтодор»</small></div>' +
+      '<button id="businessOpenDrive" class="secondary-sheet-button" type="button">▤ Документы модуля</button></div>' +
+      '<form id="businessForm" class="business-form"><input id="businessItemId" type="hidden">' +
+      config.fields.map(field =>
+        '<label><span>' + escapeHtml(field[1]) + '</span><input data-business-field="' + field[0] + '" type="' + field[2] + '"' +
+        (["name","contract_number","offer_number"].includes(field[0]) ? ' required' : '') + '></label>'
+      ).join("") +
+      '<div class="business-form-actions"><button id="businessCancelEdit" class="secondary-sheet-button" type="button" hidden>Отмена</button>' +
+      '<button class="primary-sheet-button" type="submit">Сохранить</button></div></form>' +
+      '<div id="businessResult"></div><div id="businessList" class="business-list"></div>' +
+      '<div class="sheet-actions"><button id="businessBack" class="secondary-sheet-button" type="button">← К проекту</button></div>' +
+    '</section>';
+
+  let items = [];
+  let folderId = null;
+  try {
+    const folders = await api("/api/projects/" + project.id + "/business-folders");
+    folderId = folders.folders?.[config.folder]?.id || null;
+  } catch (_) {}
+
+  const reset = () => {
+    el("businessItemId").value = "";
+    workspaceBody.querySelectorAll("[data-business-field]").forEach(input => input.value = "");
+    el("businessCancelEdit").hidden = true;
+  };
+
+  const load = async () => {
+    const data = await api("/api/projects/" + project.id + "/" + config.endpoint);
+    items = data.items || [];
+    el("businessList").innerHTML = items.length ? items.map(item => {
+      const title = item.name || item.contract_number || item.offer_number || ("#" + item.id);
+      const details = module.module_key === "counterparties"
+        ? [item.inn && "ИНН " + item.inn, item.contact_person, item.phone].filter(Boolean).join(" · ")
+        : [item.contract_date || item.issue_date, item.amount ? Number(item.amount).toLocaleString("ru-RU") + " ₽" : "", item.status].filter(Boolean).join(" · ");
+      return '<article class="business-list-row"><div><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(details || "Без дополнительных данных") + '</small></div>' +
+        '<div><button type="button" data-business-edit="' + item.id + '">Изменить</button><button class="danger" type="button" data-business-delete="' + item.id + '">Удалить</button></div></article>';
+    }).join("") : '<div class="workspace-empty">Записей пока нет.</div>';
+
+    workspaceBody.querySelectorAll("[data-business-edit]").forEach(button => button.onclick = () => {
+      const item = items.find(x => x.id === Number(button.dataset.businessEdit));
+      if (!item) return;
+      el("businessItemId").value = item.id;
+      workspaceBody.querySelectorAll("[data-business-field]").forEach(input => input.value = item[input.dataset.businessField] ?? "");
+      el("businessCancelEdit").hidden = false;
+    });
+    workspaceBody.querySelectorAll("[data-business-delete]").forEach(button => button.onclick = async () => {
+      if (!confirm("Удалить запись?")) return;
+      await api("/api/projects/" + project.id + "/" + config.endpoint + "/" + button.dataset.businessDelete, {method:"DELETE"});
+      await load();
+    });
+  };
+
+  el("businessForm").onsubmit = async event => {
+    event.preventDefault();
+    const id = el("businessItemId").value;
+    const payload = {};
+    workspaceBody.querySelectorAll("[data-business-field]").forEach(input => {
+      payload[input.dataset.businessField] = input.type === "number" ? Number(input.value || 0) : input.value.trim();
+    });
+    try {
+      await api("/api/projects/" + project.id + "/" + config.endpoint + (id ? "/" + id : ""), {
+        method: id ? "PUT" : "POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+      });
+      reset(); await load();
+      el("businessResult").innerHTML = workspaceResult(id ? "Запись обновлена." : "Запись добавлена.", "success");
+    } catch (error) {
+      el("businessResult").innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+  el("businessCancelEdit").onclick = reset;
+  el("businessBack").onclick = () => renderProjectModule(project);
+  el("businessOpenDrive").onclick = () => renderDocumentsWorkspace(folderId);
+  await load();
+}
+
+
 async function renderPrimavtodorSubmodule(project, module) {
   if (module.module_key === "employees") {
     await renderEmployeesModule(project, module);
+    return;
+  }
+  if (["counterparties","contracts","invoice_offers"].includes(module.module_key)) {
+    await renderPrimavtodorBusinessModule(project, module);
     return;
   }
   showWorkspaceShell(
@@ -2284,13 +2426,16 @@ async function renderPrimavtodorSubmodule(project, module) {
   const descriptions = {
     timesheet: "Учёт табелей, смен, рабочего времени и связанных документов.",
     garage: "Учёт гаража, техники, транспорта и эксплуатационных материалов.",
-    employees: "Сотрудники проекта, кадровые сведения и связанные документы."
+    employees: "Сотрудники проекта, кадровые сведения и связанные документы.",
+    counterparties: "Организации и лица, с которыми работает проект.",
+    contracts: "Договоры проекта и связанные документы.",
+    invoice_offers: "Счета-оферты: счёт с краткими существенными условиями договора."
   };
 
   workspaceBody.innerHTML =
     '<section class="workspace-card workspace-card-wide primavtodor-module-view">' +
       '<div class="workspace-hero-icon">' +
-        (module.module_key === "timesheet" ? "▦" : module.module_key === "garage" ? "▰" : "◉") +
+        (module.module_key === "timesheet" ? "▦" : module.module_key === "garage" ? "▰" : module.module_key === "counterparties" ? "◎" : module.module_key === "contracts" ? "§" : module.module_key === "invoice_offers" ? "₽" : "◉") +
       '</div>' +
       '<strong>' + escapeHtml(module.name) + '</strong>' +
       '<p>' + escapeHtml(descriptions[module.module_key] || "Модуль проекта.") + '</p>' +
