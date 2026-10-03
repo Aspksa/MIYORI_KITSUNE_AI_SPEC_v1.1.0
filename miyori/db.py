@@ -88,6 +88,53 @@ def init_db() -> None:
                 FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS counterparties (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                inn TEXT NOT NULL DEFAULT '',
+                kpp TEXT NOT NULL DEFAULT '',
+                legal_address TEXT NOT NULL DEFAULT '',
+                contact_person TEXT NOT NULL DEFAULT '',
+                phone TEXT NOT NULL DEFAULT '',
+                email TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS contracts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                counterparty_id INTEGER,
+                contract_number TEXT NOT NULL,
+                contract_date TEXT NOT NULL DEFAULT '',
+                subject TEXT NOT NULL DEFAULT '',
+                amount REAL NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'draft',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY(counterparty_id) REFERENCES counterparties(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS invoice_offers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                counterparty_id INTEGER,
+                contract_id INTEGER,
+                offer_number TEXT NOT NULL,
+                issue_date TEXT NOT NULL DEFAULT '',
+                amount REAL NOT NULL DEFAULT 0,
+                terms TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'draft',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY(counterparty_id) REFERENCES counterparties(id) ON DELETE SET NULL,
+                FOREIGN KEY(contract_id) REFERENCES contracts(id) ON DELETE SET NULL
+            );
+
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER,
@@ -301,6 +348,9 @@ def init_db() -> None:
             ("timesheet", "Табель"),
             ("garage", "Гараж"),
             ("employees", "Сотрудники"),
+            ("counterparties", "Контрагенты"),
+            ("contracts", "Договоры"),
+            ("invoice_offers", "Счёт-Оферта"),
         ):
             conn.execute(
                 """
@@ -310,6 +360,23 @@ def init_db() -> None:
                 """,
                 (primavtodor_id, module_key, module_name, utc_now()),
             )
+
+        for folder_name in ("Контрагенты", "Договоры", "Счёт-Оферта"):
+            existing_folder = conn.execute(
+                """
+                SELECT id FROM document_folders
+                WHERE project_id = ? AND parent_id IS NULL AND name = ?
+                """,
+                (primavtodor_id, folder_name),
+            ).fetchone()
+            if not existing_folder:
+                conn.execute(
+                    """
+                    INSERT INTO document_folders(project_id, parent_id, name, created_at)
+                    VALUES (?, NULL, ?, ?)
+                    """,
+                    (primavtodor_id, folder_name, utc_now()),
+                )
 
         profile = conn.execute("SELECT id FROM account_profile WHERE id = 1").fetchone()
         if not profile:
@@ -652,6 +719,236 @@ def delete_employee(project_id: int, employee_id: int) -> bool:
     return cur.rowcount == 1
 
 
+def find_document_folder(project_id: int, name: str) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT id, project_id, parent_id, name, created_at
+            FROM document_folders
+            WHERE project_id = ? AND parent_id IS NULL AND name = ?
+            LIMIT 1
+            """,
+            (project_id, name),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_counterparties(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, name, inn, kpp, legal_address,
+                   contact_person, phone, email, created_at, updated_at
+            FROM counterparties
+            WHERE project_id = ?
+            ORDER BY name COLLATE NOCASE
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_counterparty(project_id: int, **values) -> dict:
+    name = " ".join(str(values.get("name", "")).strip().split())
+    if not name:
+        raise ValueError("Название контрагента обязательно.")
+    now = utc_now()
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO counterparties(
+                project_id, name, inn, kpp, legal_address,
+                contact_person, phone, email, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id, name, str(values.get("inn", "")).strip(),
+                str(values.get("kpp", "")).strip(),
+                str(values.get("legal_address", "")).strip(),
+                str(values.get("contact_person", "")).strip(),
+                str(values.get("phone", "")).strip(),
+                str(values.get("email", "")).strip(), now, now,
+            ),
+        )
+        row = conn.execute("SELECT * FROM counterparties WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def update_counterparty(project_id: int, item_id: int, **values) -> dict | None:
+    name = " ".join(str(values.get("name", "")).strip().split())
+    if not name:
+        raise ValueError("Название контрагента обязательно.")
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE counterparties
+            SET name=?, inn=?, kpp=?, legal_address=?, contact_person=?,
+                phone=?, email=?, updated_at=?
+            WHERE id=? AND project_id=?
+            """,
+            (
+                name, str(values.get("inn", "")).strip(), str(values.get("kpp", "")).strip(),
+                str(values.get("legal_address", "")).strip(),
+                str(values.get("contact_person", "")).strip(),
+                str(values.get("phone", "")).strip(), str(values.get("email", "")).strip(),
+                utc_now(), item_id, project_id,
+            ),
+        )
+        if cur.rowcount != 1:
+            return None
+        row = conn.execute("SELECT * FROM counterparties WHERE id = ?", (item_id,)).fetchone()
+    return dict(row)
+
+
+def delete_counterparty(project_id: int, item_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM counterparties WHERE id=? AND project_id=?", (item_id, project_id))
+    return cur.rowcount == 1
+
+
+def list_contracts(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT c.*, p.name AS counterparty_name
+            FROM contracts c
+            LEFT JOIN counterparties p ON p.id = c.counterparty_id
+            WHERE c.project_id = ?
+            ORDER BY c.contract_date DESC, c.id DESC
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_contract(project_id: int, **values) -> dict:
+    number = str(values.get("contract_number", "")).strip()
+    if not number:
+        raise ValueError("Номер договора обязателен.")
+    now = utc_now()
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO contracts(
+                project_id, counterparty_id, contract_number, contract_date,
+                subject, amount, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id, values.get("counterparty_id"), number,
+                str(values.get("contract_date", "")).strip(),
+                str(values.get("subject", "")).strip(),
+                float(values.get("amount") or 0),
+                str(values.get("status", "draft")).strip() or "draft", now, now,
+            ),
+        )
+        row = conn.execute("SELECT * FROM contracts WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def update_contract(project_id: int, item_id: int, **values) -> dict | None:
+    number = str(values.get("contract_number", "")).strip()
+    if not number:
+        raise ValueError("Номер договора обязателен.")
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE contracts SET counterparty_id=?, contract_number=?, contract_date=?,
+                subject=?, amount=?, status=?, updated_at=?
+            WHERE id=? AND project_id=?
+            """,
+            (
+                values.get("counterparty_id"), number,
+                str(values.get("contract_date", "")).strip(),
+                str(values.get("subject", "")).strip(), float(values.get("amount") or 0),
+                str(values.get("status", "draft")).strip() or "draft",
+                utc_now(), item_id, project_id,
+            ),
+        )
+        if cur.rowcount != 1:
+            return None
+        row = conn.execute("SELECT * FROM contracts WHERE id = ?", (item_id,)).fetchone()
+    return dict(row)
+
+
+def delete_contract(project_id: int, item_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM contracts WHERE id=? AND project_id=?", (item_id, project_id))
+    return cur.rowcount == 1
+
+
+def list_invoice_offers(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT o.*, p.name AS counterparty_name, c.contract_number
+            FROM invoice_offers o
+            LEFT JOIN counterparties p ON p.id = o.counterparty_id
+            LEFT JOIN contracts c ON c.id = o.contract_id
+            WHERE o.project_id = ?
+            ORDER BY o.issue_date DESC, o.id DESC
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_invoice_offer(project_id: int, **values) -> dict:
+    number = str(values.get("offer_number", "")).strip()
+    if not number:
+        raise ValueError("Номер счёта-оферты обязателен.")
+    now = utc_now()
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO invoice_offers(
+                project_id, counterparty_id, contract_id, offer_number,
+                issue_date, amount, terms, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id, values.get("counterparty_id"), values.get("contract_id"),
+                number, str(values.get("issue_date", "")).strip(),
+                float(values.get("amount") or 0), str(values.get("terms", "")).strip(),
+                str(values.get("status", "draft")).strip() or "draft", now, now,
+            ),
+        )
+        row = conn.execute("SELECT * FROM invoice_offers WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def update_invoice_offer(project_id: int, item_id: int, **values) -> dict | None:
+    number = str(values.get("offer_number", "")).strip()
+    if not number:
+        raise ValueError("Номер счёта-оферты обязателен.")
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE invoice_offers
+            SET counterparty_id=?, contract_id=?, offer_number=?, issue_date=?,
+                amount=?, terms=?, status=?, updated_at=?
+            WHERE id=? AND project_id=?
+            """,
+            (
+                values.get("counterparty_id"), values.get("contract_id"), number,
+                str(values.get("issue_date", "")).strip(), float(values.get("amount") or 0),
+                str(values.get("terms", "")).strip(),
+                str(values.get("status", "draft")).strip() or "draft",
+                utc_now(), item_id, project_id,
+            ),
+        )
+        if cur.rowcount != 1:
+            return None
+        row = conn.execute("SELECT * FROM invoice_offers WHERE id = ?", (item_id,)).fetchone()
+    return dict(row)
+
+
+def delete_invoice_offer(project_id: int, item_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM invoice_offers WHERE id=? AND project_id=?", (item_id, project_id))
+    return cur.rowcount == 1
+
+
 def create_project(name: str, kind: str = "home") -> dict:
     clean = name.strip()
     if kind not in {"home", "work"}:
@@ -696,6 +993,9 @@ def list_project_modules(project_id: int) -> list[dict]:
                     WHEN 'timesheet' THEN 1
                     WHEN 'garage' THEN 2
                     WHEN 'employees' THEN 3
+                    WHEN 'counterparties' THEN 4
+                    WHEN 'contracts' THEN 5
+                    WHEN 'invoice_offers' THEN 6
                     ELSE 99
                 END,
                 name COLLATE NOCASE
