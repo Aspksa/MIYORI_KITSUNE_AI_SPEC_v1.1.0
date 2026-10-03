@@ -32,14 +32,23 @@ from miyori.db import (
     add_document,
     create_document_folder,
     create_employee,
+    create_counterparty,
+    create_contract,
+    create_invoice_offer,
     create_task,
     delete_employee,
+    delete_counterparty,
+    delete_contract,
+    delete_invoice_offer,
     development_snapshot,
     list_conversations,
     list_device_sessions,
     list_document_folders,
     list_documents,
     list_employees,
+    list_counterparties,
+    list_contracts,
+    list_invoice_offers,
     list_project_modules,
     list_projects,
     list_memory_facts,
@@ -56,9 +65,13 @@ from miyori.db import (
     update_account_profile,
     update_ai_preferences,
     update_employee,
+    update_counterparty,
+    update_contract,
+    update_invoice_offer,
     update_memory_status,
     upsert_device_session,
     verified_memory_context,
+    find_document_folder,
 )
 from miyori.agent import run_agent
 from miyori.background import register_background_handlers
@@ -205,6 +218,35 @@ class AiPreferencesRequest(BaseModel):
     show_uncertainty: bool = True
     priority_mode: str = Field(pattern="^(accuracy|balanced|speed)$")
     operating_mode: str = Field(pattern="^(personal|work|analyst|research|developer)$")
+
+
+class CounterpartyRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=220)
+    inn: str = Field(default="", max_length=32)
+    kpp: str = Field(default="", max_length=32)
+    legal_address: str = Field(default="", max_length=500)
+    contact_person: str = Field(default="", max_length=180)
+    phone: str = Field(default="", max_length=80)
+    email: str = Field(default="", max_length=180)
+
+
+class ContractRequest(BaseModel):
+    counterparty_id: int | None = None
+    contract_number: str = Field(min_length=1, max_length=120)
+    contract_date: str = Field(default="", max_length=32)
+    subject: str = Field(default="", max_length=1000)
+    amount: float = 0
+    status: str = Field(default="draft", max_length=40)
+
+
+class InvoiceOfferRequest(BaseModel):
+    counterparty_id: int | None = None
+    contract_id: int | None = None
+    offer_number: str = Field(min_length=1, max_length=120)
+    issue_date: str = Field(default="", max_length=32)
+    amount: float = 0
+    terms: str = Field(default="", max_length=3000)
+    status: str = Field(default="draft", max_length=40)
 
 
 class EmployeeRequest(BaseModel):
@@ -598,6 +640,99 @@ def project_modules(project_id: int) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     return {"modules": list_project_modules(project_id)}
+
+
+@app.get("/api/projects/{project_id}/business-folders")
+def project_business_folders(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    names = ("Контрагенты", "Договоры", "Счёт-Оферта")
+    return {
+        "folders": {
+            name: find_document_folder(project_id, name)
+            for name in names
+        }
+    }
+
+
+@app.get("/api/projects/{project_id}/counterparties")
+def counterparties_get(project_id: int) -> dict:
+    if not get_project(project_id): raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"items": list_counterparties(project_id)}
+
+
+@app.post("/api/projects/{project_id}/counterparties")
+def counterparties_create(project_id: int, request: CounterpartyRequest) -> dict:
+    if not get_project(project_id): raise HTTPException(status_code=404, detail="Проект не найден.")
+    try: item = create_counterparty(project_id, **request.model_dump())
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"item": item}
+
+
+@app.put("/api/projects/{project_id}/counterparties/{item_id}")
+def counterparties_update(project_id: int, item_id: int, request: CounterpartyRequest) -> dict:
+    try: item = update_counterparty(project_id, item_id, **request.model_dump())
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not item: raise HTTPException(status_code=404, detail="Контрагент не найден.")
+    return {"item": item}
+
+
+@app.delete("/api/projects/{project_id}/counterparties/{item_id}")
+def counterparties_delete(project_id: int, item_id: int) -> dict:
+    if not delete_counterparty(project_id, item_id): raise HTTPException(status_code=404, detail="Контрагент не найден.")
+    return {"ok": True}
+
+
+@app.get("/api/projects/{project_id}/contracts")
+def contracts_get(project_id: int) -> dict:
+    return {"items": list_contracts(project_id)}
+
+
+@app.post("/api/projects/{project_id}/contracts")
+def contracts_create(project_id: int, request: ContractRequest) -> dict:
+    try: item = create_contract(project_id, **request.model_dump())
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"item": item}
+
+
+@app.put("/api/projects/{project_id}/contracts/{item_id}")
+def contracts_update(project_id: int, item_id: int, request: ContractRequest) -> dict:
+    try: item = update_contract(project_id, item_id, **request.model_dump())
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not item: raise HTTPException(status_code=404, detail="Договор не найден.")
+    return {"item": item}
+
+
+@app.delete("/api/projects/{project_id}/contracts/{item_id}")
+def contracts_delete(project_id: int, item_id: int) -> dict:
+    if not delete_contract(project_id, item_id): raise HTTPException(status_code=404, detail="Договор не найден.")
+    return {"ok": True}
+
+
+@app.get("/api/projects/{project_id}/invoice-offers")
+def invoice_offers_get(project_id: int) -> dict:
+    return {"items": list_invoice_offers(project_id)}
+
+
+@app.post("/api/projects/{project_id}/invoice-offers")
+def invoice_offers_create(project_id: int, request: InvoiceOfferRequest) -> dict:
+    try: item = create_invoice_offer(project_id, **request.model_dump())
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"item": item}
+
+
+@app.put("/api/projects/{project_id}/invoice-offers/{item_id}")
+def invoice_offers_update(project_id: int, item_id: int, request: InvoiceOfferRequest) -> dict:
+    try: item = update_invoice_offer(project_id, item_id, **request.model_dump())
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not item: raise HTTPException(status_code=404, detail="Счёт-оферта не найден.")
+    return {"item": item}
+
+
+@app.delete("/api/projects/{project_id}/invoice-offers/{item_id}")
+def invoice_offers_delete(project_id: int, item_id: int) -> dict:
+    if not delete_invoice_offer(project_id, item_id): raise HTTPException(status_code=404, detail="Счёт-оферта не найден.")
+    return {"ok": True}
 
 
 @app.get("/api/projects/{project_id}/employees")
