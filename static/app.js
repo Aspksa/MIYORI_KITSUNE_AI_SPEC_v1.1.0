@@ -1454,12 +1454,14 @@ async function renderAccountWorkspace() {
           '<label><span>API-ключ Cloud.ru</span>' +
           '<input id="workspaceCloudKey" type="password" autocomplete="off" placeholder="Вставьте новый ключ">' +
           '<small>' + (p.api_key_set ? 'Сохранён: ' + escapeHtml(p.api_key_masked) + ' · пустое поле сохранит текущий ключ' : 'Ключ не сохранён') + '</small></label>' +
-          '<label><span>Model ID</span><input id="workspaceCloudModel" type="text" list="workspaceCloudModels" value="' +
-          escapeHtml(p.model_id || '') + '" placeholder="Точный ID модели Cloud.ru"><datalist id="workspaceCloudModels"></datalist></label>' +
+          '<label><span>Model ID</span>' +
+          '<select id="workspaceCloudModel"><option value="">Загружаю модели Cloud.ru…</option></select>' +
+          '<small id="workspaceCloudModelState">Модель выбирается только из GET /models.</small></label>' +
           '<label><span>Base URL</span><input id="workspaceCloudBase" type="url" value="' +
           escapeHtml(p.base_url || 'https://foundation-models.api.cloud.ru/v1') + '"></label>' +
           '<div id="workspaceCloudResult"></div>' +
-          '<div class="sheet-actions"><button id="workspaceCloudTest" class="secondary-sheet-button" type="button">Проверить Cloud.ru</button>' +
+          '<div class="sheet-actions"><button id="workspaceCloudReload" class="secondary-sheet-button" type="button">Обновить список моделей</button>' +
+          '<button id="workspaceCloudTest" class="secondary-sheet-button" type="button">Проверить модель</button>' +
           '<button class="primary-sheet-button" type="submit">Сохранить</button></div>' +
         '</form>' +
       '</section>';
@@ -1468,31 +1470,70 @@ async function renderAccountWorkspace() {
     const key = el("workspaceCloudKey");
     const model = el("workspaceCloudModel");
     const base = el("workspaceCloudBase");
-    const options = el("workspaceCloudModels");
+    const modelState = el("workspaceCloudModelState");
+
+    const populateModels = (catalog, preferred = null) => {
+      const chatModels = catalog.chat_models || [];
+      model.innerHTML = '<option value="">Выберите чат-модель…</option>';
+      for (const item of chatModels) {
+        const option = document.createElement("option");
+        option.value = item.id;
+        option.textContent = (item.name && item.name !== item.id)
+          ? item.name + " — " + item.id
+          : item.id;
+        model.appendChild(option);
+      }
+      const desired = preferred || p.model_id || "";
+      const exists = chatModels.some(item => item.id === desired);
+      model.value = exists ? desired : "";
+      if (desired && !exists) {
+        modelState.textContent = "Сохранённый ID «" + desired + "» не найден среди доступных чат-моделей. Выберите новый.";
+        result.innerHTML = workspaceResult(
+          "Сохранённый Model ID недействителен для Foundation Models. Это и вызывало HTTP 404.",
+          "warning"
+        );
+      } else {
+        modelState.textContent = "Доступных чат-моделей: " + chatModels.length + ".";
+      }
+    };
+
+    const loadModels = async () => {
+      model.disabled = true;
+      modelState.textContent = "Загружаю GET /models…";
+      try {
+        const catalog = await api("/api/account/cloudru/models");
+        populateModels(catalog, p.model_id);
+        if (!catalog.chat_models?.length) {
+          result.innerHTML = workspaceResult("Cloud.ru не вернул чат-модели для этого ключа.", "warning");
+        }
+      } catch (error) {
+        model.innerHTML = '<option value="">Список моделей недоступен</option>';
+        modelState.textContent = "Не удалось загрузить модели.";
+        result.innerHTML = workspaceResult(error.message, "error");
+      } finally {
+        model.disabled = false;
+      }
+    };
+
+    el("workspaceCloudReload").onclick = loadModels;
 
     el("workspaceCloudTest").onclick = async () => {
-      result.innerHTML = workspaceResult("Проверяю /models и реальный chat/completions…", "working");
+      result.innerHTML = workspaceResult("Проверяю выбранную модель через реальный chat/completions…", "working");
       try {
         const checked = await api("/api/account/cloudru/test", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             api_key: key.value.trim() || null,
-            model_id: model.value.trim() || null,
+            model_id: model.value || null,
             base_url: base.value.trim() || null
           })
         });
-        options.innerHTML = "";
-        for (const item of (checked.chat_models || [])) {
-          const option = document.createElement("option");
-          option.value = item.id;
-          option.label = item.name || item.id;
-          options.appendChild(option);
-        }
-        let message = "Ключ работает. Моделей найдено: " + checked.models_found + ".";
-        if (checked.chat_ok) message += " Chat completions для «" + checked.selected_model + "» работает.";
-        else if (!checked.selected_model) message += " Выберите Model ID из подсказок и повторите проверку.";
-        result.innerHTML = workspaceResult(message, checked.chat_ok ? "success" : "warning");
+        populateModels(checked, checked.selected_model);
+        result.innerHTML = workspaceResult(
+          checked.message || (checked.ok ? "Cloud.ru работает." : "Проверка не пройдена."),
+          checked.ok && checked.chat_ok ? "success" : "warning"
+        );
       } catch (error) {
         result.innerHTML = workspaceResult(error.message, "error");
       }
@@ -1500,20 +1541,24 @@ async function renderAccountWorkspace() {
 
     el("workspaceCloudForm").onsubmit = async (event) => {
       event.preventDefault();
+      if (!model.value) {
+        result.innerHTML = workspaceResult("Сначала выберите Model ID из списка Cloud.ru.", "warning");
+        return;
+      }
       try {
         const saved = await api("/api/account/cloudru", {
           method: "PUT",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             api_key: key.value.trim() || null,
-            model_id: model.value.trim(),
+            model_id: model.value,
             base_url: base.value.trim()
           })
         });
         result.innerHTML = workspaceResult(
           saved.cloudru.configured
-            ? "Настройки сохранены и уже используются Miyori."
-            : "Настройки сохранены, но для работы нужны ключ и Model ID.",
+            ? "Настройки сохранены. Выбранная модель: " + saved.cloudru.model_id
+            : "Настройки сохранены, но конфигурация неполная.",
           saved.cloudru.configured ? "success" : "warning"
         );
         key.value = "";
@@ -1522,6 +1567,8 @@ async function renderAccountWorkspace() {
         result.innerHTML = workspaceResult(error.message, "error");
       }
     };
+
+    await loadModels();
   } catch (error) {
     workspaceBody.innerHTML = workspaceResult(error.message, "error");
   }
