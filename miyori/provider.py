@@ -16,7 +16,10 @@ class ProviderError(RuntimeError):
     pass
 
 
-async def chat(messages: list[dict[str, str]]) -> str:
+async def chat(
+    messages: list[dict[str, str]],
+    memory_context: list[str] | None = None,
+) -> str:
     if not settings.cloudru_api_key:
         raise ProviderError(
             "Cloud.ru API ключ не настроен. Скопируйте .env.example в .env и заполните CLOUDRU_API_KEY."
@@ -26,9 +29,19 @@ async def chat(messages: list[dict[str, str]]) -> str:
             "Модель Cloud.ru не выбрана. Укажите CLOUDRU_MODEL_ID в файле .env."
         )
 
+    system_prompt = SYSTEM_PROMPT
+    if memory_context:
+        memory_block = "\n".join(f"- {item}" for item in memory_context)
+        system_prompt += (
+            "\n\nПроверенная память текущего проекта:\n"
+            f"{memory_block}\n"
+            "Используй эти сведения как подтверждённый контекст текущего проекта. "
+            "Не переноси их в другие проекты."
+        )
+
     payload = {
         "model": settings.cloudru_model_id,
-        "messages": [{"role": "system", "content": SYSTEM_PROMPT}, *messages],
+        "messages": [{"role": "system", "content": system_prompt}, *messages],
     }
     headers = {
         "Authorization": f"Bearer {settings.cloudru_api_key}",
