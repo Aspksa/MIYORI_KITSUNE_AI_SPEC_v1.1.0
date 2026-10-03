@@ -16,6 +16,8 @@ const addProject = document.getElementById("addProject");
 const conversationList = document.getElementById("conversationList");
 const memoryList = document.getElementById("memoryList");
 const refreshMemory = document.getElementById("refreshMemory");
+const memoryList = document.getElementById("memoryList");
+const refreshMemory = document.getElementById("refreshMemory");
 const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
 const modelText = document.getElementById("modelText");
@@ -183,6 +185,56 @@ async function loadMemory() {
   }
 }
 
+async function loadMemory() {
+  if (!state.projectId || !memoryList) return;
+  const data = await api("/api/projects/" + state.projectId + "/memory");
+  memoryList.innerHTML = "";
+  if (!data.facts.length) {
+    memoryList.innerHTML = '<div class="conversation-empty">Память пока пуста</div>';
+    return;
+  }
+  for (const fact of data.facts) {
+    const card = document.createElement("div");
+    card.className = "memory-item status-" + fact.status;
+    card.innerHTML =
+      '<div class="memory-statement">' + escapeHtml(fact.statement) + '</div>' +
+      '<div class="memory-meta"><span>' + escapeHtml(fact.status) + '</span></div>';
+    if (fact.status === "candidate") {
+      const actions = document.createElement("div");
+      actions.className = "memory-actions";
+      for (const item of [["verified","Подтвердить"],["disputed","Оспорить"]]) {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = item[1];
+        b.addEventListener("click", async () => {
+          await api("/api/projects/" + state.projectId + "/memory/" + fact.id, {
+            method: "PATCH",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({status:item[0]})
+          });
+          await loadMemory();
+        });
+        actions.appendChild(b);
+      }
+      card.appendChild(actions);
+    } else if (fact.status === "verified") {
+      const actions = document.createElement("div");
+      actions.className = "memory-actions";
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = "Устарело";
+      b.addEventListener("click", async () => {
+        await api("/api/projects/" + state.projectId + "/memory/" + fact.id, {
+          method: "PATCH",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({status:"superseded"})
+        });
+        await loadMemory();
+      });
+      actions.appendChild(b); card.appendChild(actions);
+    }
+    memoryList.appendChild(card);
+  }
+}
+
 async function loadConversations() {
   if (!state.projectId) return;
   const data = await api(`/api/projects/${state.projectId}/conversations`);
@@ -328,6 +380,7 @@ input.addEventListener("keydown", (event) => {
 
 newChat.addEventListener("click", startNewChat);
 newChatSide.addEventListener("click", startNewChat);
+if (refreshMemory) refreshMemory.addEventListener("click", loadMemory);
 refreshMemory.addEventListener("click", loadMemory);
 
 async function boot() {
