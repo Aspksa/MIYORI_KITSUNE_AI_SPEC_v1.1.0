@@ -36,8 +36,10 @@ def decide_actions(message: str) -> list[AgentDecision]:
         "помни", "памят", "я говорил", "я предпочитаю", "мой ", "моя ", "мои ",
     )
     document_markers = (
-        "документ", "файл", "источник", "найди", "прочитай", "по материал",
-        "в тексте", "в проекте", "спецификац",
+        "документ", "источник", "по материал", "в тексте", "спецификац",
+    )
+    workspace_list_markers = (
+        "список файлов", "какие файлы", "файлы workspace", "рабочая папка",
     )
     status_markers = (
         "статус проекта", "состояние проекта", "готов ли проект", "проверь проект",
@@ -57,6 +59,14 @@ def decide_actions(message: str) -> list[AgentDecision]:
                 tool_name="project_memory_search",
                 reason="Запрос может зависеть от подтверждённой памяти проекта.",
                 arguments={"query": text},
+            )
+        )
+
+    if any(marker in lowered for marker in workspace_list_markers):
+        actions.append(
+            AgentDecision(
+                tool_name="workspace_list",
+                reason="Запрос относится к файлам рабочей папки проекта.",
             )
         )
 
