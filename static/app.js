@@ -1385,6 +1385,182 @@ const menuAccount = el("menuAccount");
 const menuSettings = el("menuSettings");
 const menuProjectUpdate = el("menuProjectUpdate");
 
+const accountOverlay = el("accountOverlay");
+const updateOverlay = el("updateOverlay");
+const cloudruForm = el("cloudruForm");
+const cloudruApiKey = el("cloudruApiKey");
+const cloudruModelId = el("cloudruModelId");
+const cloudruBaseUrl = el("cloudruBaseUrl");
+const cloudruKeyState = el("cloudruKeyState");
+const cloudruResult = el("cloudruResult");
+const updateResult = el("updateResult");
+
+function openSheet(overlay) {
+  if (!overlay) return;
+  overlay.hidden = false;
+  document.body.classList.add("sheet-open");
+}
+
+function closeSheet(overlay) {
+  if (!overlay) return;
+  overlay.hidden = true;
+  if ((!accountOverlay || accountOverlay.hidden) && (!updateOverlay || updateOverlay.hidden)) {
+    document.body.classList.remove("sheet-open");
+  }
+}
+
+function setSheetResult(node, message, tone = "neutral") {
+  if (!node) return;
+  node.hidden = false;
+  node.className = "sheet-result " + tone;
+  node.textContent = message;
+}
+
+async function loadCloudruProfile() {
+  const data = await api("/api/account/cloudru");
+  const profile = data.cloudru;
+  cloudruApiKey.value = "";
+  cloudruModelId.value = profile.model_id || "";
+  cloudruBaseUrl.value = profile.base_url || "https://foundation-models.api.cloud.ru/v1";
+  cloudruKeyState.textContent = profile.api_key_set
+    ? "Сохранён: " + profile.api_key_masked + " · пустое поле сохранит текущий ключ"
+    : "Ключ ещё не сохранён";
+  cloudruResult.hidden = true;
+  return profile;
+}
+
+async function saveCloudruProfile(event) {
+  event.preventDefault();
+  const key = cloudruApiKey.value.trim();
+  try {
+    const data = await api("/api/account/cloudru", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        api_key: key || null,
+        model_id: cloudruModelId.value.trim(),
+        base_url: cloudruBaseUrl.value.trim()
+      })
+    });
+    cloudruApiKey.value = "";
+    cloudruKeyState.textContent = data.cloudru.api_key_set
+      ? "Сохранён: " + data.cloudru.api_key_masked
+      : "Ключ не задан";
+    setSheetResult(
+      cloudruResult,
+      data.cloudru.configured
+        ? "Cloud.ru сохранён и уже используется текущим процессом Miyori."
+        : "Настройки сохранены. Для готовности нужны API-ключ и Model ID.",
+      data.cloudru.configured ? "success" : "warning"
+    );
+    await loadStatus();
+  } catch (error) {
+    setSheetResult(cloudruResult, error.message, "error");
+  }
+}
+
+async function testCloudruProfile() {
+  const key = cloudruApiKey.value.trim();
+  setSheetResult(cloudruResult, "Проверяю подключение к Cloud.ru…", "working");
+  try {
+    const data = await api("/api/account/cloudru/test", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        api_key: key || null,
+        model_id: cloudruModelId.value.trim() || null,
+        base_url: cloudruBaseUrl.value.trim() || null
+      })
+    });
+    let message = "Cloud.ru отвечает. Доступных моделей: " + data.models_found + ".";
+    if (data.selected_model) {
+      message += data.selected_model_found === false
+        ? " Выбранная модель не найдена в ответе /models."
+        : " Model ID принят для проверки.";
+    }
+    setSheetResult(cloudruResult, message, "success");
+  } catch (error) {
+    setSheetResult(cloudruResult, error.message, "error");
+  }
+}
+
+function shortSha(value) {
+  return value ? String(value).slice(0, 10) : "—";
+}
+
+function renderUpdateStatus(status) {
+  el("updateLocalSha").textContent = shortSha(status.local_sha);
+  el("updateRemoteSha").textContent = shortSha(status.remote_sha);
+  el("updateWorktree").textContent = !status.git_available
+    ? "Git недоступен"
+    : !status.is_git_checkout
+      ? "Не git checkout"
+      : status.clean
+        ? "Чистая"
+        : "Есть изменения";
+  el("updateAutoState").textContent = status.auto_update
+    ? "Вкл. · каждые " + status.interval_minutes + " мин."
+    : "Выключено";
+
+  if (status.last_error) {
+    setSheetResult(updateResult, status.last_error, "error");
+  } else if (status.restart_required) {
+    setSheetResult(updateResult, "Обновление уже применено. Перезапустите Miyori.", "warning");
+  } else if (status.update_available) {
+    setSheetResult(
+      updateResult,
+      "Доступно обновление: +" + status.behind + " коммит(ов) из origin/" + status.branch + ".",
+      "warning"
+    );
+  } else if (status.local_sha && status.remote_sha) {
+    setSheetResult(updateResult, "Локальный проект синхронизирован с GitHub.", "success");
+  } else {
+    setSheetResult(updateResult, "Статус GitHub ещё не проверен.", "neutral");
+  }
+
+  const applyButton = el("applyProjectUpdate");
+  if (applyButton) {
+    applyButton.disabled =
+      !status.update_available ||
+      !status.clean ||
+      !status.origin_ok ||
+      status.current_branch !== status.branch ||
+      status.ahead > 0;
+  }
+}
+
+async function loadProjectUpdateStatus(refresh = false) {
+  setSheetResult(updateResult, refresh ? "Проверяю GitHub…" : "Загружаю состояние…", "working");
+  try {
+    const data = refresh
+      ? await api("/api/update/check", {method: "POST"})
+      : await api("/api/update/status");
+    renderUpdateStatus(data.update);
+    return data.update;
+  } catch (error) {
+    setSheetResult(updateResult, error.message, "error");
+    return null;
+  }
+}
+
+async function applyProjectUpdateNow() {
+  setSheetResult(updateResult, "Применяю безопасное fast-forward обновление…", "working");
+  try {
+    const data = await api("/api/update/apply", {method: "POST"});
+    renderUpdateStatus(data.update);
+    if (data.update.updated) {
+      setSheetResult(
+        updateResult,
+        "Проект обновлён до " + shortSha(data.update.to_sha) +
+        ". Перезапустите Miyori, чтобы запустить новый код.",
+        "success"
+      );
+    }
+  } catch (error) {
+    setSheetResult(updateResult, error.message, "error");
+  }
+}
+
 if (menuMobileApp) {
   menuMobileApp.addEventListener("click", () => {
     openSidebarSection(
@@ -1396,12 +1572,13 @@ if (menuMobileApp) {
 }
 
 if (menuAccount) {
-  menuAccount.addEventListener("click", () => {
-    openSidebarSection(
-      "Личный кабинет",
-      "Раздел подготовлен в навигации. Здесь позже будут профиль, устройства, сессии, доступы и персональные параметры.",
-      "neutral"
-    );
+  menuAccount.addEventListener("click", async () => {
+    openSheet(accountOverlay);
+    try {
+      await loadCloudruProfile();
+    } catch (error) {
+      setSheetResult(cloudruResult, error.message, "error");
+    }
   });
 }
 
@@ -1412,13 +1589,23 @@ if (menuSettings) {
 }
 
 if (menuProjectUpdate) {
-  menuProjectUpdate.addEventListener("click", () => {
-    openSidebarSection(
-      "Обновление проекта",
-      "Текущая версия Miyori: " + (versionText?.textContent || "неизвестна") +
-      ". Автоматическое обновление пока не подключено; раздел готов для будущего updater-модуля.",
-      "neutral"
-    );
+  menuProjectUpdate.addEventListener("click", async () => {
+    openSheet(updateOverlay);
+    await loadProjectUpdateStatus(false);
+  });
+}
+
+if (cloudruForm) cloudruForm.addEventListener("submit", saveCloudruProfile);
+if (el("testCloudru")) el("testCloudru").addEventListener("click", testCloudruProfile);
+if (el("checkProjectUpdate")) el("checkProjectUpdate").addEventListener("click", () => loadProjectUpdateStatus(true));
+if (el("applyProjectUpdate")) el("applyProjectUpdate").addEventListener("click", applyProjectUpdateNow);
+if (el("closeAccountPanel")) el("closeAccountPanel").addEventListener("click", () => closeSheet(accountOverlay));
+if (el("closeUpdatePanel")) el("closeUpdatePanel").addEventListener("click", () => closeSheet(updateOverlay));
+
+for (const overlay of [accountOverlay, updateOverlay]) {
+  if (!overlay) continue;
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeSheet(overlay);
   });
 }
 
