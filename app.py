@@ -62,10 +62,18 @@ from miyori.epistemic import (
 from miyori.tasks import wake_worker
 from miyori.rag import init_rag, rag_status, retrieve as rag_retrieve
 from miyori.tools import execute_approved_request, execute_tool, list_tools
+from miyori.account import cloudru_profile, save_cloudru_profile, test_cloudru
+from miyori.updater import (
+    UpdateError,
+    apply_update,
+    clear_restart_required,
+    local_status as update_status,
+    start_update_monitor,
+)
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.18")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.19")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -124,6 +132,18 @@ class EvidenceCreateRequest(BaseModel):
     weight: float = Field(default=1.0, ge=0.0, le=2.0)
 
 
+class CloudRuProfileRequest(BaseModel):
+    api_key: str | None = Field(default=None, max_length=500)
+    base_url: str | None = Field(default=None, max_length=500)
+    model_id: str | None = Field(default=None, max_length=300)
+
+
+class CloudRuTestRequest(BaseModel):
+    api_key: str | None = Field(default=None, max_length=500)
+    base_url: str | None = Field(default=None, max_length=500)
+    model_id: str | None = Field(default=None, max_length=300)
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
@@ -131,6 +151,8 @@ def startup() -> None:
     init_rag()
     register_background_handlers()
     wake_worker()
+    clear_restart_required()
+    start_update_monitor()
 
 
 @app.get("/")
@@ -142,7 +164,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.18",
+        "version": "00.00.19",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -152,6 +174,56 @@ def status() -> dict:
         "storage": "SQLite",
         "rag": rag_status(),
     }
+
+
+@app.get("/api/account/cloudru")
+def account_cloudru_get() -> dict:
+    return {"cloudru": cloudru_profile()}
+
+
+@app.put("/api/account/cloudru")
+def account_cloudru_save(request: CloudRuProfileRequest) -> dict:
+    try:
+        profile = save_cloudru_profile(
+            api_key=request.api_key,
+            base_url=request.base_url,
+            model_id=request.model_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"cloudru": profile}
+
+
+@app.post("/api/account/cloudru/test")
+async def account_cloudru_test(request: CloudRuTestRequest) -> dict:
+    try:
+        return await test_cloudru(
+            api_key=request.api_key,
+            base_url=request.base_url,
+            model_id=request.model_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/api/update/status")
+def project_update_status(refresh: bool = False) -> dict:
+    return {"update": update_status(fetch=refresh)}
+
+
+@app.post("/api/update/check")
+def project_update_check() -> dict:
+    return {"update": update_status(fetch=True)}
+
+
+@app.post("/api/update/apply")
+def project_update_apply() -> dict:
+    try:
+        return {"update": apply_update()}
+    except UpdateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get("/api/projects")
