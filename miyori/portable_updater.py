@@ -129,7 +129,7 @@ def _download_zip(sha: str) -> Path:
     return target
 
 
-def apply(root: Path, state_path: Path, branch: str) -> dict:
+def apply(root: Path, state_path: Path, branch: str, backup_enabled: bool = True) -> dict:
     current = status(root, state_path, branch, fetch=True)
     if current.get("last_error"):
         raise PortableUpdateError(current["last_error"])
@@ -162,7 +162,7 @@ def apply(root: Path, state_path: Path, branch: str) -> dict:
 
             for info, relative in members:
                 destination = root.joinpath(*relative.parts)
-                if destination.exists() and destination.is_file():
+                if backup_enabled and destination.exists() and destination.is_file():
                     backup = backup_root.joinpath(*relative.parts)
                     backup.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(destination, backup)
