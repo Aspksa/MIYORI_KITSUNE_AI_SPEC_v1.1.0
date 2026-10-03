@@ -74,6 +74,29 @@ def init_db() -> None:
                 FOREIGN KEY(source_id) REFERENCES memory_sources(id),
                 FOREIGN KEY(supersedes_fact_id) REFERENCES memory_facts(id)
             );
+
+            CREATE TABLE IF NOT EXISTS documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                stored_path TEXT NOT NULL,
+                mime_type TEXT,
+                sha256 TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(project_id, sha256),
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS document_chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id INTEGER NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(document_id, chunk_index),
+                FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
+            );
             """
         )
 
@@ -541,3 +564,105 @@ def recent_messages(conversation_id: int, limit: int = 30) -> list[dict[str, str
         {"role": row["role"], "content": row["content"]}
         for row in reversed(rows)
     ]
+
+
+def add_document(
+    project_id: int,
+    filename: str,
+    stored_path: str,
+    mime_type: str | None,
+    sha256: str,
+    size_bytes: int,
+    chunks: list[str],
+) -> dict:
+    with connect() as conn:
+        existing = conn.execute(
+            """
+            SELECT id, project_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
+            FROM documents WHERE project_id = ? AND sha256 = ?
+            """,
+            (project_id, sha256),
+        ).fetchone()
+        if existing:
+            return dict(existing)
+
+        cur = conn.execute(
+            """
+            INSERT INTO documents(
+                project_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id, filename, stored_path, mime_type,
+                sha256, size_bytes, utc_now(),
+            ),
+        )
+        document_id = int(cur.lastrowid)
+
+        for index, content in enumerate(chunks):
+            conn.execute(
+                """
+                INSERT INTO document_chunks(document_id, chunk_index, content, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (document_id, index, content, utc_now()),
+            )
+
+        row = conn.execute(
+            """
+            SELECT id, project_id, filename, stored_path, mime_type, sha256, size_bytes, created_at
+            FROM documents WHERE id = ?
+            """,
+            (document_id,),
+        ).fetchone()
+    return dict(row)
+
+
+def list_documents(project_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                d.id, d.filename, d.mime_type, d.sha256, d.size_bytes, d.created_at,
+                COUNT(c.id) AS chunk_count
+            FROM documents d
+            LEFT JOIN document_chunks c ON c.document_id = d.id
+            WHERE d.project_id = ?
+            GROUP BY d.id
+            ORDER BY d.id DESC
+            """,
+            (project_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def search_document_chunks(project_id: int, query: str, limit: int = 6) -> list[dict]:
+    query_tokens = _memory_tokens(query)
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                c.id, c.chunk_index, c.content,
+                d.id AS document_id, d.filename
+            FROM document_chunks c
+            JOIN documents d ON d.id = c.document_id
+            WHERE d.project_id = ?
+            ORDER BY c.id DESC
+            LIMIT 1000
+            """,
+            (project_id,),
+        ).fetchall()
+
+    scored = []
+    for recency, row in enumerate(rows):
+        content_tokens = _memory_tokens(row["content"])
+        overlap = len(query_tokens & content_tokens)
+        exact_bonus = 4 if query.strip().lower() in row["content"].lower() else 0
+        score = overlap * 10 + exact_bonus - min(recency, 100) * 0.005
+        if overlap or exact_bonus:
+            item = dict(row)
+            item["score"] = round(score, 3)
+            scored.append((score, item))
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [row for _, row in scored[:limit]]
