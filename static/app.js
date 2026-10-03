@@ -9,6 +9,10 @@ const errorBox = el("errorBox");
 const projectSelect = el("projectSelect");
 const conversationList = el("conversationList");
 const memoryList = el("memoryList");
+const documentInput = el("documentInput");
+const documentSearch = el("documentSearch");
+const documentList = el("documentList");
+const documentSearchResults = el("documentSearchResults");
 const memorySearch = el("memorySearch");
 const statusDot = el("statusDot");
 const statusText = el("statusText");
@@ -94,12 +98,85 @@ async function loadProjects() {
   if (!state.projectId && data.projects.length) state.projectId = data.projects[0].id;
   projectSelect.value = String(state.projectId);
   updateProjectLabel();
-  await Promise.all([loadConversations(), loadMemory()]);
+  await Promise.all([loadConversations(), loadMemory(), loadDocuments()]);
 }
 
 function updateProjectLabel() {
   const option = projectSelect.selectedOptions[0];
   projectLabel.textContent = option ? "Проект: " + option.textContent : "Проект";
+}
+
+async function loadDocuments() {
+  if (!state.projectId) return;
+  try {
+    const data = await api("/api/projects/" + state.projectId + "/documents");
+    documentList.innerHTML = "";
+    if (!data.documents.length) {
+      documentList.innerHTML = '<div class="conversation-empty">Документов пока нет</div>';
+      return;
+    }
+    for (const item of data.documents) {
+      const row = document.createElement("div");
+      row.className = "document-item";
+      row.innerHTML =
+        '<span>' + escapeHtml(item.filename) + '</span>' +
+        '<small>' + item.chunk_count + ' фрагм. · ' + Math.max(1, Math.round(item.size_bytes / 1024)) + ' КБ</small>';
+      documentList.appendChild(row);
+    }
+  } catch (error) {
+    documentList.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + '</div>';
+  }
+}
+
+async function searchDocuments() {
+  if (!state.projectId) return;
+  const query = documentSearch.value.trim();
+  documentSearchResults.innerHTML = "";
+  if (!query) return;
+
+  try {
+    const data = await api(
+      "/api/projects/" + state.projectId + "/documents/search?q=" + encodeURIComponent(query)
+    );
+    if (!data.chunks.length) {
+      documentSearchResults.innerHTML = '<div class="conversation-empty">Совпадений нет</div>';
+      return;
+    }
+    for (const item of data.chunks) {
+      const card = document.createElement("div");
+      card.className = "document-result";
+      const preview = item.content.length > 260 ? item.content.slice(0, 257) + "..." : item.content;
+      card.innerHTML =
+        '<strong>' + escapeHtml(item.filename) + ' · фрагмент ' + item.chunk_index + '</strong>' +
+        '<p>' + escapeHtml(preview) + '</p>';
+      documentSearchResults.appendChild(card);
+    }
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+async function uploadDocument(file) {
+  if (!file || !state.projectId) return;
+  const formData = new FormData();
+  formData.append("file", file);
+  showError("");
+  try {
+    const response = await fetch(
+      "/api/projects/" + state.projectId + "/documents",
+      {method: "POST", body: formData}
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      const detail = data?.detail || "Ошибка загрузки документа.";
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    await loadDocuments();
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    documentInput.value = "";
+  }
 }
 
 async function loadConversations() {
@@ -250,7 +327,7 @@ form.addEventListener("submit", async (event) => {
 
     state.conversationId = data.conversation_id;
     addMessage("assistant", data.answer);
-    await Promise.all([loadConversations(), loadMemory()]);
+    await Promise.all([loadConversations(), loadMemory(), loadDocuments()]);
   } catch (error) {
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
@@ -297,6 +374,8 @@ input.addEventListener("keydown", (event) => {
   }
 });
 memorySearch.addEventListener("input", loadMemory);
+documentSearch.addEventListener("input", searchDocuments);
+documentInput.addEventListener("change", () => uploadDocument(documentInput.files[0]));
 el("refreshMemory").addEventListener("click", loadMemory);
 el("newChat").addEventListener("click", startNewChat);
 el("newChatSide").addEventListener("click", startNewChat);
