@@ -32,6 +32,11 @@ def cloudru_profile() -> dict:
     }
 
 
+def _env_encode(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return f'"{escaped}"'
+
+
 def _write_env_values(values: dict[str, str]) -> None:
     path = _env_path()
     original = path.read_text(encoding="utf-8") if path.exists() else ""
@@ -44,7 +49,7 @@ def _write_env_values(values: dict[str, str]) -> None:
         matched = False
         for key in _ENV_KEYS:
             if stripped.startswith(key + "="):
-                output.append(f"{key}={values[key]}")
+                output.append(f"{key}={_env_encode(values[key])}")
                 replaced.add(key)
                 matched = True
                 break
@@ -56,7 +61,7 @@ def _write_env_values(values: dict[str, str]) -> None:
 
     for key in _ENV_KEYS:
         if key not in replaced:
-            output.append(f"{key}={values[key]}")
+            output.append(f"{key}={_env_encode(values[key])}")
 
     path.write_text("\n".join(output).rstrip() + "\n", encoding="utf-8")
 
