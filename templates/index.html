@@ -15,44 +15,86 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.13</span>
+            <span class="version-pill" id="versionText">00.00.14</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
       </div>
 
-      <section class="project-card">
-        <div class="section-caption">Текущий проект</div>
-        <div class="project-row">
-          <select id="projectSelect" aria-label="Выбор проекта"></select>
-          <button id="addProject" class="icon-button" type="button" title="Создать проект" aria-label="Создать проект">+</button>
-        </div>
-      </section>
-
-      <div class="rail-heading">
-        <span>Разговоры</span>
-        <button id="newChatSide" class="ghost-button" type="button">+ Новый</button>
-      </div>
-      <div id="conversationList" class="conversation-list"></div>
-
-      <div class="rail-spacer"></div>
-
-      <section class="connection-card">
-        <div class="status-line">
-          <span id="statusDot" class="dot"></span>
-          <div>
-            <strong id="statusText">Проверяю…</strong>
-            <div id="modelText" class="subtle">Модель не выбрана</div>
+      <section class="lavender-panel system-panel">
+        <div class="panel-title">Состояние системы</div>
+        <div class="system-status-list">
+          <div class="system-status-row">
+            <span class="system-status-icon">◉</span>
+            <div><strong>ИИ</strong><small id="modelText">Модель не выбрана</small></div>
+            <span id="aiStatusChip" class="soft-status neutral">Проверяю</span>
+          </div>
+          <div class="system-status-row">
+            <span class="system-status-icon">✦</span>
+            <div><strong>Память</strong><small>Контекст проекта</small></div>
+            <span id="memoryStatusChip" class="soft-status neutral">Ожидание</span>
+          </div>
+          <div class="system-status-row">
+            <span class="system-status-icon">◫</span>
+            <div><strong>База данных</strong><small>SQLite</small></div>
+            <span id="dbStatusChip" class="soft-status neutral">Проверяю</span>
+          </div>
+          <div class="system-status-row">
+            <span class="system-status-icon">▤</span>
+            <div><strong>Документы</strong><small id="docsStatusText">Нет данных</small></div>
+            <span id="docsStatusChip" class="soft-status neutral">Ожидание</span>
+          </div>
+          <div class="system-status-row">
+            <span class="system-status-icon">⌁</span>
+            <div><strong>Cloud.ru</strong><small id="statusText">Проверяю…</small></div>
+            <span id="statusDot" class="dot"></span>
           </div>
         </div>
       </section>
+
+      <section class="lavender-panel processing-panel">
+        <div class="panel-title">Этапы обработки</div>
+        <div class="processing-steps" id="processingSteps">
+          <div class="processing-step" data-stage="accepted">
+            <span class="stage-node">1</span>
+            <div><strong>Запрос принят</strong><small>Ожидаю задачу</small></div>
+          </div>
+          <div class="processing-step" data-stage="context">
+            <span class="stage-node">2</span>
+            <div><strong>Сбор контекста</strong><small>Память и документы</small></div>
+          </div>
+          <div class="processing-step" data-stage="work">
+            <span class="stage-node">3</span>
+            <div><strong>Работа</strong><small>Анализ и действия</small></div>
+          </div>
+          <div class="processing-step" data-stage="result">
+            <span class="stage-node">4</span>
+            <div><strong>Результат</strong><small>Ожидает выполнения</small></div>
+          </div>
+        </div>
+      </section>
+
+      <details class="workspace-details">
+        <summary>Проект и разговоры</summary>
+        <section class="project-card compact-project">
+          <div class="project-row">
+            <select id="projectSelect" aria-label="Выбор проекта"></select>
+            <button id="addProject" class="icon-button" type="button" title="Создать проект" aria-label="Создать проект">+</button>
+          </div>
+        </section>
+        <div class="rail-heading">
+          <span>Разговоры</span>
+          <button id="newChatSide" class="ghost-button" type="button">+ Новый</button>
+        </div>
+        <div id="conversationList" class="conversation-list"></div>
+      </details>
     </aside>
 
     <main class="chat-area">
       <header class="chat-header">
         <div class="chat-title">
           <span class="section-caption" id="projectLabel">Личная AI-помощница</span>
-          <h2 id="conversationTitle">Разговор с Миёри</h2>
+          <h2 id="conversationTitle">Чат с Миёри</h2>
         </div>
         <div class="header-actions">
           <button id="toggleConsole" class="icon-action" type="button" title="Технические детали Миёри" aria-label="Технические детали Миёри">◎</button>
@@ -170,7 +212,7 @@
       <footer class="composer-wrap">
         <form id="chatForm" class="composer">
           <div class="composer-field">
-            <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Сообщение Миёри…" required></textarea>
+            <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Задать вопрос…" required></textarea>
             <div class="composer-hint">Enter — отправить · Shift+Enter — новая строка</div>
           </div>
           <button id="sendButton" class="send-button" type="submit" aria-label="Отправить">↑</button>
