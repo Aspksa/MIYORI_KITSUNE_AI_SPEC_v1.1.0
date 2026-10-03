@@ -794,6 +794,44 @@ form.addEventListener("submit", async (event) => {
       brainPlan.innerHTML = data.brain.plan.map(
         (item, index) => "<div>" + (index + 1) + ". " + escapeHtml(item) + "</div>"
       ).join("");
+
+      if (data.brain.plan?.length) {
+        const planCard = addActivityCard("План Brain", null, "neutral");
+        const planBody = document.createElement("div");
+        planBody.className = "activity-body plan-result";
+        data.brain.plan.forEach((item, index) => {
+          const row = document.createElement("div");
+          row.className = "plan-row";
+          row.innerHTML = '<span>' + (index + 1) + '</span><div>' + escapeHtml(item) + '</div>';
+          planBody.appendChild(row);
+        });
+        planCard.appendChild(planBody);
+      }
+
+      if (data.brain.sources?.length) {
+        const sourceCard = addActivityCard("Источники ответа", null, "neutral");
+        const sourceBody = document.createElement("div");
+        sourceBody.className = "activity-body source-list";
+        data.brain.sources.forEach((source) => {
+          const item = document.createElement("div");
+          item.className = "source-card";
+          item.innerHTML =
+            '<strong>' + escapeHtml(source.filename || "Документ") +
+            ' · фрагмент ' + source.chunk_index + '</strong>' +
+            '<p>' + escapeHtml(source.content || "") + '</p>';
+          const ask = document.createElement("button");
+          ask.type = "button";
+          ask.textContent = "Спросить по источнику";
+          ask.onclick = () => {
+            input.value = "По источнику " + (source.filename || "документ") +
+              ", фрагмент " + source.chunk_index + ": ";
+            input.focus();
+          };
+          item.appendChild(ask);
+          sourceBody.appendChild(item);
+        });
+        sourceCard.appendChild(sourceBody);
+      }
     }
     if (data.agent) {
       agentBudget.textContent = data.agent.steps_used + "/" + data.agent.max_steps;
