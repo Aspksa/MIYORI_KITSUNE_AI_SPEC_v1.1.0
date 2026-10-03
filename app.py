@@ -338,6 +338,7 @@ def project_nexus(project_id: int) -> dict:
             "checks_total": development.get("checks_total", 0),
         },
         "suggestions": suggestions[:3],
+        "epistemic": epistemic_snapshot(project_id),
     }
 
 
