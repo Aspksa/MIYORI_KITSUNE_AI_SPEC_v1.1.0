@@ -24,18 +24,22 @@ from miyori.db import (
     decide_permission_request,
     disconnect_device_session,
     get_account_profile,
+    get_ai_preferences,
     get_agent_trace,
     get_permission_request,
     get_project,
     init_db,
     add_document,
     create_document_folder,
+    create_employee,
     create_task,
+    delete_employee,
     development_snapshot,
     list_conversations,
     list_device_sessions,
     list_document_folders,
     list_documents,
+    list_employees,
     list_project_modules,
     list_projects,
     list_memory_facts,
@@ -50,6 +54,8 @@ from miyori.db import (
     search_verified_memory,
     update_account_avatar,
     update_account_profile,
+    update_ai_preferences,
+    update_employee,
     update_memory_status,
     upsert_device_session,
     verified_memory_context,
@@ -77,6 +83,7 @@ from miyori.tasks import wake_worker
 from miyori.rag import init_rag, rag_status, retrieve as rag_retrieve
 from miyori.tools import execute_approved_request, execute_tool, list_tools
 from miyori.account import cloudru_profile, list_cloudru_models, save_cloudru_profile, test_cloudru
+from miyori.module_registry import module_manifest, release_history
 from miyori.updater import (
     UpdateError,
     apply_update,
@@ -99,7 +106,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.30", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.31", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -174,6 +181,26 @@ class EvidenceCreateRequest(BaseModel):
     weight: float = Field(default=1.0, ge=0.0, le=2.0)
 
 
+class AiPreferencesRequest(BaseModel):
+    communication_style: str = Field(pattern="^(balanced|warm|business|minimal)$")
+    detail_level: str = Field(pattern="^(short|normal|detailed)$")
+    initiative_level: str = Field(pattern="^(low|medium|high)$")
+    ask_before_assuming: bool = False
+    suggest_next_steps: bool = True
+    use_rag: bool = True
+    use_verified_memory: bool = True
+    show_uncertainty: bool = True
+    priority_mode: str = Field(pattern="^(accuracy|balanced|speed)$")
+    operating_mode: str = Field(pattern="^(personal|work|analyst|research|developer)$")
+
+
+class EmployeeRequest(BaseModel):
+    full_name: str = Field(min_length=1, max_length=180)
+    department: str = Field(default="", max_length=160)
+    position: str = Field(default="", max_length=160)
+    fuel_card_number: str = Field(default="", max_length=120)
+
+
 class AccountProfileRequest(BaseModel):
     owner_name: str = Field(default="", max_length=120)
     miyori_address: str = Field(default="Господин", max_length=80)
@@ -216,7 +243,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.30",
+        "version": "00.00.31",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -398,6 +425,47 @@ async def account_cloudru_test(request: CloudRuTestRequest, http_request: Reques
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+@app.get("/api/modules")
+def modules_manifest() -> dict:
+    return module_manifest()
+
+
+@app.get("/api/update/changelog")
+def update_changelog(request: Request) -> dict:
+    _require_local_admin(request)
+    return {
+        "manifest": module_manifest(),
+        "releases": release_history(),
+    }
+
+
+@app.get("/api/ai/preferences")
+def ai_preferences_get(request: Request) -> dict:
+    _require_local_admin(request)
+    return {"preferences": get_ai_preferences()}
+
+
+@app.put("/api/ai/preferences")
+def ai_preferences_save(request: AiPreferencesRequest, http_request: Request) -> dict:
+    _require_local_admin(http_request)
+    try:
+        preferences = update_ai_preferences(
+            communication_style=request.communication_style,
+            detail_level=request.detail_level,
+            initiative_level=request.initiative_level,
+            ask_before_assuming=request.ask_before_assuming,
+            suggest_next_steps=request.suggest_next_steps,
+            use_rag=request.use_rag,
+            use_verified_memory=request.use_verified_memory,
+            show_uncertainty=request.show_uncertainty,
+            priority_mode=request.priority_mode,
+            operating_mode=request.operating_mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"preferences": preferences}
+
+
 @app.get("/api/update/status")
 def project_update_status(request: Request, refresh: bool = False) -> dict:
     _require_local_admin(request)
@@ -438,6 +506,61 @@ def project_modules(project_id: int) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     return {"modules": list_project_modules(project_id)}
+
+
+@app.get("/api/projects/{project_id}/employees")
+def project_employees(project_id: int) -> dict:
+    project = get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"employees": list_employees(project_id)}
+
+
+@app.post("/api/projects/{project_id}/employees")
+def project_employee_create(project_id: int, request: EmployeeRequest) -> dict:
+    project = get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        employee = create_employee(
+            project_id,
+            full_name=request.full_name,
+            department=request.department,
+            position=request.position,
+            fuel_card_number=request.fuel_card_number,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"employee": employee}
+
+
+@app.put("/api/projects/{project_id}/employees/{employee_id}")
+def project_employee_update(project_id: int, employee_id: int, request: EmployeeRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        employee = update_employee(
+            project_id,
+            employee_id,
+            full_name=request.full_name,
+            department=request.department,
+            position=request.position,
+            fuel_card_number=request.fuel_card_number,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not employee:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден.")
+    return {"employee": employee}
+
+
+@app.delete("/api/projects/{project_id}/employees/{employee_id}")
+def project_employee_delete(project_id: int, employee_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    if not delete_employee(project_id, employee_id):
+        raise HTTPException(status_code=404, detail="Сотрудник не найден.")
+    return {"ok": True}
 
 
 @app.get("/api/projects/{project_id}/conversations")
