@@ -47,12 +47,24 @@ from miyori.development import run_project_self_check
 from miyori.documents import chunk_text, decode_document, safe_filename, save_original, sha256_bytes
 from miyori.provider import ProviderError, chat
 from miyori.persona import persona_metadata
+from miyori.epistemic import (
+    add_evidence,
+    capture_user_claims,
+    create_claim,
+    create_source,
+    epistemic_snapshot,
+    get_claim as get_epistemic_claim,
+    init_epistemic_db,
+    list_claims as list_epistemic_claims,
+    trusted_claim_context,
+    verify_claim,
+)
 from miyori.tasks import wake_worker
 from miyori.tools import execute_approved_request, execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.15")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.16")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -88,9 +100,33 @@ class PermissionDecisionRequest(BaseModel):
     approved: bool
 
 
+class ClaimCreateRequest(BaseModel):
+    statement: str = Field(min_length=1, max_length=1000)
+    claim_type: str | None = Field(default=None, pattern="^(fact|preference|hypothesis|strategy)$")
+
+
+class SourceCreateRequest(BaseModel):
+    source_type: str = Field(pattern="^(user_message|document|tool|external|manual)$")
+    source_key: str | None = Field(default=None, max_length=300)
+    title: str | None = Field(default=None, max_length=300)
+    locator: str | None = Field(default=None, max_length=1000)
+    publisher: str | None = Field(default=None, max_length=300)
+    quality: float = Field(default=0.5, ge=0.0, le=1.0)
+    independent_group: str | None = Field(default=None, max_length=300)
+    metadata: dict = Field(default_factory=dict)
+
+
+class EvidenceCreateRequest(BaseModel):
+    source_id: int
+    stance: str = Field(pattern="^(supports|contradicts|neutral)$")
+    excerpt: str | None = Field(default=None, max_length=2000)
+    weight: float = Field(default=1.0, ge=0.0, le=2.0)
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    init_epistemic_db()
     register_background_handlers()
     wake_worker()
 
@@ -104,7 +140,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.15",
+        "version": "00.00.16",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -305,6 +341,107 @@ def project_nexus(project_id: int) -> dict:
     }
 
 
+@app.get("/api/projects/{project_id}/epistemic")
+def epistemic_overview(project_id: int, status: str | None = None) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        claims = list_epistemic_claims(project_id, status=status, limit=100)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "snapshot": epistemic_snapshot(project_id),
+        "claims": claims,
+    }
+
+
+@app.post("/api/projects/{project_id}/epistemic/claims")
+def epistemic_claim_create(project_id: int, request: ClaimCreateRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        claim = create_claim(
+            project_id,
+            request.statement,
+            claim_type=request.claim_type,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"claim": claim}
+
+
+@app.get("/api/projects/{project_id}/epistemic/claims/{claim_id}")
+def epistemic_claim_get(project_id: int, claim_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    claim = get_epistemic_claim(project_id, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail="Утверждение не найдено.")
+    return {"claim": claim}
+
+
+@app.post("/api/projects/{project_id}/epistemic/sources")
+def epistemic_source_create(project_id: int, request: SourceCreateRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        source = create_source(
+            project_id,
+            request.source_type,
+            source_key=request.source_key,
+            title=request.title,
+            locator=request.locator,
+            publisher=request.publisher,
+            quality=request.quality,
+            independent_group=request.independent_group,
+            metadata=request.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"source": source}
+
+
+@app.post("/api/projects/{project_id}/epistemic/claims/{claim_id}/evidence")
+def epistemic_evidence_create(
+    project_id: int,
+    claim_id: int,
+    request: EvidenceCreateRequest,
+) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        evidence = add_evidence(
+            project_id,
+            claim_id,
+            request.source_id,
+            request.stance,
+            excerpt=request.excerpt,
+            weight=request.weight,
+        )
+        verification = verify_claim(project_id, claim_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "evidence": evidence,
+        "verification": verification.__dict__,
+        "claim": get_epistemic_claim(project_id, claim_id),
+    }
+
+
+@app.post("/api/projects/{project_id}/epistemic/claims/{claim_id}/verify")
+def epistemic_claim_verify(project_id: int, claim_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        result = verify_claim(project_id, claim_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "verification": result.__dict__,
+        "claim": get_epistemic_claim(project_id, claim_id),
+    }
+
+
 @app.get("/api/tools")
 def tools_catalog() -> dict:
     return {"tools": list_tools()}
@@ -439,9 +576,16 @@ async def send_message(request: ChatRequest) -> dict:
         user_message_id,
         text,
     )
+    captured_claims = capture_user_claims(
+        request.project_id,
+        conversation_id,
+        user_message_id,
+        text,
+    )
 
     context = recent_messages(conversation_id)
     brain = build_context(request.project_id, text)
+    epistemic = trusted_claim_context(request.project_id, text, limit=6)
     agent = run_agent(request.project_id, conversation_id, text)
     try:
         answer = await chat(
@@ -450,6 +594,7 @@ async def send_message(request: ChatRequest) -> dict:
             document_context=brain.documents,
             brain_plan=brain.plan,
             tool_context=agent.tool_context,
+            epistemic_context=epistemic,
         )
     except ProviderError as exc:
         raise HTTPException(
@@ -478,6 +623,20 @@ async def send_message(request: ChatRequest) -> dict:
                 }
                 for item in brain.documents
             ],
+        },
+        "epistemic": {
+            "used_claims": [
+                {
+                    "id": item.get("id"),
+                    "statement": item.get("statement"),
+                    "status": item.get("status"),
+                    "confidence": item.get("confidence"),
+                    "claim_type": item.get("claim_type"),
+                }
+                for item in epistemic
+            ],
+            "captured_claim_ids": [item.get("id") for item in captured_claims],
+            "snapshot": epistemic_snapshot(request.project_id),
         },
         "agent": {
             "run_id": agent.run_id,
