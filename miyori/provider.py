@@ -6,6 +6,7 @@ import httpx
 
 from .config import settings
 from .persona import build_persona_context
+from .account import list_cloudru_models
 
 
 SYSTEM_PROMPT = """Ты Миёри — личная AI-помощница с канонической художественной личностью из Persona Pack.
@@ -175,6 +176,21 @@ async def chat(
 
     if response.is_error:
         detail = response.text[:1500]
+        if response.status_code == 404:
+            try:
+                catalog = await list_cloudru_models()
+                available = [item["id"] for item in catalog.get("chat_models", [])]
+                if settings.cloudru_model_id not in available:
+                    examples = ", ".join(available[:5]) or "список пуст"
+                    raise ProviderError(
+                        "Сохранённый Model ID не найден среди доступных чат-моделей Cloud.ru: "
+                        f"«{settings.cloudru_model_id}». Откройте Личный кабинет → Cloud.ru "
+                        f"и выберите модель из списка. Доступные примеры: {examples}."
+                    )
+            except ProviderError:
+                raise
+            except Exception:
+                pass
         raise ProviderError(
             "Cloud.ru chat/completions завершился ошибкой. "
             f"Model ID: {settings.cloudru_model_id}; endpoint: {url}; "
