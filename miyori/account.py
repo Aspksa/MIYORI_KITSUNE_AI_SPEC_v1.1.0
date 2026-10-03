@@ -8,6 +8,7 @@ from .config import settings
 
 _ENV_KEYS = ("CLOUDRU_API_KEY", "CLOUDRU_BASE_URL", "CLOUDRU_MODEL_ID")
 _DEFAULT_BASE = "https://foundation-models.api.cloud.ru/v1"
+PREFERRED_CHAT_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
 
 
 def _env_path() -> Path:
@@ -29,6 +30,7 @@ def cloudru_profile() -> dict:
         "api_key_masked": _masked_key(settings.cloudru_api_key),
         "base_url": settings.cloudru_base_url,
         "model_id": settings.cloudru_model_id,
+        "preferred_model_id": PREFERRED_CHAT_MODEL,
     }
 
 
@@ -146,6 +148,7 @@ async def list_cloudru_models(
             })
 
     chat_models = [item for item in models if item["is_chat"]]
+    chat_models.sort(key=lambda item: (item["id"] != PREFERRED_CHAT_MODEL, item["id"].lower()))
     return {
         "ok": True,
         "models_found": len(ids),
@@ -153,6 +156,8 @@ async def list_cloudru_models(
         "chat_models": chat_models[:200],
         "selected_model": settings.cloudru_model_id or None,
         "selected_model_found": bool(settings.cloudru_model_id and settings.cloudru_model_id in ids),
+        "preferred_model_id": PREFERRED_CHAT_MODEL,
+        "preferred_model_available": PREFERRED_CHAT_MODEL in ids,
     }
 
 
