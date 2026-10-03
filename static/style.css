@@ -435,3 +435,23 @@ select {
 }
 .document-result strong { display: block; margin-bottom: 4px; color: #c8b1da; font-size: 10px; }
 .document-result p { margin: 0; color: #aeb6c2; font-size: 10px; line-height: 1.4; }
+
+.mini-status { color: #79c79b; font-size: 10px; text-transform: uppercase; }
+.brain-plan { display: grid; gap: 5px; }
+.tool-list, .task-list { display: grid; gap: 6px; max-height: 180px; overflow-y: auto; }
+.tool-item, .task-item {
+  padding: 8px 9px; border: 1px solid #303744; border-radius: 9px;
+  background: #171c24; font-size: 10px;
+}
+.tool-item strong, .task-item strong { display: block; color: #d9dce3; margin-bottom: 3px; }
+.tool-item small, .task-item small { color: #7f8996; line-height: 1.35; }
+.task-actions { display: flex; gap: 6px; margin-bottom: 8px; }
+.mini-button, .task-item button {
+  padding: 5px 7px; border: 1px solid #3b4350; border-radius: 8px;
+  background: #202631; color: #dce1e8; font-size: 10px;
+}
+.task-item { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.task-item.status-failed { border-color: #664040; }
+.task-item.status-completed { border-color: #315744; }
+.development-stats { line-height: 1.55; }
+.development-stats b { color: #e9ecf1; }
