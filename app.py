@@ -23,6 +23,8 @@ from miyori.db import (
     list_memory_facts,
     maybe_capture_user_memory,
     recent_messages,
+    replace_memory_fact,
+    search_verified_memory,
     update_memory_status,
     verified_memory_context,
 )
@@ -30,7 +32,7 @@ from miyori.provider import ProviderError, chat
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.03")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.04")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -48,6 +50,10 @@ class MemoryStatusRequest(BaseModel):
     status: str = Field(pattern="^(candidate|verified|disputed|superseded)$")
 
 
+class MemoryReplaceRequest(BaseModel):
+    statement: str = Field(min_length=1, max_length=1000)
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
@@ -62,7 +68,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.03",
+        "version": "00.00.04",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -129,6 +135,24 @@ def memory_status(project_id: int, fact_id: int, request: MemoryStatusRequest) -
     return {"fact": fact}
 
 
+@app.get("/api/projects/{project_id}/memory/search")
+def memory_search(project_id: int, q: str = "") -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"facts": search_verified_memory(project_id, q, limit=12)}
+
+
+@app.post("/api/projects/{project_id}/memory/{fact_id}/replace")
+def memory_replace(project_id: int, fact_id: int, request: MemoryReplaceRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        fact = replace_memory_fact(project_id, fact_id, request.statement)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"fact": fact}
+
+
 @app.post("/api/chat")
 async def send_message(request: ChatRequest) -> dict:
     text = request.message.strip()
@@ -154,7 +178,7 @@ async def send_message(request: ChatRequest) -> dict:
     )
 
     context = recent_messages(conversation_id)
-    memory_context = verified_memory_context(request.project_id)
+    memory_context = verified_memory_context(request.project_id, text)
     try:
         answer = await chat(context, memory_context=memory_context)
     except ProviderError as exc:
