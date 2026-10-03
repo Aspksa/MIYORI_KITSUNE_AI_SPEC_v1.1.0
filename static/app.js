@@ -1561,6 +1561,11 @@ async function renderAccountWorkspace() {
 }
 
 async function renderUpdateWorkspace(refresh = false) {
+  const formatUpdateSha = (value) => {
+    if (!value) return "—";
+    const text = String(value).trim();
+    return text.length > 10 ? text.slice(0, 10) : text;
+  };
   showWorkspaceShell("update", "Система", "Обновление проекта", "Проверка GitHub и безопасное обновление локальной Miyori.");
   workspaceBody.innerHTML =
     '<section class="workspace-card workspace-card-wide">' +
@@ -1596,9 +1601,9 @@ async function renderUpdateWorkspace(refresh = false) {
         '<div class="update-status-grid">' +
           '<div><span>Режим</span><strong>' + escapeHtml(mode) + '</strong></div>' +
           '<div><span>Локальная версия</span><strong>' +
-          escapeHtml(u.local_sha ? shortSha(u.local_sha) : ("Miyori " + (versionText?.textContent || "—"))) +
+          escapeHtml(u.local_sha ? formatUpdateSha(u.local_sha) : ("Miyori " + (versionText?.textContent || "—"))) +
           '</strong></div>' +
-          '<div><span>GitHub версия</span><strong>' + escapeHtml(shortSha(u.remote_sha)) + '</strong></div>' +
+          '<div><span>GitHub версия</span><strong>' + escapeHtml(formatUpdateSha(u.remote_sha)) + '</strong></div>' +
           '<div><span>Рабочая копия</span><strong>' + escapeHtml(worktree) + '</strong></div>' +
           '<div><span>Автообновление</span><strong>' + (u.auto_update ? 'Включено' : 'Выключено') + '</strong></div>' +
           '<div><span>Проверка</span><strong>' + escapeHtml(u.last_checked_at || '—') + '</strong></div>' +
@@ -1621,7 +1626,7 @@ async function renderUpdateWorkspace(refresh = false) {
       const u = data.update;
       container.innerHTML = workspaceResult(
         u.updated
-          ? "Обновление применено до " + shortSha(u.to_sha) + ". Перезапустите Miyori."
+          ? "Обновление применено до " + formatUpdateSha(u.to_sha) + ". Перезапустите Miyori."
           : (u.message || "Обновление не требуется."),
         u.updated ? "success" : "neutral"
       ) + (u.backup_path ? '<div class="sheet-note">Резервная копия: <code>' + escapeHtml(u.backup_path) + '</code></div>' : '');
