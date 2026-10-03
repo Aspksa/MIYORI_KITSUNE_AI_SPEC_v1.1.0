@@ -115,7 +115,10 @@ def _tokens(text: str) -> set[str]:
         "так", "уже", "ещё", "очень", "можно", "нужно", "надо", "если",
     }
     return {
-        token for token in re.findall(r"[a-zA-Zа-яА-ЯёЁ0-9_-]{2,}", text.lower())
+        token for token in re.findall(
+            r"[a-zA-Zа-яА-ЯёЁ_-]{2,}|\d+(?:[.,]\d+)?",
+            text.lower(),
+        )
         if token not in stop
     }
 

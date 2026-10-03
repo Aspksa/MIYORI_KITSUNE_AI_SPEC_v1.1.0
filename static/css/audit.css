@@ -310,3 +310,50 @@ small {
     font-size: 10px;
   }
 }
+
+
+/* 00.00.38 — workflow reliability / audit trail */
+.audit-event-list {
+  display: grid;
+  gap: 8px;
+}
+.audit-event-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border: 1px solid #e6dfed;
+  border-radius: 11px;
+  background: #fcfbff;
+}
+.audit-event-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.audit-event-head strong {
+  color: #4d4259;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.audit-event-head span,
+.audit-event-item small {
+  color: #978da1;
+  font-size: 10px;
+}
+.audit-event-item.audit-user {
+  border-left: 3px solid #8e74c5;
+}
+.audit-event-item.audit-miyori {
+  border-left: 3px solid #6a9b7b;
+}
+.audit-event-item.audit-system {
+  border-left: 3px solid #b88b6f;
+}
+.permission-item.status-recovering {
+  border-color: #e2cda9;
+  background: #fffaf1;
+}
+.permission-item.status-recovering small {
+  color: #9b7040;
+}

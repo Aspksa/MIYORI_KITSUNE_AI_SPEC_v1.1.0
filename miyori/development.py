@@ -41,6 +41,17 @@ def run_project_self_check(project_id: int) -> list[CheckResult]:
             snapshot["failed_tasks"] == 0,
             f"failed_tasks={snapshot['failed_tasks']}",
         ),
+        CheckResult(
+            "workflow_recovery",
+            snapshot["recovering_workflows"] == 0
+            and snapshot["recovery_operations"] == 0,
+            (
+                f"recovering_workflows={snapshot['recovering_workflows']}; "
+                f"recovery_operations={snapshot['recovery_operations']}; "
+                f"waiting_workflows={snapshot['waiting_workflows']}; "
+                f"pending_permissions={snapshot['pending_permissions']}"
+            ),
+        ),
     ]
 
     for check in checks:

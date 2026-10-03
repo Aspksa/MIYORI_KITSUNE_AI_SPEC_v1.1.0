@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.37"
+PROJECT_VERSION = "00.00.38"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "status": "active",
-        "description": "AI Core v2: Context Router, model-assisted Planner, Agent loop, layered memory, источники и безопасные действия.",
+        "description": "AI Core v2.1: persistent workflows, resumable Agent loop, idempotency, audit trail и crash-safe tool execution.",
+    },
+    "workflow_engine": {
+        "name": "Workflow Engine",
+        "version": "1.0.0",
+        "status": "active",
+        "description": "Persistent workflow state, permission continuation, tool operations, recovery, idempotency и audit trail.",
     },
     "account": {
         "name": "Личный кабинет",
@@ -29,7 +35,7 @@ MODULES = {
     },
     "drive": {
         "name": "Документы / Облако / Miyori",
-        "version": "1.5.0",
+        "version": "1.5.1",
         "status": "active",
         "description": "Miyori Drive: физическое хранилище проекта, оригиналы, папки, безопасная корзина, восстановление, поиск по содержимому и RAG.",
     },
@@ -120,6 +126,44 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.38",
+        "title": "AI Reliability & Workflow Engine",
+        "summary": "Agent Core получил устойчивое состояние workflow, продолжение после разрешений, idempotency, Tool Registry v2, audit trail, crash recovery, verify-before-write и интеграционный контур тестирования.",
+        "modules": [
+            {
+                "key": "miyori_ai",
+                "version": "2.1.0",
+                "changes": [
+                    "Каждый инструментальный запрос получает persistent workflow в SQLite и переживает перезапуск приложения.",
+                    "После решения permission тот же workflow продолжается с сохранённой историей, а не планируется заново.",
+                    "Chat request_id и response_key защищают от повторных HTTP-запросов и дублирования сообщений.",
+                    "Добавлены состояния running / waiting_permission / recovering / completed / failed / cancelled.",
+                    "Добавлены API просмотра, восстановления и отмены workflow."
+                ],
+            },
+            {
+                "key": "workflow_engine",
+                "version": "1.0.0",
+                "changes": [
+                    "Добавлены workflow_steps, workflow_events, tool_operations и audit_events.",
+                    "Tool operations получают стабильный idempotency key и preflight snapshot.",
+                    "Crash recovery сначала проверяет фактическое состояние и только потом допускает безопасный retry.",
+                    "Verify-before-write блокирует изменение, если данные изменились после подтверждения пользователя.",
+                    "Audit Trail фиксирует запрос, решение Planner, permission, фактическое выполнение и завершение workflow.",
+                    "Recovery-состояния включены в Development Self-Check."
+                ],
+            },
+            {
+                "key": "drive",
+                "version": "1.5.1",
+                "changes": [
+                    "Создание папок и перемещение документов получили preflight/verify и crash-safe idempotent execution.",
+                    "Конфликт между подтверждением и фактическим состоянием Drive не перезаписывается автоматически."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.37",
         "title": "Miyori AI Core v2",

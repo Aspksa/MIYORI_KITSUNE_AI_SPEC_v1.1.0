@@ -2,24 +2,25 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.37.**  
+**Внутренняя версия приложения: 00.00.38.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
 
-## Состояние релиза 00.00.37
+## Состояние релиза 00.00.38
 
-`00.00.37` — **Miyori AI Core v2**. Основной AI-контур переработан под дальнейшее развитие проекта:
+`00.00.38` — **AI Reliability & Workflow Engine**. Релиз укрепляет AI Core v2 перед Document Intelligence и автономными рабочими сценариями:
 
-- Context Router решает, нужны ли текущему запросу документы, пользовательская память, память проекта, Epistemic Core и инструменты;
-- Agent Core использует model-assisted Planner с жёстким JSON-контрактом и deterministic fallback;
-- Planner работает пошагово, видит компактный контекст последних сообщений и может выполнять до 5 проверяемых шагов;
-- read-инструменты выполняются автоматически, write-инструменты по-прежнему проходят через permission layer;
-- Miyori умеет читать каталог Drive и конкретные документы, создавать папки и перемещать документы только после подтверждения;
-- источники документов формируются приложением, передаются модели как разрешённый source manifest и сохраняются вместе с ответом;
-- память разделена на `user` и `project`, а текущий разговор остаётся working memory;
-- обычные фразы не записываются автоматически в долговременную память;
-- Epistemic Core показывает оценки «Подтверждено», «Вероятно», «Есть противоречия», «Недостаточно данных»;
-- RAG может включать и исключать отдельные каналы retrieval в зависимости от запроса;
-- добавлены тесты маршрутизации, Planner fallback, памяти, источников, межпроектной изоляции и permission safety.
+- каждый инструментальный запрос получает persistent workflow в SQLite;
+- workflow хранит цель, маршрут контекста, текущий шаг, историю действий, pending permission и финальное состояние;
+- после `Разрешить / Отклонить` Agent продолжает тот же workflow, а не строит новую цепочку с нуля;
+- добавлены состояния `running / waiting_permission / recovering / completed / failed / cancelled`;
+- chat и manual tools получили idempotency keys, защищающие от повторных HTTP-запросов;
+- Tool Registry v2 описывает schema аргументов, риск, destructive-флаг, idempotency, timeout, rollback capability, recovery strategy и human-readable preview;
+- write-tools получают preflight snapshot и verify-before-write — устаревшее подтверждение не перезаписывает изменившиеся данные;
+- crash recovery проверяет фактическое состояние операции перед retry;
+- добавлен Audit Trail: запрос → решение Planner → permission → фактическое выполнение → завершение workflow;
+- recovery-состояния входят в Development Self-Check и отображаются в техническом интерфейсе;
+- добавлены интеграционные тесты chat → permission → resume, тесты idempotency/recovery и миграции SQLite `00.00.37 → 00.00.38`;
+- добавлен GitHub Actions CI для автоматического запуска тестов на push/PR.
 
 ## Что уже реализовано
 
@@ -30,11 +31,16 @@
 - локальный контекст проекта;
 - Brain plan;
 - Context Router для выборочной загрузки контекста;
-- Agent Core v2 с model-assisted Planner и deterministic fallback;
-- до 5 пошаговых инструментальных действий;
+- Agent Core v2.1 с model-assisted Planner и deterministic fallback;
+- persistent Workflow Engine для многошаговых задач;
+- до 5 проверяемых инструментальных шагов на один workflow;
+- продолжение того же workflow после permission;
 - компактный conversational context для ссылок «этот файл / перемести его»;
+- Tool Registry v2 с schema/risk/recovery metadata;
 - инструменты чтения и контролируемые действия;
 - разрешения на write-действия;
+- idempotency для chat и write-tools;
+- Audit Trail и recovery после перезапуска;
 - фоновые задачи и self-check;
 - системный статус и диагностика.
 
@@ -110,9 +116,9 @@ data/
 - `miyori/brain.py` — публичный операционный план;
 - `miyori/context_router.py` — маршрутизация памяти, документов, знаний и tools;
 - `miyori/planner.py` — Planner schema, fallback и безопасная валидация решений;
-- `miyori/agent.py` — пошаговый Agent Core;
+- `miyori/agent.py` — persistent/resumable Agent Workflow Engine;
 - `miyori/sources.py` — манифест источников ответа;
-- `miyori/tools.py` — registry и политика инструментов;
+- `miyori/tools.py` — Tool Registry v2, validation, preflight, verify, idempotency и recovery;
 - `miyori/hands.py` — безопасные workspace-действия;
 - `miyori/rag.py` — retrieval;
 - `miyori/epistemic.py` — epistemic knowledge layer;
@@ -147,11 +153,27 @@ CSS загружается в фиксированном cascade-порядке:
 
 Порядок файлов является частью frontend-контракта и не должен произвольно меняться.
 
+## Фундамент дальнейшего развития
+
+Workflow Engine специально не привязан к одному типу проекта. На его контракты могут опираться следующие поколения Miyori без смены базовой модели исполнения:
+
+- Document Intelligence: извлечение реквизитов, сравнение договоров, реестры, risk flags и генерация итоговых документов;
+- Autonomous Workflows: сохранённые сценарии, события, расписания, фоновые проверки и продолжительные задачи;
+- мобильный клиент: тот же workflow/permission/audit contract через отдельный безопасный transport layer;
+- бизнес-модули: договоры, счета, сотрудники, гараж, табели и будущие доменные инструменты;
+- домашняя автоматизация: устройства и правила с теми же risk/permission/recovery принципами;
+- будущий policy layer: разные уровни автономности, бюджеты действий, роли и capability scopes.
+
+Ключевой принцип: новые возможности добавляются как инструменты и workflow policies, а не через обход permission, project isolation или audit trail.
+
 ## Локальные данные и безопасность
 
 - SQLite и проектные файлы хранятся локально;
 - Cloud.ru API key не возвращается клиенту в открытом виде;
 - write-инструменты требуют разрешения;
+- устаревшее подтверждение блокируется verify-before-write;
+- повторный HTTP/tool request защищён idempotency key;
+- незавершённые write-операции после перезапуска переходят в recovery вместо слепого повтора;
 - project workspace защищён от path traversal;
 - локально-чувствительные account/settings операции ограничены loopback-доступом;
 - RAG/Memory/Epistemic блоки передаются модели как данные, а не как инструкции.
@@ -180,14 +202,17 @@ CLOUDRU_MODEL_ID=deepseek-ai/DeepSeek-V4-Flash
 
 ## Тесты
 
-Автоматический контур покрывает Account / Cloud.ru secret handling, Persona Pack, RAG, Epistemic Core, updater safety, Miyori Drive, Context Router, Planner fallback, слои памяти, source manifest, межпроектную изоляцию чтения документов и permission safety write-инструментов.
+Автоматический контур покрывает Account / Cloud.ru secret handling, Persona Pack, RAG, Epistemic Core, updater safety, Miyori Drive, Context Router, Planner fallback, слои памяти, source manifest, межпроектную изоляцию, permission safety, Tool Registry v2, idempotency, stale-approval protection, crash recovery, SQLite migration и mocked-provider интеграционный сценарий `/api/chat → permission → resume`.
 
-Следующий слой покрытия: Home Network, Parental Control, Primavtodor CRUD, Settings API и полноценный mocked-provider интеграционный `/api/chat`.
+GitHub Actions запускает `python -m unittest discover -s tests -p "test_*.py" -v` на push и pull request в `main`.
+
+Следующий слой покрытия: Home Network, Parental Control, Primavtodor CRUD, Settings API, Document Intelligence extractors и длительные background workflows.
 
 ## Текущие ограничения
 
 - Planner уже model-assisted, но при недоступности Cloud.ru намеренно переключается на ограниченный deterministic fallback;
-- write-планы с зависимыми шагами останавливаются на permission request и продолжаются только после подтверждения отдельного действия;
+- workflow имеет консервативный лимит до 5 инструментальных шагов; увеличение бюджета должно сопровождаться budget/policy governance;
+- конфликтное recovery-состояние намеренно требует ручной проверки вместо автоматического перезаписывания данных;
 - мобильный iOS/Android клиент ещё не реализован;
 - детский контроль пока не применяет политики на реальном устройстве;
 - домашняя сеть пока не выполняет автоматическое обнаружение;
@@ -199,6 +224,7 @@ CLOUDRU_MODEL_ID=deepseek-ai/DeepSeek-V4-Flash
 - `00.00.34` — домашние модули + полный UI audit + удаление processing UI;
 - `00.00.35` — документация + frontend modularization + удаление processing legacy;
 - `00.00.36` — физический Miyori Drive проекта + оригиналы + безопасная корзина + восстановление + поиск по содержимому;
-- `00.00.37` — Miyori AI Core v2: Context Router + Planner + Agent loop + layered memory + sources + epistemic assessments + tool safety tests.
+- `00.00.37` — Miyori AI Core v2: Context Router + Planner + Agent loop + layered memory + sources + epistemic assessments + tool safety tests;
+- `00.00.38` — AI Reliability & Workflow Engine: persistent workflows + permission resume + idempotency + Tool Registry v2 + audit + crash recovery + CI.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

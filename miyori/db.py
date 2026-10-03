@@ -177,6 +177,7 @@ def init_db() -> None:
                 role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
                 content TEXT NOT NULL,
                 metadata_json TEXT,
+                client_request_id TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(conversation_id) REFERENCES conversations(id)
             );
@@ -322,11 +323,130 @@ def init_db() -> None:
                 status TEXT NOT NULL CHECK(status IN ('pending','approved','denied','executed','failed')),
                 reason TEXT,
                 result_json TEXT,
+                workflow_id INTEGER,
+                workflow_step_id INTEGER,
+                tool_operation_id INTEGER,
+                idempotency_key TEXT,
+                preview_json TEXT,
                 created_at TEXT NOT NULL,
                 decided_at TEXT,
                 executed_at TEXT,
                 FOREIGN KEY(project_id) REFERENCES projects(id)
             );
+
+            CREATE TABLE IF NOT EXISTS agent_workflows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                conversation_id INTEGER,
+                agent_run_id INTEGER,
+                request_key TEXT NOT NULL,
+                goal TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN (
+                    'running','waiting_permission','recovering',
+                    'completed','failed','cancelled'
+                )),
+                route_json TEXT NOT NULL,
+                conversation_context_json TEXT NOT NULL,
+                planner_mode TEXT NOT NULL DEFAULT 'model',
+                current_step INTEGER NOT NULL DEFAULT 0,
+                max_steps INTEGER NOT NULL DEFAULT 5,
+                pending_permission_id INTEGER,
+                result_json TEXT,
+                error_json TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                finished_at TEXT,
+                UNIQUE(project_id, request_key),
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE SET NULL,
+                FOREIGN KEY(agent_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS workflow_steps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workflow_id INTEGER NOT NULL,
+                step_index INTEGER NOT NULL,
+                kind TEXT NOT NULL CHECK(kind IN ('tool','finish')),
+                tool_name TEXT,
+                reason TEXT NOT NULL,
+                arguments_json TEXT NOT NULL DEFAULT '{}',
+                result_json TEXT,
+                status TEXT NOT NULL CHECK(status IN (
+                    'planned','running','waiting_permission','recovery_required',
+                    'completed','failed','skipped','cancelled'
+                )),
+                permission_request_id INTEGER,
+                idempotency_key TEXT NOT NULL,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT,
+                UNIQUE(workflow_id, step_index),
+                UNIQUE(workflow_id, idempotency_key),
+                FOREIGN KEY(workflow_id) REFERENCES agent_workflows(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS workflow_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workflow_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(workflow_id) REFERENCES agent_workflows(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS tool_operations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                workflow_id INTEGER,
+                workflow_step_id INTEGER,
+                permission_request_id INTEGER,
+                tool_name TEXT NOT NULL,
+                idempotency_key TEXT NOT NULL,
+                arguments_json TEXT NOT NULL,
+                preflight_json TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL CHECK(status IN (
+                    'planned','running','recovery_required','executed','failed','cancelled'
+                )),
+                result_json TEXT,
+                error_json TEXT,
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT,
+                UNIQUE(project_id, idempotency_key),
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY(workflow_id) REFERENCES agent_workflows(id) ON DELETE SET NULL,
+                FOREIGN KEY(workflow_step_id) REFERENCES workflow_steps(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                conversation_id INTEGER,
+                workflow_id INTEGER,
+                actor TEXT NOT NULL CHECK(actor IN ('user','miyori','system')),
+                event_type TEXT NOT NULL,
+                entity_type TEXT,
+                entity_id TEXT,
+                summary TEXT NOT NULL,
+                details_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE SET NULL,
+                FOREIGN KEY(workflow_id) REFERENCES agent_workflows(id) ON DELETE SET NULL
+            );
+
+                        CREATE INDEX IF NOT EXISTS idx_agent_workflows_project_status
+                ON agent_workflows(project_id, status, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_workflow_steps_workflow
+                ON workflow_steps(workflow_id, step_index);
+            CREATE INDEX IF NOT EXISTS idx_tool_operations_recovery
+                ON tool_operations(project_id, status, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_events_project
+                ON audit_events(project_id, id DESC);
 
             CREATE TABLE IF NOT EXISTS hand_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -361,6 +481,16 @@ def init_db() -> None:
         }
         if "metadata_json" not in message_columns:
             conn.execute("ALTER TABLE messages ADD COLUMN metadata_json TEXT")
+        if "client_request_id" not in message_columns:
+            conn.execute("ALTER TABLE messages ADD COLUMN client_request_id TEXT")
+        conn.execute("DROP INDEX IF EXISTS idx_messages_client_request")
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_request
+            ON messages(client_request_id)
+            WHERE client_request_id IS NOT NULL
+            """
+        )
 
         memory_columns = {
             row["name"]
@@ -378,6 +508,21 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE memory_facts ADD COLUMN salience REAL NOT NULL DEFAULT 0.5"
             )
+
+        permission_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(permission_requests)").fetchall()
+        }
+        if "workflow_id" not in permission_columns:
+            conn.execute("ALTER TABLE permission_requests ADD COLUMN workflow_id INTEGER")
+        if "workflow_step_id" not in permission_columns:
+            conn.execute("ALTER TABLE permission_requests ADD COLUMN workflow_step_id INTEGER")
+        if "tool_operation_id" not in permission_columns:
+            conn.execute("ALTER TABLE permission_requests ADD COLUMN tool_operation_id INTEGER")
+        if "idempotency_key" not in permission_columns:
+            conn.execute("ALTER TABLE permission_requests ADD COLUMN idempotency_key TEXT")
+        if "preview_json" not in permission_columns:
+            conn.execute("ALTER TABLE permission_requests ADD COLUMN preview_json TEXT")
 
         document_columns = {
             row["name"]
@@ -1276,7 +1421,7 @@ def conversation_messages(conversation_id: int, project_id: int) -> list[dict]:
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT id, role, content, metadata_json, created_at
+            SELECT id, role, content, metadata_json, client_request_id, created_at
             FROM messages
             WHERE conversation_id = ?
             ORDER BY id ASC
@@ -1318,18 +1463,34 @@ def add_message(
     role: str,
     content: str,
     metadata: dict | None = None,
+    client_request_id: str | None = None,
 ) -> int:
     with connect() as conn:
+        if client_request_id:
+            existing = conn.execute(
+                """
+                SELECT id FROM messages
+                WHERE client_request_id = ?
+                LIMIT 1
+                """,
+                (client_request_id,),
+            ).fetchone()
+            if existing:
+                return int(existing["id"])
+
         cur = conn.execute(
             """
-            INSERT INTO messages(conversation_id, role, content, metadata_json, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO messages(
+                conversation_id, role, content, metadata_json,
+                client_request_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 conversation_id,
                 role,
                 content,
                 json.dumps(metadata or {}, ensure_ascii=False),
+                client_request_id,
                 utc_now(),
             ),
         )
@@ -1350,6 +1511,30 @@ def add_message(
                 )
 
         return message_id
+
+
+
+def get_message_by_client_request_id(
+    project_id: int,
+    client_request_id: str,
+) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT m.id, m.conversation_id, m.role, m.content, m.metadata_json,
+                   m.client_request_id, m.created_at
+            FROM messages m
+            JOIN conversations c ON c.id = m.conversation_id
+            WHERE c.project_id = ? AND m.client_request_id = ?
+            LIMIT 1
+            """,
+            (project_id, client_request_id),
+        ).fetchone()
+    if not row:
+        return None
+    item = dict(row)
+    item["metadata"] = _loads_json(item.pop("metadata_json", None), {})
+    return item
 
 
 def add_memory_fact(
@@ -1500,6 +1685,7 @@ def _memory_tokens(text: str) -> set[str]:
         "что", "это", "как", "для", "или", "мне", "мой", "моя", "мои",
         "про", "при", "под", "над", "без", "есть", "был", "была", "будет",
         "какой", "какая", "какие", "который", "когда", "где", "чем",
+        "пользователь", "пользователя", "проект", "проекта",
     }
     return {
         token
@@ -2577,6 +2763,34 @@ def development_snapshot(project_id: int) -> dict:
             "SELECT COUNT(*) AS n FROM development_checks WHERE project_id = ?",
             (project_id,),
         ).fetchone()["n"]
+        waiting_workflows = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM agent_workflows
+            WHERE project_id = ? AND status = 'waiting_permission'
+            """,
+            (project_id,),
+        ).fetchone()["n"]
+        recovering_workflows = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM agent_workflows
+            WHERE project_id = ? AND status = 'recovering'
+            """,
+            (project_id,),
+        ).fetchone()["n"]
+        recovery_operations = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM tool_operations
+            WHERE project_id = ? AND status = 'recovery_required'
+            """,
+            (project_id,),
+        ).fetchone()["n"]
+        pending_permissions = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM permission_requests
+            WHERE project_id = ? AND status = 'pending'
+            """,
+            (project_id,),
+        ).fetchone()["n"]
 
     return {
         "verified_facts": int(verified_facts),
@@ -2586,6 +2800,10 @@ def development_snapshot(project_id: int) -> dict:
         "completed_tasks": int(completed_tasks),
         "checks_passed": int(checks_passed),
         "checks_total": int(checks_total),
+        "waiting_workflows": int(waiting_workflows),
+        "recovering_workflows": int(recovering_workflows),
+        "recovery_operations": int(recovery_operations),
+        "pending_permissions": int(pending_permissions),
     }
 
 
@@ -2626,6 +2844,671 @@ def recent_development_checks(project_id: int, limit: int = 30) -> list[dict]:
     for row in rows:
         item = dict(row)
         item["passed"] = bool(item["passed"])
+        result.append(item)
+    return result
+
+
+
+
+WORKFLOW_STATUSES = {
+    "running", "waiting_permission", "recovering",
+    "completed", "failed", "cancelled",
+}
+
+WORKFLOW_STEP_STATUSES = {
+    "planned", "running", "waiting_permission", "recovery_required",
+    "completed", "failed", "skipped", "cancelled",
+}
+
+TOOL_OPERATION_STATUSES = {
+    "planned", "running", "recovery_required", "executed", "failed", "cancelled",
+}
+
+
+def _loads_json(value: str | None, default: object) -> object:
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return default
+
+
+def create_agent_workflow(
+    project_id: int,
+    conversation_id: int | None,
+    agent_run_id: int | None,
+    request_key: str,
+    goal: str,
+    route: dict,
+    conversation_context: list[dict],
+    max_steps: int,
+) -> dict:
+    clean_key = request_key.strip()
+    if not clean_key:
+        raise ValueError("request_key workflow не может быть пустым.")
+    now = utc_now()
+    with connect() as conn:
+        existing = conn.execute(
+            """
+            SELECT * FROM agent_workflows
+            WHERE project_id = ? AND request_key = ?
+            LIMIT 1
+            """,
+            (project_id, clean_key),
+        ).fetchone()
+        if existing:
+            row = existing
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO agent_workflows(
+                    project_id, conversation_id, agent_run_id, request_key, goal,
+                    status, route_json, conversation_context_json,
+                    planner_mode, current_step, max_steps,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, 'model', 0, ?, ?, ?)
+                """,
+                (
+                    project_id,
+                    conversation_id,
+                    agent_run_id,
+                    clean_key,
+                    goal,
+                    json.dumps(route, ensure_ascii=False),
+                    json.dumps(conversation_context, ensure_ascii=False),
+                    max_steps,
+                    now,
+                    now,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM agent_workflows WHERE id = ?",
+                (cur.lastrowid,),
+            ).fetchone()
+    return _workflow_row(row)
+
+
+def _workflow_row(row: sqlite3.Row | dict | None) -> dict | None:
+    if not row:
+        return None
+    item = dict(row)
+    item["route"] = _loads_json(item.pop("route_json", None), {})
+    item["conversation_context"] = _loads_json(
+        item.pop("conversation_context_json", None),
+        [],
+    )
+    item["result"] = _loads_json(item.pop("result_json", None), None)
+    item["error"] = _loads_json(item.pop("error_json", None), None)
+    return item
+
+
+def get_agent_workflow(
+    workflow_id: int,
+    project_id: int | None = None,
+) -> dict | None:
+    with connect() as conn:
+        if project_id is None:
+            row = conn.execute(
+                "SELECT * FROM agent_workflows WHERE id = ?",
+                (workflow_id,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT * FROM agent_workflows WHERE id = ? AND project_id = ?",
+                (workflow_id, project_id),
+            ).fetchone()
+    return _workflow_row(row)
+
+
+def get_agent_workflow_by_request_key(
+    project_id: int,
+    request_key: str,
+) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM agent_workflows
+            WHERE project_id = ? AND request_key = ?
+            LIMIT 1
+            """,
+            (project_id, request_key),
+        ).fetchone()
+    return _workflow_row(row)
+
+
+def list_agent_workflows(
+    project_id: int,
+    *,
+    statuses: tuple[str, ...] | None = None,
+    limit: int = 50,
+) -> list[dict]:
+    limit = max(1, min(int(limit), 200))
+    params: list[object] = [project_id]
+    where = "WHERE project_id = ?"
+    if statuses:
+        invalid = set(statuses) - WORKFLOW_STATUSES
+        if invalid:
+            raise ValueError("Недопустимый статус workflow.")
+        placeholders = ",".join("?" for _ in statuses)
+        where += f" AND status IN ({placeholders})"
+        params.extend(statuses)
+    params.append(limit)
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT * FROM agent_workflows
+            {where}
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+    return [_workflow_row(row) for row in rows]
+
+
+def update_agent_workflow(
+    workflow_id: int,
+    *,
+    status: str | None = None,
+    planner_mode: str | None = None,
+    current_step: int | None = None,
+    pending_permission_id: int | None | object = ...,
+    result: dict | None | object = ...,
+    error: dict | None | object = ...,
+    finished: bool = False,
+) -> dict | None:
+    assignments = ["updated_at = ?"]
+    params: list[object] = [utc_now()]
+    if status is not None:
+        if status not in WORKFLOW_STATUSES:
+            raise ValueError("Недопустимый статус workflow.")
+        assignments.append("status = ?")
+        params.append(status)
+    if planner_mode is not None:
+        assignments.append("planner_mode = ?")
+        params.append(planner_mode)
+    if current_step is not None:
+        assignments.append("current_step = ?")
+        params.append(int(current_step))
+    if pending_permission_id is not ...:
+        assignments.append("pending_permission_id = ?")
+        params.append(pending_permission_id)
+    if result is not ...:
+        assignments.append("result_json = ?")
+        params.append(
+            json.dumps(result, ensure_ascii=False) if result is not None else None
+        )
+    if error is not ...:
+        assignments.append("error_json = ?")
+        params.append(
+            json.dumps(error, ensure_ascii=False) if error is not None else None
+        )
+    if finished:
+        assignments.append("finished_at = ?")
+        params.append(utc_now())
+    params.append(workflow_id)
+    with connect() as conn:
+        conn.execute(
+            f"UPDATE agent_workflows SET {', '.join(assignments)} WHERE id = ?",
+            params,
+        )
+    return get_agent_workflow(workflow_id)
+
+
+def create_workflow_step(
+    workflow_id: int,
+    step_index: int,
+    kind: str,
+    reason: str,
+    *,
+    tool_name: str | None = None,
+    arguments: dict | None = None,
+    status: str = "planned",
+    idempotency_key: str,
+) -> dict:
+    if kind not in {"tool", "finish"}:
+        raise ValueError("Недопустимый тип workflow step.")
+    if status not in WORKFLOW_STEP_STATUSES:
+        raise ValueError("Недопустимый статус workflow step.")
+    now = utc_now()
+    with connect() as conn:
+        existing = conn.execute(
+            """
+            SELECT * FROM workflow_steps
+            WHERE workflow_id = ? AND step_index = ?
+            LIMIT 1
+            """,
+            (workflow_id, step_index),
+        ).fetchone()
+        if existing:
+            return _workflow_step_row(existing)
+        cur = conn.execute(
+            """
+            INSERT INTO workflow_steps(
+                workflow_id, step_index, kind, tool_name, reason,
+                arguments_json, status, idempotency_key,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                workflow_id,
+                step_index,
+                kind,
+                tool_name,
+                reason,
+                json.dumps(arguments or {}, ensure_ascii=False),
+                status,
+                idempotency_key,
+                now,
+                now,
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM workflow_steps WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+    return _workflow_step_row(row)
+
+
+def _workflow_step_row(row: sqlite3.Row | dict | None) -> dict | None:
+    if not row:
+        return None
+    item = dict(row)
+    item["arguments"] = _loads_json(item.pop("arguments_json", None), {})
+    item["result"] = _loads_json(item.pop("result_json", None), None)
+    return item
+
+
+def get_workflow_step(step_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM workflow_steps WHERE id = ?",
+            (step_id,),
+        ).fetchone()
+    return _workflow_step_row(row)
+
+
+def list_workflow_steps(workflow_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM workflow_steps
+            WHERE workflow_id = ?
+            ORDER BY step_index ASC, id ASC
+            """,
+            (workflow_id,),
+        ).fetchall()
+    return [_workflow_step_row(row) for row in rows]
+
+
+def update_workflow_step(
+    step_id: int,
+    *,
+    status: str | None = None,
+    result: dict | None | object = ...,
+    permission_request_id: int | None | object = ...,
+    increment_retry: bool = False,
+    mark_started: bool = False,
+    mark_finished: bool = False,
+) -> dict | None:
+    assignments = ["updated_at = ?"]
+    params: list[object] = [utc_now()]
+    if status is not None:
+        if status not in WORKFLOW_STEP_STATUSES:
+            raise ValueError("Недопустимый статус workflow step.")
+        assignments.append("status = ?")
+        params.append(status)
+    if result is not ...:
+        assignments.append("result_json = ?")
+        params.append(
+            json.dumps(result, ensure_ascii=False) if result is not None else None
+        )
+    if permission_request_id is not ...:
+        assignments.append("permission_request_id = ?")
+        params.append(permission_request_id)
+    if increment_retry:
+        assignments.append("retry_count = retry_count + 1")
+    if mark_started:
+        assignments.append("started_at = COALESCE(started_at, ?)")
+        params.append(utc_now())
+    if mark_finished:
+        assignments.append("finished_at = ?")
+        params.append(utc_now())
+    params.append(step_id)
+    with connect() as conn:
+        conn.execute(
+            f"UPDATE workflow_steps SET {', '.join(assignments)} WHERE id = ?",
+            params,
+        )
+    return get_workflow_step(step_id)
+
+
+def record_workflow_event(
+    workflow_id: int,
+    event_type: str,
+    payload: dict | None = None,
+) -> dict:
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO workflow_events(workflow_id, event_type, payload_json, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                workflow_id,
+                event_type,
+                json.dumps(payload or {}, ensure_ascii=False),
+                utc_now(),
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM workflow_events WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+    item = dict(row)
+    item["payload"] = _loads_json(item.pop("payload_json", None), {})
+    return item
+
+
+def list_workflow_events(workflow_id: int, limit: int = 200) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM workflow_events
+            WHERE workflow_id = ?
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (workflow_id, max(1, min(int(limit), 500))),
+        ).fetchall()
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["payload"] = _loads_json(item.pop("payload_json", None), {})
+        result.append(item)
+    return result
+
+
+def create_tool_operation(
+    project_id: int,
+    tool_name: str,
+    idempotency_key: str,
+    arguments: dict,
+    *,
+    workflow_id: int | None = None,
+    workflow_step_id: int | None = None,
+    permission_request_id: int | None = None,
+    preflight: dict | None = None,
+) -> dict:
+    now = utc_now()
+    with connect() as conn:
+        existing = conn.execute(
+            """
+            SELECT * FROM tool_operations
+            WHERE project_id = ? AND idempotency_key = ?
+            LIMIT 1
+            """,
+            (project_id, idempotency_key),
+        ).fetchone()
+        if existing:
+            return _tool_operation_row(existing)
+        cur = conn.execute(
+            """
+            INSERT INTO tool_operations(
+                project_id, workflow_id, workflow_step_id, permission_request_id,
+                tool_name, idempotency_key, arguments_json, preflight_json,
+                status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'planned', ?, ?)
+            """,
+            (
+                project_id,
+                workflow_id,
+                workflow_step_id,
+                permission_request_id,
+                tool_name,
+                idempotency_key,
+                json.dumps(arguments, ensure_ascii=False),
+                json.dumps(preflight or {}, ensure_ascii=False),
+                now,
+                now,
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM tool_operations WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+    return _tool_operation_row(row)
+
+
+def _tool_operation_row(row: sqlite3.Row | dict | None) -> dict | None:
+    if not row:
+        return None
+    item = dict(row)
+    item["arguments"] = _loads_json(item.pop("arguments_json", None), {})
+    item["preflight"] = _loads_json(item.pop("preflight_json", None), {})
+    item["result"] = _loads_json(item.pop("result_json", None), None)
+    item["error"] = _loads_json(item.pop("error_json", None), None)
+    return item
+
+
+def get_tool_operation(operation_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM tool_operations WHERE id = ?",
+            (operation_id,),
+        ).fetchone()
+    return _tool_operation_row(row)
+
+
+def get_tool_operation_by_key(project_id: int, idempotency_key: str) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM tool_operations
+            WHERE project_id = ? AND idempotency_key = ?
+            LIMIT 1
+            """,
+            (project_id, idempotency_key),
+        ).fetchone()
+    return _tool_operation_row(row)
+
+
+def link_tool_operation_permission(
+    operation_id: int,
+    permission_request_id: int,
+) -> dict | None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE tool_operations
+            SET permission_request_id = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (permission_request_id, utc_now(), operation_id),
+        )
+    return get_tool_operation(operation_id)
+
+
+def update_tool_operation(
+    operation_id: int,
+    *,
+    status: str | None = None,
+    result: dict | None | object = ...,
+    error: dict | None | object = ...,
+    increment_attempt: bool = False,
+    mark_started: bool = False,
+    mark_finished: bool = False,
+) -> dict | None:
+    assignments = ["updated_at = ?"]
+    params: list[object] = [utc_now()]
+    if status is not None:
+        if status not in TOOL_OPERATION_STATUSES:
+            raise ValueError("Недопустимый статус tool operation.")
+        assignments.append("status = ?")
+        params.append(status)
+    if result is not ...:
+        assignments.append("result_json = ?")
+        params.append(
+            json.dumps(result, ensure_ascii=False) if result is not None else None
+        )
+    if error is not ...:
+        assignments.append("error_json = ?")
+        params.append(
+            json.dumps(error, ensure_ascii=False) if error is not None else None
+        )
+    if increment_attempt:
+        assignments.append("attempt_count = attempt_count + 1")
+    if mark_started:
+        assignments.append("started_at = COALESCE(started_at, ?)")
+        params.append(utc_now())
+    if mark_finished:
+        assignments.append("finished_at = ?")
+        params.append(utc_now())
+    params.append(operation_id)
+    with connect() as conn:
+        conn.execute(
+            f"UPDATE tool_operations SET {', '.join(assignments)} WHERE id = ?",
+            params,
+        )
+    return get_tool_operation(operation_id)
+
+
+def list_recoverable_tool_operations(project_id: int | None = None) -> list[dict]:
+    params: list[object] = []
+    where = "WHERE status IN ('running','recovery_required')"
+    if project_id is not None:
+        where += " AND project_id = ?"
+        params.append(project_id)
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT * FROM tool_operations
+            {where}
+            ORDER BY id ASC
+            """,
+            params,
+        ).fetchall()
+    return [_tool_operation_row(row) for row in rows]
+
+
+def mark_interrupted_runtime_for_recovery() -> dict:
+    now = utc_now()
+    with connect() as conn:
+        workflows_running = conn.execute(
+            """
+            UPDATE agent_workflows
+            SET status = 'recovering', updated_at = ?
+            WHERE status = 'running'
+            """,
+            (now,),
+        ).rowcount
+        workflows_permission = conn.execute(
+            """
+            UPDATE agent_workflows
+            SET status = 'recovering', updated_at = ?
+            WHERE status = 'waiting_permission'
+              AND pending_permission_id IN (
+                  SELECT id FROM permission_requests
+                  WHERE status IN ('approved','executed','failed','denied')
+              )
+            """,
+            (now,),
+        ).rowcount
+        workflows = int(workflows_running) + int(workflows_permission)
+        steps = conn.execute(
+            """
+            UPDATE workflow_steps
+            SET status = 'recovery_required', updated_at = ?
+            WHERE status = 'running'
+            """,
+            (now,),
+        ).rowcount
+        operations = conn.execute(
+            """
+            UPDATE tool_operations
+            SET status = 'recovery_required', updated_at = ?
+            WHERE status = 'running'
+            """,
+            (now,),
+        ).rowcount
+    return {
+        "workflows": int(workflows),
+        "steps": int(steps),
+        "operations": int(operations),
+    }
+
+
+def record_audit_event(
+    project_id: int,
+    actor: str,
+    event_type: str,
+    summary: str,
+    *,
+    conversation_id: int | None = None,
+    workflow_id: int | None = None,
+    entity_type: str | None = None,
+    entity_id: str | int | None = None,
+    details: dict | None = None,
+) -> dict:
+    if actor not in {"user", "miyori", "system"}:
+        raise ValueError("Недопустимый actor audit event.")
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO audit_events(
+                project_id, conversation_id, workflow_id, actor, event_type,
+                entity_type, entity_id, summary, details_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id,
+                conversation_id,
+                workflow_id,
+                actor,
+                event_type,
+                entity_type,
+                None if entity_id is None else str(entity_id),
+                summary,
+                json.dumps(details or {}, ensure_ascii=False),
+                utc_now(),
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM audit_events WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+    item = dict(row)
+    item["details"] = _loads_json(item.pop("details_json", None), {})
+    return item
+
+
+def list_audit_events(
+    project_id: int,
+    *,
+    workflow_id: int | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    where = "WHERE project_id = ?"
+    params: list[object] = [project_id]
+    if workflow_id is not None:
+        where += " AND workflow_id = ?"
+        params.append(workflow_id)
+    params.append(max(1, min(int(limit), 500)))
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT * FROM audit_events
+            {where}
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["details"] = _loads_json(item.pop("details_json", None), {})
         result.append(item)
     return result
 
@@ -2685,15 +3568,33 @@ def record_agent_action(
     return item
 
 
-def finish_agent_run(run_id: int, status: str = "completed") -> None:
+def set_agent_run_status(
+    run_id: int,
+    status: str,
+    *,
+    finished: bool = False,
+) -> None:
     with connect() as conn:
-        conn.execute(
-            """
-            UPDATE agent_runs SET status = ?, finished_at = ?
-            WHERE id = ?
-            """,
-            (status, utc_now(), run_id),
-        )
+        if finished:
+            conn.execute(
+                """
+                UPDATE agent_runs SET status = ?, finished_at = ?
+                WHERE id = ?
+                """,
+                (status, utc_now(), run_id),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE agent_runs SET status = ?, finished_at = NULL
+                WHERE id = ?
+                """,
+                (status, run_id),
+            )
+
+
+def finish_agent_run(run_id: int, status: str = "completed") -> None:
+    set_agent_run_status(run_id, status, finished=True)
 
 
 def get_agent_trace(run_id: int) -> dict | None:
@@ -2737,25 +3638,39 @@ def create_permission_request(
     tool_name: str,
     arguments: dict,
     reason: str | None = None,
+    *,
+    workflow_id: int | None = None,
+    workflow_step_id: int | None = None,
+    tool_operation_id: int | None = None,
+    idempotency_key: str | None = None,
+    preview: dict | None = None,
 ) -> dict:
     with connect() as conn:
         cur = conn.execute(
             """
             INSERT INTO permission_requests(
-                project_id, tool_name, arguments_json, status, reason, created_at
-            ) VALUES (?, ?, ?, 'pending', ?, ?)
+                project_id, tool_name, arguments_json, status, reason,
+                workflow_id, workflow_step_id, tool_operation_id, idempotency_key, preview_json,
+                created_at
+            ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 project_id,
                 tool_name,
                 json.dumps(arguments, ensure_ascii=False),
                 reason,
+                workflow_id,
+                workflow_step_id,
+                tool_operation_id,
+                idempotency_key,
+                json.dumps(preview or {}, ensure_ascii=False),
                 utc_now(),
             ),
         )
         row = conn.execute(
             """
             SELECT id, project_id, tool_name, arguments_json, status, reason,
+                   workflow_id, workflow_step_id, tool_operation_id, idempotency_key, preview_json,
                    created_at, decided_at, executed_at
             FROM permission_requests WHERE id = ?
             """,
@@ -2763,6 +3678,7 @@ def create_permission_request(
         ).fetchone()
     item = dict(row)
     item["arguments"] = json.loads(item.pop("arguments_json"))
+    item["preview"] = _loads_json(item.pop("preview_json", None), {})
     return item
 
 
@@ -2771,7 +3687,8 @@ def list_permission_requests(project_id: int, limit: int = 50) -> list[dict]:
         rows = conn.execute(
             """
             SELECT id, project_id, tool_name, arguments_json, status, reason,
-                   result_json, created_at, decided_at, executed_at
+                   result_json, workflow_id, workflow_step_id, tool_operation_id, idempotency_key,
+                   preview_json, created_at, decided_at, executed_at
             FROM permission_requests
             WHERE project_id = ?
             ORDER BY id DESC
@@ -2783,6 +3700,7 @@ def list_permission_requests(project_id: int, limit: int = 50) -> list[dict]:
     for row in rows:
         item = dict(row)
         item["arguments"] = json.loads(item.pop("arguments_json"))
+        item["preview"] = _loads_json(item.pop("preview_json", None), {})
         raw_result = item.pop("result_json")
         item["result"] = json.loads(raw_result) if raw_result else None
         result.append(item)
@@ -2794,7 +3712,8 @@ def get_permission_request(project_id: int, request_id: int) -> dict | None:
         row = conn.execute(
             """
             SELECT id, project_id, tool_name, arguments_json, status, reason,
-                   result_json, created_at, decided_at, executed_at
+                   result_json, workflow_id, workflow_step_id, tool_operation_id, idempotency_key,
+                   preview_json, created_at, decided_at, executed_at
             FROM permission_requests
             WHERE id = ? AND project_id = ?
             """,
@@ -2804,6 +3723,7 @@ def get_permission_request(project_id: int, request_id: int) -> dict | None:
         return None
     item = dict(row)
     item["arguments"] = json.loads(item.pop("arguments_json"))
+    item["preview"] = _loads_json(item.pop("preview_json", None), {})
     raw_result = item.pop("result_json")
     item["result"] = json.loads(raw_result) if raw_result else None
     return item

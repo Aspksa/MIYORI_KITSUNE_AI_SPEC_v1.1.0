@@ -133,6 +133,11 @@ form.addEventListener("submit", async (event) => {
   input.style.height = "auto";
   setBusy(true);
 
+  const requestId = (window.crypto?.randomUUID?.() || (
+    Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
+  ));
+  state.lastRequestId = requestId;
+
   try {
     const response = await fetch("/api/chat", {
       method: "POST",
@@ -140,7 +145,8 @@ form.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         message: text,
         project_id: state.projectId,
-        conversation_id: state.conversationId
+        conversation_id: state.conversationId,
+        request_id: requestId
       })
     });
     const data = await response.json();
@@ -164,7 +170,12 @@ form.addEventListener("submit", async (event) => {
     }
 
     if (data.agent) {
-      if (agentBudget) agentBudget.textContent = data.agent.steps_used + "/" + data.agent.max_steps;
+      if (agentBudget) {
+        agentBudget.textContent = data.agent.steps_used + "/" + data.agent.max_steps;
+        agentBudget.title = data.agent.workflow_status
+          ? "Workflow: " + data.agent.workflow_status
+          : "";
+      }
       if (agentTrace) {
         agentTrace.innerHTML = (data.agent.actions || []).map((action) => {
           const tool = action.tool_name ? escapeHtml(action.tool_name) : "без инструмента";
@@ -175,21 +186,25 @@ form.addEventListener("submit", async (event) => {
       }
 
       for (const req of (data.agent.pending_permissions || [])) {
+        addPermissionActivity(req);
+      }
+      if (data.agent.recovery_required && data.agent.workflow_id) {
         addActivityCard(
-          "Нужно подтверждение · " + toolLabel(req.tool_name),
-          permissionPreview(req),
+          "Workflow требует восстановления",
+          "Состояние сохранено. Miyori не будет повторять изменение вслепую.",
           "warning",
-          [
-            {label: "Разрешить", primary: true, onClick: async () => decidePermission(req.id, true, true)},
-            {label: "Отклонить", onClick: async () => decidePermission(req.id, false, true)}
-          ]
+          [{
+            label: "Проверить и продолжить",
+            primary: true,
+            onClick: async () => resumeWorkflow(data.agent.workflow_id, true)
+          }]
         );
       }
     }
 
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
-      loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
+      loadTools(), loadPermissions(), loadAudit(), loadTasks(), loadDevelopment(), loadNexus()
     ]);
   } catch (error) {
     showError(error.message || "Не удалось получить ответ.");
@@ -207,7 +222,7 @@ projectSelect.addEventListener("change", async () => {
   showWelcome();
   await Promise.all([
     loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
+    loadTools(), loadPermissions(), loadAudit(), loadTasks(), loadDevelopment(), loadNexus()
   ]);
 });
 

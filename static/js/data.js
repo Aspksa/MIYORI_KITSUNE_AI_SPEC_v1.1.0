@@ -12,7 +12,7 @@ async function loadProjects() {
   updateProjectLabel();
   await Promise.all([
     loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
+    loadTools(), loadPermissions(), loadAudit(), loadTasks(), loadDevelopment(), loadNexus()
   ]);
 }
 
@@ -196,20 +196,63 @@ function toolLabel(name) {
 }
 
 function permissionPreview(request) {
-  const args = request.arguments || {};
+  const preview = request.preview || {};
   const lines = [];
-  if (args.path) lines.push("Файл: " + args.path);
-  if (args.name) lines.push("Папка: " + args.name);
-  if (args.document_id) lines.push("Документ ID: " + args.document_id);
-  if (Object.prototype.hasOwnProperty.call(args, "folder_id")) {
-    lines.push("Целевая папка ID: " + (args.folder_id ?? "корень"));
-  }
-  if (typeof args.content === "string") {
-    const preview = args.content.length > 500 ? args.content.slice(0, 500) + "…" : args.content;
-    lines.push("Содержимое:\n" + preview);
+  if (preview.summary) lines.push(preview.summary);
+  for (const change of (preview.changes || [])) {
+    lines.push(String(change.field || "Изменение") + ": " + String(change.value ?? "—"));
   }
   if (request.reason) lines.push("Причина: " + request.reason);
-  return lines.join("\n\n") || "Это действие изменит workspace проекта.";
+
+  if (!lines.length) {
+    const args = request.arguments || {};
+    if (args.path) lines.push("Файл: " + args.path);
+    if (args.name) lines.push("Папка: " + args.name);
+    if (args.document_id) lines.push("Документ ID: " + args.document_id);
+    if (Object.prototype.hasOwnProperty.call(args, "folder_id")) {
+      lines.push("Целевая папка ID: " + (args.folder_id ?? "корень"));
+    }
+  }
+  return lines.join("\n\n") || "Это действие изменит данные проекта.";
+}
+
+function addPermissionActivity(req) {
+  addActivityCard(
+    "Нужно подтверждение · " + toolLabel(req.tool_name),
+    permissionPreview(req),
+    "warning",
+    [
+      {
+        label: "Разрешить",
+        primary: true,
+        onClick: async () => decidePermission(req.id, true, true)
+      },
+      {
+        label: "Отклонить",
+        onClick: async () => decidePermission(req.id, false, true)
+      }
+    ]
+  );
+}
+
+function applyWorkflowContinuation(result) {
+  const continuation = result?.continuation;
+  if (continuation?.conversation_id) {
+    state.conversationId = continuation.conversation_id;
+  }
+  if (continuation?.answer) {
+    addMessage("assistant", continuation.answer, continuation.sources || []);
+  }
+  for (const req of (continuation?.agent?.pending_permissions || [])) {
+    addPermissionActivity(req);
+  }
+  if (result?.execution_error) {
+    addActivityCard(
+      "Workflow требует внимания",
+      result.execution_error,
+      "warning"
+    );
+  }
 }
 
 function addToolResultCard(toolName, result) {
@@ -324,31 +367,18 @@ async function runChatTool(tool, providedArgs = null) {
     const result = await api("/api/projects/" + state.projectId + "/tools/execute", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({name: tool.name, arguments: args})
+      body: JSON.stringify({
+        name: tool.name,
+        arguments: args,
+        request_id: (window.crypto?.randomUUID?.() || (
+          Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
+        ))
+      })
     });
 
     if (result.status === "approval_required") {
       const req = result.permission_request;
-      addActivityCard(
-        "Нужно подтверждение · " + toolLabel(tool.name),
-        permissionPreview(req),
-        "warning",
-        [
-          {
-            label: "Разрешить",
-            primary: true,
-            onClick: async () => {
-              await decidePermission(req.id, true, true);
-            }
-          },
-          {
-            label: "Отклонить",
-            onClick: async () => {
-              await decidePermission(req.id, false, true);
-            }
-          }
-        ]
-      );
+      addPermissionActivity(req);
       setPulse("waiting");
       await loadPermissions();
       return;
@@ -419,21 +449,62 @@ async function decidePermission(requestId, approved, fromChat = false) {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({approved})
     });
+
     if (fromChat) {
-      if (approved) {
+      if (approved && result.execution?.result) {
         addActivityCard(
           "Разрешение выполнено",
-          result.execution?.result || "Действие выполнено.",
+          result.execution.result,
           "success"
         );
-      } else {
+      } else if (!approved) {
         addActivityCard("Действие отклонено", "Изменений не внесено.", "neutral");
       }
+      applyWorkflowContinuation(result);
     }
-    setPulse("ready");
-    await Promise.all([loadPermissions(), loadTools(), loadNexus()]);
+
+    setPulse(
+      result.workflow?.workflow_status === "waiting_permission"
+        ? "waiting"
+        : "ready"
+    );
+    await Promise.all([
+      loadPermissions(), loadAudit(), loadTools(), loadNexus(), loadConversations()
+    ]);
   } catch (error) {
     if (fromChat) addActivityCard("Ошибка разрешения", error.message, "error");
+    else showError(error.message);
+  }
+}
+
+async function resumeWorkflow(workflowId, fromChat = false) {
+  try {
+    const result = await api(
+      "/api/projects/" + state.projectId + "/workflows/" + workflowId + "/resume",
+      {method: "POST"}
+    );
+    if (fromChat) {
+      if (result.continuation?.answer) {
+        addMessage(
+          "assistant",
+          result.continuation.answer,
+          result.continuation.sources || []
+        );
+      }
+      for (const req of (result.continuation?.agent?.pending_permissions || [])) {
+        addPermissionActivity(req);
+      }
+      if (result.continuation_error) {
+        addActivityCard(
+          "Workflow восстановлен, но ответ не сформирован",
+          result.continuation_error,
+          "warning"
+        );
+      }
+    }
+    await Promise.all([loadPermissions(), loadAudit(), loadConversations(), loadNexus()]);
+  } catch (error) {
+    if (fromChat) addActivityCard("Ошибка восстановления", error.message, "error");
     else showError(error.message);
   }
 }
@@ -441,19 +512,45 @@ async function decidePermission(requestId, approved, fromChat = false) {
 async function loadPermissions() {
   if (!state.projectId) return;
   try {
-    const data = await api("/api/projects/" + state.projectId + "/permissions");
+    const [data, recovery] = await Promise.all([
+      api("/api/projects/" + state.projectId + "/permissions"),
+      api("/api/projects/" + state.projectId + "/workflows?status=recovering")
+    ]);
     permissionList.innerHTML = "";
-    if (!data.requests.length) {
+
+    const requests = data.requests || [];
+    const workflows = recovery.workflows || [];
+    if (!requests.length && !workflows.length) {
       permissionList.innerHTML = '<div class="conversation-empty">Запросов нет</div>';
       return;
     }
 
-    for (const req of data.requests.slice(0, 12)) {
+    for (const workflow of workflows.slice(0, 8)) {
+      const row = document.createElement("div");
+      row.className = "permission-item status-recovering";
+      row.innerHTML =
+        "<div><strong>Workflow #" + workflow.id + "</strong>" +
+        "<small>требуется восстановление</small></div>";
+      const actions = document.createElement("div");
+      actions.className = "permission-actions";
+      const resume = document.createElement("button");
+      resume.type = "button";
+      resume.textContent = "Восстановить";
+      resume.onclick = () => resumeWorkflow(workflow.id, true);
+      actions.appendChild(resume);
+      row.appendChild(actions);
+      permissionList.appendChild(row);
+    }
+
+    for (const req of requests.slice(0, 20)) {
       const row = document.createElement("div");
       row.className = "permission-item status-" + req.status;
+      const preview = req.preview?.summary
+        ? '<small>' + escapeHtml(req.preview.summary) + '</small>'
+        : '<small>' + escapeHtml(req.status) + '</small>';
       row.innerHTML =
-        "<div><strong>#" + req.id + " " + escapeHtml(req.tool_name) + "</strong>" +
-        "<small>" + escapeHtml(req.status) + "</small></div>";
+        "<div><strong>#" + req.id + " " + escapeHtml(toolLabel(req.tool_name)) +
+        "</strong>" + preview + "</div>";
 
       if (req.status === "pending") {
         const actions = document.createElement("div");
@@ -474,6 +571,46 @@ async function loadPermissions() {
     }
   } catch (error) {
     permissionList.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + "</div>";
+  }
+}
+
+async function loadAudit() {
+  if (!state.projectId || !auditList) return;
+  try {
+    const data = await api(
+      "/api/projects/" + state.projectId + "/audit?limit=40"
+    );
+    const events = data.events || [];
+    auditList.innerHTML = "";
+    if (!events.length) {
+      auditList.innerHTML = '<div class="conversation-empty">Журнал пока пуст</div>';
+      return;
+    }
+
+    for (const item of events) {
+      const row = document.createElement("div");
+      row.className = "audit-event-item audit-" + String(item.actor || "system");
+      const when = item.created_at
+        ? new Date(item.created_at).toLocaleString("ru-RU", {
+            day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+          })
+        : "";
+      row.innerHTML =
+        '<div class="audit-event-head"><strong>' +
+        escapeHtml(item.summary || item.event_type || "Событие") +
+        '</strong><span>' + escapeHtml(when) + '</span></div>' +
+        '<small>' +
+        escapeHtml(
+          (item.actor || "system") +
+          " · " + (item.event_type || "event") +
+          (item.workflow_id ? " · workflow #" + item.workflow_id : "")
+        ) +
+        '</small>';
+      auditList.appendChild(row);
+    }
+  } catch (error) {
+    auditList.innerHTML =
+      '<div class="conversation-empty">' + escapeHtml(error.message) + '</div>';
   }
 }
 
@@ -587,7 +724,9 @@ async function loadDevelopment() {
     developmentStats.innerHTML =
       "Факты: <b>" + s.verified_facts + "</b> · Документы: <b>" + s.documents +
       "</b> · Задачи OK: <b>" + s.completed_tasks + "</b> · Ошибки: <b>" +
-      s.failed_tasks + "</b> · Проверки: <b>" + s.checks_passed + "/" + s.checks_total + "</b>";
+      s.failed_tasks + "</b> · Workflow ждут: <b>" + (s.waiting_workflows || 0) +
+      "</b> · Recovery: <b>" + ((s.recovering_workflows || 0) + (s.recovery_operations || 0)) +
+      "</b> · Проверки: <b>" + s.checks_passed + "/" + s.checks_total + "</b>";
   } catch (error) {
     developmentStats.textContent = error.message;
   }
@@ -602,3 +741,6 @@ async function runDevelopmentCheck() {
     showError(error.message);
   }
 }
+
+
+if (el("refreshAudit")) el("refreshAudit").addEventListener("click", loadAudit);

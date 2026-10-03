@@ -19,6 +19,11 @@ def _safe_path(project_id: int, relative_path: str) -> Path:
     return candidate
 
 
+def resolve_workspace_path(project_id: int, relative_path: str) -> Path:
+    """Public safe resolver used by Tool Registry preflight/recovery checks."""
+    return _safe_path(project_id, relative_path)
+
+
 def list_workspace_files(project_id: int) -> dict:
     root = project_workspace(project_id)
     items = []

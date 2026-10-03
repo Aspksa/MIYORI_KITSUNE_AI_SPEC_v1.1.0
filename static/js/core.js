@@ -27,6 +27,7 @@ const developmentStats = el("developmentStats");
 const agentTrace = el("agentTrace");
 const agentBudget = el("agentBudget");
 const permissionList = el("permissionList");
+const auditList = el("auditList");
 const miyoriConsole = el("miyoriConsole");
 const consoleHeader = el("consoleHeader");
 const toggleConsole = el("toggleConsole");

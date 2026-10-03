@@ -26,7 +26,11 @@ from miyori.db import (
     get_account_profile,
     get_ai_preferences,
     get_agent_trace,
+    get_agent_workflow,
+    get_agent_workflow_by_request_key,
+    get_message_by_client_request_id,
     get_permission_request,
+    get_workflow_step,
     get_project,
     init_db,
     add_document,
@@ -66,10 +70,17 @@ from miyori.db import (
     list_project_modules,
     list_projects,
     list_memory_facts,
+    list_agent_workflows,
+    list_audit_events,
     list_permission_requests,
+    list_workflow_events,
+    list_workflow_steps,
     list_tasks,
+    mark_interrupted_runtime_for_recovery,
     maybe_capture_user_memory,
     recent_messages,
+    record_audit_event,
+    record_workflow_event,
     replace_memory_fact,
     search_document_chunks,
     recent_development_checks,
@@ -84,15 +95,18 @@ from miyori.db import (
     update_invoice_offer,
     update_home_device,
     update_parental_profile,
+    set_agent_run_status,
+    update_agent_workflow,
     update_memory_status,
+    update_workflow_step,
     upsert_device_session,
     verified_memory_context,
     find_document_folder,
 )
-from miyori.agent import run_agent
+from miyori.agent import run_agent, resume_agent_workflow
 from miyori.background import register_background_handlers
 from miyori.brain import build_context
-from miyori.context_router import route_context
+from miyori.context_router import ContextRoute, route_context
 from miyori.development import run_project_self_check
 from miyori.documents import (
     MAX_FILE_BYTES,
@@ -130,7 +144,12 @@ from miyori.tasks import start_worker_monitor, wake_worker, worker_status
 from miyori.rag import init_rag, rag_status, retrieve as rag_retrieve
 from miyori.planner import MAX_AGENT_STEPS
 from miyori.sources import build_answer_sources
-from miyori.tools import execute_approved_request, execute_tool, list_tools
+from miyori.tools import (
+    execute_approved_request,
+    execute_tool,
+    list_tools,
+    reconcile_recoverable_operations,
+)
 from miyori.account import cloudru_profile, list_cloudru_models, save_cloudru_profile, test_cloudru
 from miyori.module_registry import module_manifest, release_history
 from miyori.system_settings import (
@@ -190,6 +209,8 @@ def _sync_project_drive(project_id: int) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    recovery_marked = mark_interrupted_runtime_for_recovery()
+    recovery_checked = reconcile_recoverable_operations(allow_retry=False)
     init_epistemic_db()
     for project in list_projects():
         _sync_project_drive(int(project["id"]))
@@ -199,10 +220,14 @@ async def lifespan(app: FastAPI):
     start_worker_monitor()
     clear_restart_required()
     start_update_monitor()
+    app.state.runtime_recovery = {
+        "marked": recovery_marked,
+        "checked": recovery_checked,
+    }
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.37", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.38", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -220,6 +245,7 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     project_id: int
     conversation_id: int | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class ProjectCreateRequest(BaseModel):
@@ -243,6 +269,7 @@ class MemoryReplaceRequest(BaseModel):
 class ToolExecuteRequest(BaseModel):
     name: str
     arguments: dict = Field(default_factory=dict)
+    request_id: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class TaskCreateRequest(BaseModel):
@@ -391,7 +418,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.37",
+        "version": "00.00.38",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -633,7 +660,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.37",
+        "project_version": "00.00.38",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1474,6 +1501,177 @@ def epistemic_claim_verify(project_id: int, claim_id: int) -> dict:
     }
 
 
+
+def _route_from_payload(payload: dict) -> ContextRoute:
+    return ContextRoute(
+        use_recent_messages=bool(payload.get("use_recent_messages", True)),
+        use_user_memory=bool(payload.get("use_user_memory", False)),
+        use_project_memory=bool(payload.get("use_project_memory", False)),
+        use_documents=bool(payload.get("use_documents", False)),
+        use_epistemic=bool(payload.get("use_epistemic", False)),
+        use_tools=bool(payload.get("use_tools", False)),
+        max_rag_items=int(payload.get("max_rag_items", 8)),
+        reasons=tuple(payload.get("reasons") or ()),
+    )
+
+
+async def _build_agent_response(
+    *,
+    project_id: int,
+    conversation_id: int,
+    text: str,
+    route: ContextRoute,
+    agent,
+    captured_memory: dict | None = None,
+    captured_claims: list[dict] | None = None,
+    request_id: str | None = None,
+) -> dict:
+    workflow_state = get_agent_workflow(agent.workflow_id, project_id) or {}
+    current_step = int(workflow_state.get("current_step") or 0)
+    response_key = (
+        f"assistant:workflow:{agent.workflow_id}:"
+        f"step:{current_step}:status:{agent.workflow_status}"
+    )
+    cached = ((workflow_state.get("result") or {}).get("last_response"))
+    if cached and cached.get("response_key") == response_key:
+        return cached
+
+    context = recent_messages(conversation_id)
+    tool_catalog = list_tools()
+    brain = build_context(
+        project_id,
+        text,
+        route,
+        tools_allowed=[item["name"] for item in tool_catalog],
+    )
+
+    ai_preferences = get_ai_preferences()
+    use_rag = bool(ai_preferences.get("use_rag", 1))
+    use_verified_memory = bool(ai_preferences.get("use_verified_memory", 1))
+
+    include_documents = bool(route.use_documents and use_rag)
+    include_memory = bool(
+        (route.use_user_memory or route.use_project_memory)
+        and use_verified_memory
+    )
+    include_knowledge = bool(route.use_epistemic)
+
+    rag = rag_retrieve(
+        project_id,
+        text,
+        limit=route.max_rag_items,
+        include_documents=include_documents,
+        include_memory=include_memory,
+        include_knowledge=include_knowledge,
+        include_user_memory=route.use_user_memory,
+        include_project_memory=route.use_project_memory,
+    )
+    rag_payload = rag.to_dict()
+
+    epistemic = (
+        trusted_claim_context(project_id, text, limit=8)
+        if route.use_epistemic
+        else []
+    )
+    sources = build_answer_sources(
+        project_id,
+        rag_payload,
+        agent.tool_context,
+    )
+
+    answer = await chat(
+        context,
+        memory_context=None,
+        document_context=None,
+        brain_plan=brain.plan,
+        tool_context=agent.tool_context,
+        epistemic_context=epistemic,
+        rag_context=rag_payload,
+        answer_sources=sources,
+    )
+
+    add_message(
+        conversation_id,
+        "assistant",
+        answer,
+        metadata={
+            "sources": sources,
+            "context_route": route.to_dict(),
+            "agent_run_id": agent.run_id,
+            "workflow_id": agent.workflow_id,
+            "workflow_status": agent.workflow_status,
+            "request_id": request_id,
+            "response_key": response_key,
+        },
+        client_request_id=response_key,
+    )
+
+    unique_tool_steps = {
+        int(action["step_index"])
+        for action in agent.actions
+        if action.get("tool_name")
+        and action.get("status") not in {"skipped"}
+    }
+    response = {
+        "conversation_id": conversation_id,
+        "project_id": project_id,
+        "request_id": request_id,
+        "response_key": response_key,
+        "answer": answer,
+        "sources": sources,
+        "workflow": {
+            "id": agent.workflow_id,
+            "status": agent.workflow_status,
+            "recovery_required": agent.recovery_required,
+        },
+        "brain": {
+            "plan": brain.plan,
+            "context_route": brain.context_route,
+            "working_memory": brain.working_memory,
+            "tools_allowed": brain.tools_allowed,
+        },
+        "rag": rag_payload,
+        "memory": {
+            "captured": captured_memory,
+            "user_scope_enabled": bool(route.use_user_memory and use_verified_memory),
+            "project_scope_enabled": bool(route.use_project_memory and use_verified_memory),
+        },
+        "epistemic": {
+            "used_claims": [
+                {
+                    "id": item.get("id"),
+                    "statement": item.get("statement"),
+                    "status": item.get("status"),
+                    "assessment": item.get("assessment"),
+                    "confidence": item.get("confidence"),
+                    "claim_type": item.get("claim_type"),
+                }
+                for item in epistemic
+            ],
+            "captured_claim_ids": [
+                item.get("id") for item in (captured_claims or [])
+            ],
+            "snapshot": epistemic_snapshot(project_id),
+        },
+        "agent": {
+            "run_id": agent.run_id,
+            "workflow_id": agent.workflow_id,
+            "workflow_status": agent.workflow_status,
+            "actions": agent.actions,
+            "steps_used": len(unique_tool_steps),
+            "max_steps": MAX_AGENT_STEPS,
+            "planner_mode": agent.planner_mode,
+            "pending_permissions": agent.pending_permissions,
+            "recovery_required": agent.recovery_required,
+        },
+    }
+    update_agent_workflow(
+        agent.workflow_id,
+        result={"last_response": response},
+    )
+    return response
+
+
 @app.get("/api/tools")
 def tools_catalog() -> dict:
     return {"tools": list_tools()}
@@ -1484,7 +1682,15 @@ def tool_execute(project_id: int, request: ToolExecuteRequest) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     try:
-        return execute_tool(request.name, project_id, request.arguments)
+        return execute_tool(
+            request.name,
+            project_id,
+            request.arguments,
+            idempotency_key=(
+                f"manual:{request.request_id}"
+                if request.request_id else None
+            ),
+        )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (TypeError, ValueError) as exc:
@@ -1499,7 +1705,7 @@ def permissions_list(project_id: int) -> dict:
 
 
 @app.post("/api/projects/{project_id}/permissions/{request_id}/decision")
-def permission_decision(
+async def permission_decision(
     project_id: int,
     request_id: int,
     request: PermissionDecisionRequest,
@@ -1507,24 +1713,267 @@ def permission_decision(
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
 
+    original = get_permission_request(project_id, request_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Запрос разрешения не найден.")
+
     decided = decide_permission_request(project_id, request_id, request.approved)
     if not decided:
-        raise HTTPException(status_code=409, detail="Запрос уже обработан или не найден.")
+        current = get_permission_request(project_id, request_id)
+        if current and (
+            (request.approved and current["status"] in {"approved", "executed", "failed"})
+            or (not request.approved and current["status"] == "denied")
+        ):
+            decided = current
+        else:
+            raise HTTPException(status_code=409, detail="Запрос уже обработан или не найден.")
 
-    if not request.approved:
-        return {"request": decided}
+    workflow_id = decided.get("workflow_id")
+    workflow = (
+        get_agent_workflow(int(workflow_id), project_id)
+        if workflow_id else None
+    )
+    conversation_id = (
+        int(workflow["conversation_id"])
+        if workflow and workflow.get("conversation_id") is not None
+        else None
+    )
 
-    try:
-        execution = execute_approved_request(project_id, request_id)
-    except PermissionError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except (TypeError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if original["status"] == "pending":
+        record_audit_event(
+            project_id,
+            "user",
+            "permission.approved" if request.approved else "permission.denied",
+            "Пользователь разрешил действие Miyori."
+            if request.approved else
+            "Пользователь отклонил действие Miyori.",
+            conversation_id=conversation_id,
+            workflow_id=int(workflow_id) if workflow_id else None,
+            entity_type="permission",
+            entity_id=request_id,
+            details={
+                "tool": decided["tool_name"],
+                "preview": decided.get("preview") or {},
+            },
+        )
+
+    execution = None
+    execution_error = None
+    if request.approved and decided["status"] != "executed":
+        try:
+            execution = execute_approved_request(
+                project_id,
+                request_id,
+                conversation_id=conversation_id,
+            )
+        except Exception as exc:
+            execution_error = str(exc)
+
+    current_request = get_permission_request(project_id, request_id)
+
+    continuation = None
+    agent_payload = None
+    if workflow_id:
+        try:
+            agent = await resume_agent_workflow(
+                project_id,
+                int(workflow_id),
+                permission_request_id=request_id,
+            )
+            agent_payload = {
+                "workflow_id": agent.workflow_id,
+                "workflow_status": agent.workflow_status,
+                "pending_permissions": agent.pending_permissions,
+                "recovery_required": agent.recovery_required,
+            }
+            refreshed_workflow = get_agent_workflow(int(workflow_id), project_id)
+            route = _route_from_payload((refreshed_workflow or workflow)["route"])
+            try:
+                continuation = await _build_agent_response(
+                    project_id=project_id,
+                    conversation_id=int((refreshed_workflow or workflow)["conversation_id"]),
+                    text=str((refreshed_workflow or workflow)["goal"]),
+                    route=route,
+                    agent=agent,
+                    captured_memory=None,
+                    captured_claims=[],
+                    request_id=None,
+                )
+            except ProviderError as exc:
+                # The authorized action has already been resolved. Never turn a
+                # post-action LLM failure into an ambiguous HTTP retry.
+                execution_error = (
+                    (execution_error + " | ") if execution_error else ""
+                ) + f"Не удалось сформировать продолжение ответа: {exc}"
+        except (ValueError, RuntimeError) as exc:
+            execution_error = (
+                (execution_error + " | ") if execution_error else ""
+            ) + str(exc)
+
+    if not workflow_id and request.approved and execution_error:
+        raise HTTPException(status_code=422, detail=execution_error)
 
     return {
-        "request": get_permission_request(project_id, request_id),
+        "request": current_request or decided,
         "execution": execution,
+        "execution_error": execution_error,
+        "workflow": agent_payload,
+        "continuation": continuation,
     }
+
+
+@app.get("/api/projects/{project_id}/workflows")
+def workflows_list(project_id: int, status: str | None = None) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    statuses = (status,) if status else None
+    try:
+        workflows = list_agent_workflows(project_id, statuses=statuses, limit=100)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"workflows": workflows}
+
+
+@app.get("/api/projects/{project_id}/workflows/{workflow_id}")
+def workflow_get(project_id: int, workflow_id: int) -> dict:
+    workflow = get_agent_workflow(workflow_id, project_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow не найден.")
+    return {
+        "workflow": workflow,
+        "steps": list_workflow_steps(workflow_id),
+        "events": list_workflow_events(workflow_id),
+        "audit": list_audit_events(project_id, workflow_id=workflow_id, limit=200),
+    }
+
+
+@app.post("/api/projects/{project_id}/workflows/{workflow_id}/cancel")
+def workflow_cancel(project_id: int, workflow_id: int) -> dict:
+    workflow = get_agent_workflow(workflow_id, project_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow не найден.")
+    if workflow["status"] == "recovering":
+        raise HTTPException(
+            status_code=409,
+            detail="Сначала завершите проверку восстановления workflow.",
+        )
+    if workflow["status"] in {"completed", "cancelled"}:
+        return {"workflow": workflow}
+
+    permission_id = workflow.get("pending_permission_id")
+    if permission_id:
+        permission = get_permission_request(project_id, int(permission_id))
+        if permission and permission["status"] == "pending":
+            decide_permission_request(project_id, int(permission_id), False)
+        if permission and permission.get("workflow_step_id"):
+            step = get_workflow_step(int(permission["workflow_step_id"]))
+            if step and step["status"] == "waiting_permission":
+                update_workflow_step(
+                    int(step["id"]),
+                    status="cancelled",
+                    result={"workflow_cancelled": True},
+                    mark_finished=True,
+                )
+
+    update_agent_workflow(
+        workflow_id,
+        status="cancelled",
+        pending_permission_id=None,
+        result={"outcome": "cancelled_by_user"},
+        error=None,
+        finished=True,
+    )
+    set_agent_run_status(
+        int(workflow["agent_run_id"]),
+        "cancelled",
+        finished=True,
+    )
+    record_workflow_event(
+        workflow_id,
+        "workflow.cancelled",
+        {"actor": "user"},
+    )
+    record_audit_event(
+        project_id,
+        "user",
+        "workflow.cancelled",
+        "Пользователь остановил workflow.",
+        conversation_id=workflow.get("conversation_id"),
+        workflow_id=workflow_id,
+        entity_type="workflow",
+        entity_id=workflow_id,
+    )
+    return {
+        "workflow": get_agent_workflow(workflow_id, project_id),
+    }
+
+
+@app.post("/api/projects/{project_id}/workflows/{workflow_id}/resume")
+async def workflow_resume(project_id: int, workflow_id: int) -> dict:
+    workflow = get_agent_workflow(workflow_id, project_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow не найден.")
+    try:
+        agent = await resume_agent_workflow(
+            project_id,
+            workflow_id,
+            recover=True,
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    continuation = None
+    route = _route_from_payload(workflow["route"])
+    try:
+        continuation = await _build_agent_response(
+            project_id=project_id,
+            conversation_id=int(workflow["conversation_id"]),
+            text=str(workflow["goal"]),
+            route=route,
+            agent=agent,
+            captured_memory=None,
+            captured_claims=[],
+            request_id=None,
+        )
+    except ProviderError as exc:
+        return {
+            "workflow": get_agent_workflow(workflow_id, project_id),
+            "agent": {
+                "workflow_status": agent.workflow_status,
+                "recovery_required": agent.recovery_required,
+            },
+            "continuation": None,
+            "continuation_error": str(exc),
+        }
+    return {
+        "workflow": get_agent_workflow(workflow_id, project_id),
+        "agent": {
+            "workflow_status": agent.workflow_status,
+            "recovery_required": agent.recovery_required,
+            "pending_permissions": agent.pending_permissions,
+        },
+        "continuation": continuation,
+    }
+
+
+@app.get("/api/projects/{project_id}/audit")
+def audit_list(project_id: int, workflow_id: int | None = None, limit: int = 100) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {
+        "events": list_audit_events(
+            project_id,
+            workflow_id=workflow_id,
+            limit=limit,
+        )
+    }
+
+
+@app.post("/api/projects/{project_id}/recovery/check")
+def recovery_check(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return reconcile_recoverable_operations(project_id, allow_retry=False)
 
 
 @app.get("/api/projects/{project_id}/tasks")
@@ -1593,67 +2042,97 @@ async def send_message(request: ChatRequest) -> dict:
     if not get_project(request.project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
 
-    try:
-        conversation_id = ensure_conversation(
-            request.conversation_id,
+    existing_message = (
+        get_message_by_client_request_id(request.project_id, request.request_id)
+        if request.request_id else None
+    )
+
+    if existing_message:
+        if existing_message["content"] != text:
+            raise HTTPException(
+                status_code=409,
+                detail="Этот request_id уже использован для другого сообщения.",
+            )
+        if (
+            request.conversation_id is not None
+            and int(existing_message["conversation_id"]) != int(request.conversation_id)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="request_id принадлежит другому разговору.",
+            )
+        conversation_id = int(existing_message["conversation_id"])
+        user_message_id = int(existing_message["id"])
+        is_new_message = False
+        request_key = f"chat:{request.request_id}"
+        existing_workflow = get_agent_workflow_by_request_key(
             request.project_id,
+            request_key,
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        cached_response = (
+            ((existing_workflow or {}).get("result") or {}).get("last_response")
+        )
+        if cached_response:
+            return cached_response
+    else:
+        try:
+            conversation_id = ensure_conversation(
+                request.conversation_id,
+                request.project_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    user_message_id = add_message(conversation_id, "user", text)
-    route = route_context(text)
+        user_message_id = add_message(
+            conversation_id,
+            "user",
+            text,
+            client_request_id=request.request_id,
+        )
+        is_new_message = True
+        request_key = (
+            f"chat:{request.request_id}"
+            if request.request_id
+            else f"chat:message:{user_message_id}"
+        )
+        existing_workflow = None
 
-    captured_memory = maybe_capture_user_memory(
-        request.project_id,
-        conversation_id,
-        user_message_id,
-        text,
+    if is_new_message:
+        record_audit_event(
+            request.project_id,
+            "user",
+            "chat.requested",
+            "Пользователь отправил запрос Miyori.",
+            conversation_id=conversation_id,
+            entity_type="message",
+            entity_id=user_message_id,
+            details={
+                "request_id": request.request_id,
+                "message_preview": text[:500],
+            },
+        )
+        captured_memory = maybe_capture_user_memory(
+            request.project_id,
+            conversation_id,
+            user_message_id,
+            text,
+        )
+        captured_claims = capture_user_claims(
+            request.project_id,
+            conversation_id,
+            user_message_id,
+            text,
+        )
+    else:
+        captured_memory = None
+        captured_claims = []
+
+    route = (
+        _route_from_payload(existing_workflow["route"])
+        if existing_workflow else
+        route_context(text)
     )
-    captured_claims = capture_user_claims(
-        request.project_id,
-        conversation_id,
-        user_message_id,
-        text,
-    )
-
     context = recent_messages(conversation_id)
-    tool_catalog = list_tools()
-    brain = build_context(
-        request.project_id,
-        text,
-        route,
-        tools_allowed=[item["name"] for item in tool_catalog],
-    )
-
-    ai_preferences = get_ai_preferences()
-    use_rag = bool(ai_preferences.get("use_rag", 1))
-    use_verified_memory = bool(ai_preferences.get("use_verified_memory", 1))
-
-    include_documents = bool(route.use_documents and use_rag)
-    include_memory = bool(
-        (route.use_user_memory or route.use_project_memory)
-        and use_verified_memory
-    )
-    include_knowledge = bool(route.use_epistemic)
-
-    rag = rag_retrieve(
-        request.project_id,
-        text,
-        limit=route.max_rag_items,
-        include_documents=include_documents,
-        include_memory=include_memory,
-        include_knowledge=include_knowledge,
-        include_user_memory=route.use_user_memory,
-        include_project_memory=route.use_project_memory,
-    )
-    rag_payload = rag.to_dict()
-
-    epistemic = (
-        trusted_claim_context(request.project_id, text, limit=8)
-        if route.use_epistemic
-        else []
-    )
 
     agent = await run_agent(
         request.project_id,
@@ -1661,24 +2140,19 @@ async def send_message(request: ChatRequest) -> dict:
         text,
         route,
         conversation_context=context[-8:],
-    )
-
-    sources = build_answer_sources(
-        request.project_id,
-        rag_payload,
-        agent.tool_context,
+        request_key=request_key,
     )
 
     try:
-        answer = await chat(
-            context,
-            memory_context=None,
-            document_context=None,
-            brain_plan=brain.plan,
-            tool_context=agent.tool_context,
-            epistemic_context=epistemic,
-            rag_context=rag_payload,
-            answer_sources=sources,
+        return await _build_agent_response(
+            project_id=request.project_id,
+            conversation_id=conversation_id,
+            text=text,
+            route=route,
+            agent=agent,
+            captured_memory=captured_memory,
+            captured_claims=captured_claims,
+            request_id=request.request_id,
         )
     except ProviderError as exc:
         raise HTTPException(
@@ -1686,62 +2160,9 @@ async def send_message(request: ChatRequest) -> dict:
             detail={
                 "message": str(exc),
                 "conversation_id": conversation_id,
+                "workflow_id": agent.workflow_id,
+                "workflow_status": agent.workflow_status,
+                "pending_permissions": agent.pending_permissions,
             },
         ) from exc
-
-    add_message(
-        conversation_id,
-        "assistant",
-        answer,
-        metadata={
-            "sources": sources,
-            "context_route": route.to_dict(),
-            "agent_run_id": agent.run_id,
-        },
-    )
-
-    return {
-        "conversation_id": conversation_id,
-        "project_id": request.project_id,
-        "answer": answer,
-        "sources": sources,
-        "brain": {
-            "plan": brain.plan,
-            "context_route": brain.context_route,
-            "working_memory": brain.working_memory,
-            "tools_allowed": brain.tools_allowed,
-        },
-        "rag": rag_payload,
-        "memory": {
-            "captured": captured_memory,
-            "user_scope_enabled": bool(route.use_user_memory and use_verified_memory),
-            "project_scope_enabled": bool(route.use_project_memory and use_verified_memory),
-        },
-        "epistemic": {
-            "used_claims": [
-                {
-                    "id": item.get("id"),
-                    "statement": item.get("statement"),
-                    "status": item.get("status"),
-                    "assessment": item.get("assessment"),
-                    "confidence": item.get("confidence"),
-                    "claim_type": item.get("claim_type"),
-                }
-                for item in epistemic
-            ],
-            "captured_claim_ids": [item.get("id") for item in captured_claims],
-            "snapshot": epistemic_snapshot(request.project_id),
-        },
-        "agent": {
-            "run_id": agent.run_id,
-            "actions": agent.actions,
-            "steps_used": sum(
-                1 for action in agent.actions
-                if action.get("tool_name") and action.get("status") != "skipped"
-            ),
-            "max_steps": MAX_AGENT_STEPS,
-            "planner_mode": agent.planner_mode,
-            "pending_permissions": agent.pending_permissions,
-        },
-    }
 
