@@ -1562,7 +1562,9 @@ async function renderUpdateWorkspace(refresh = false) {
       container.innerHTML =
         '<div class="update-status-grid">' +
           '<div><span>Режим</span><strong>' + escapeHtml(mode) + '</strong></div>' +
-          '<div><span>Локальная версия</span><strong>' + escapeHtml(shortSha(u.local_sha)) + '</strong></div>' +
+          '<div><span>Локальная версия</span><strong>' +
+          escapeHtml(u.local_sha ? shortSha(u.local_sha) : ("Miyori " + (versionText?.textContent || "—"))) +
+          '</strong></div>' +
           '<div><span>GitHub версия</span><strong>' + escapeHtml(shortSha(u.remote_sha)) + '</strong></div>' +
           '<div><span>Рабочая копия</span><strong>' + escapeHtml(worktree) + '</strong></div>' +
           '<div><span>Автообновление</span><strong>' + (u.auto_update ? 'Включено' : 'Выключено') + '</strong></div>' +
