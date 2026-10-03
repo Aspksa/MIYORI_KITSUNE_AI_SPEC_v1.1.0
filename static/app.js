@@ -1380,247 +1380,330 @@ function openSidebarSection(title, detail, tone = "neutral") {
   messages.scrollTop = messages.scrollHeight;
 }
 
+const menuChat = el("menuChat");
 const menuMobileApp = el("menuMobileApp");
 const menuAccount = el("menuAccount");
 const menuSettings = el("menuSettings");
+const menuDocumentsHub = el("menuDocumentsHub");
+const menuWorkProjects = el("menuWorkProjects");
+const menuHomeProjects = el("menuHomeProjects");
 const menuProjectUpdate = el("menuProjectUpdate");
 
-const accountOverlay = el("accountOverlay");
-const updateOverlay = el("updateOverlay");
-const cloudruForm = el("cloudruForm");
-const cloudruApiKey = el("cloudruApiKey");
-const cloudruModelId = el("cloudruModelId");
-const cloudruBaseUrl = el("cloudruBaseUrl");
-const cloudruKeyState = el("cloudruKeyState");
-const cloudruResult = el("cloudruResult");
-const cloudruModelOptions = el("cloudruModelOptions");
-const updateResult = el("updateResult");
+const chatHeader = el("chatHeader");
+const chatComposer = el("chatComposer");
+const workspaceView = el("workspaceView");
+const workspaceBody = el("workspaceBody");
+const workspaceTitle = el("workspaceTitle");
+const workspaceSubtitle = el("workspaceSubtitle");
+const workspaceEyebrow = el("workspaceEyebrow");
 
-function openSheet(overlay) {
-  if (!overlay) return;
-  overlay.hidden = false;
-  document.body.classList.add("sheet-open");
+const workspaceMenu = {
+  chat: menuChat,
+  mobile: menuMobileApp,
+  account: menuAccount,
+  settings: menuSettings,
+  documents: menuDocumentsHub,
+  work: menuWorkProjects,
+  home: menuHomeProjects,
+  update: menuProjectUpdate,
+};
+
+function setWorkspaceMenuActive(name) {
+  Object.entries(workspaceMenu).forEach(([key, button]) => {
+    if (button) button.classList.toggle("active", key === name);
+  });
 }
 
-function closeSheet(overlay) {
-  if (!overlay) return;
-  overlay.hidden = true;
-  if ((!accountOverlay || accountOverlay.hidden) && (!updateOverlay || updateOverlay.hidden)) {
-    document.body.classList.remove("sheet-open");
-  }
+function showChatWorkspace() {
+  if (workspaceView) workspaceView.hidden = true;
+  if (chatHeader) chatHeader.hidden = false;
+  if (messages) messages.hidden = false;
+  if (chatComposer) chatComposer.hidden = false;
+  setWorkspaceMenuActive("chat");
+  input.focus();
 }
 
-function setSheetResult(node, message, tone = "neutral") {
-  if (!node) return;
-  node.hidden = false;
-  node.className = "sheet-result " + tone;
-  node.textContent = message;
+function showWorkspaceShell(name, eyebrow, title, subtitle) {
+  if (chatHeader) chatHeader.hidden = true;
+  if (messages) messages.hidden = true;
+  if (chatComposer) chatComposer.hidden = true;
+  if (workspaceView) workspaceView.hidden = false;
+  workspaceEyebrow.textContent = eyebrow;
+  workspaceTitle.textContent = title;
+  workspaceSubtitle.textContent = subtitle;
+  workspaceBody.innerHTML = '<div class="workspace-loading">Загружаю раздел…</div>';
+  setWorkspaceMenuActive(name);
 }
 
-async function loadCloudruProfile() {
-  const data = await api("/api/account/cloudru");
-  const profile = data.cloudru;
-  cloudruApiKey.value = "";
-  cloudruModelId.value = profile.model_id || "";
-  cloudruBaseUrl.value = profile.base_url || "https://foundation-models.api.cloud.ru/v1";
-  cloudruKeyState.textContent = profile.api_key_set
-    ? "Сохранён: " + profile.api_key_masked + " · пустое поле сохранит текущий ключ"
-    : "Ключ ещё не сохранён";
-  cloudruResult.hidden = true;
-  return profile;
+function workspaceResult(message, tone = "neutral") {
+  return '<div class="sheet-result ' + tone + '">' + escapeHtml(message) + '</div>';
 }
 
-async function saveCloudruProfile(event) {
-  event.preventDefault();
-  const key = cloudruApiKey.value.trim();
+async function renderAccountWorkspace() {
+  showWorkspaceShell("account", "Личный кабинет", "Cloud.ru", "Ключи, модель и подключение провайдера.");
   try {
-    const data = await api("/api/account/cloudru", {
-      method: "PUT",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        api_key: key || null,
-        model_id: cloudruModelId.value.trim(),
-        base_url: cloudruBaseUrl.value.trim()
-      })
-    });
-    cloudruApiKey.value = "";
-    cloudruKeyState.textContent = data.cloudru.api_key_set
-      ? "Сохранён: " + data.cloudru.api_key_masked
-      : "Ключ не задан";
-    setSheetResult(
-      cloudruResult,
-      data.cloudru.configured
-        ? "Cloud.ru сохранён и уже используется текущим процессом Miyori."
-        : "Настройки сохранены. Для готовности нужны API-ключ и Model ID.",
-      data.cloudru.configured ? "success" : "warning"
-    );
-    await loadStatus();
-  } catch (error) {
-    setSheetResult(cloudruResult, error.message, "error");
-  }
-}
+    const data = await api("/api/account/cloudru");
+    const p = data.cloudru;
+    workspaceBody.innerHTML =
+      '<section class="workspace-card workspace-card-wide">' +
+        '<div class="workspace-card-head"><div><strong>Cloud.ru Foundation Models</strong>' +
+        '<small>Секрет хранится только локально в .env</small></div>' +
+        '<span class="soft-status ' + (p.configured ? 'ok' : 'warn') + '">' +
+        (p.configured ? 'Настроено' : 'Нужна настройка') + '</span></div>' +
+        '<form id="workspaceCloudForm" class="settings-form workspace-form">' +
+          '<label><span>API-ключ Cloud.ru</span>' +
+          '<input id="workspaceCloudKey" type="password" autocomplete="off" placeholder="Вставьте новый ключ">' +
+          '<small>' + (p.api_key_set ? 'Сохранён: ' + escapeHtml(p.api_key_masked) + ' · пустое поле сохранит текущий ключ' : 'Ключ не сохранён') + '</small></label>' +
+          '<label><span>Model ID</span><input id="workspaceCloudModel" type="text" list="workspaceCloudModels" value="' +
+          escapeHtml(p.model_id || '') + '" placeholder="Точный ID модели Cloud.ru"><datalist id="workspaceCloudModels"></datalist></label>' +
+          '<label><span>Base URL</span><input id="workspaceCloudBase" type="url" value="' +
+          escapeHtml(p.base_url || 'https://foundation-models.api.cloud.ru/v1') + '"></label>' +
+          '<div id="workspaceCloudResult"></div>' +
+          '<div class="sheet-actions"><button id="workspaceCloudTest" class="secondary-sheet-button" type="button">Проверить Cloud.ru</button>' +
+          '<button class="primary-sheet-button" type="submit">Сохранить</button></div>' +
+        '</form>' +
+      '</section>';
 
-async function testCloudruProfile() {
-  const key = cloudruApiKey.value.trim();
-  setSheetResult(cloudruResult, "Проверяю подключение к Cloud.ru…", "working");
-  try {
-    const data = await api("/api/account/cloudru/test", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        api_key: key || null,
-        model_id: cloudruModelId.value.trim() || null,
-        base_url: cloudruBaseUrl.value.trim() || null
-      })
-    });
-    if (cloudruModelOptions) {
-      cloudruModelOptions.innerHTML = "";
-      for (const model of (data.chat_models || [])) {
-        const option = document.createElement("option");
-        option.value = model.id;
-        option.label = model.name || model.id;
-        cloudruModelOptions.appendChild(option);
+    const result = el("workspaceCloudResult");
+    const key = el("workspaceCloudKey");
+    const model = el("workspaceCloudModel");
+    const base = el("workspaceCloudBase");
+    const options = el("workspaceCloudModels");
+
+    el("workspaceCloudTest").onclick = async () => {
+      result.innerHTML = workspaceResult("Проверяю /models и реальный chat/completions…", "working");
+      try {
+        const checked = await api("/api/account/cloudru/test", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            api_key: key.value.trim() || null,
+            model_id: model.value.trim() || null,
+            base_url: base.value.trim() || null
+          })
+        });
+        options.innerHTML = "";
+        for (const item of (checked.chat_models || [])) {
+          const option = document.createElement("option");
+          option.value = item.id;
+          option.label = item.name || item.id;
+          options.appendChild(option);
+        }
+        let message = "Ключ работает. Моделей найдено: " + checked.models_found + ".";
+        if (checked.chat_ok) message += " Chat completions для «" + checked.selected_model + "» работает.";
+        else if (!checked.selected_model) message += " Выберите Model ID из подсказок и повторите проверку.";
+        result.innerHTML = workspaceResult(message, checked.chat_ok ? "success" : "warning");
+      } catch (error) {
+        result.innerHTML = workspaceResult(error.message, "error");
       }
-    }
-    let message = "Cloud.ru отвечает. Доступных моделей: " + data.models_found + ".";
-    if (data.selected_model && data.chat_ok) {
-      message += " Chat completions для «" + data.selected_model + "» работает.";
-    } else if (!data.selected_model) {
-      message += " Выберите Model ID из подсказок и повторите проверку.";
-    }
-    setSheetResult(cloudruResult, message, data.chat_ok || !data.selected_model ? "success" : "warning");
+    };
+
+    el("workspaceCloudForm").onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        const saved = await api("/api/account/cloudru", {
+          method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            api_key: key.value.trim() || null,
+            model_id: model.value.trim(),
+            base_url: base.value.trim()
+          })
+        });
+        result.innerHTML = workspaceResult(
+          saved.cloudru.configured
+            ? "Настройки сохранены и уже используются Miyori."
+            : "Настройки сохранены, но для работы нужны ключ и Model ID.",
+          saved.cloudru.configured ? "success" : "warning"
+        );
+        key.value = "";
+        await loadStatus();
+      } catch (error) {
+        result.innerHTML = workspaceResult(error.message, "error");
+      }
+    };
   } catch (error) {
-    setSheetResult(cloudruResult, error.message, "error");
+    workspaceBody.innerHTML = workspaceResult(error.message, "error");
   }
 }
 
-function shortSha(value) {
-  return value ? String(value).slice(0, 10) : "—";
+async function renderUpdateWorkspace(refresh = false) {
+  showWorkspaceShell("update", "Система", "Обновление проекта", "Проверка GitHub и безопасное обновление локальной Miyori.");
+  workspaceBody.innerHTML =
+    '<section class="workspace-card workspace-card-wide">' +
+      '<div class="repository-card"><strong>Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0</strong>' +
+      '<small>github.com · main · Git fast-forward или Portable ZIP</small></div>' +
+      '<div id="workspaceUpdateStatus" class="workspace-loading">Проверяю состояние…</div>' +
+      '<div class="sheet-actions"><button id="workspaceUpdateCheck" class="secondary-sheet-button" type="button">Проверить GitHub</button>' +
+      '<button id="workspaceUpdateApply" class="primary-sheet-button" type="button">Обновить сейчас</button></div>' +
+    '</section>';
+
+  const container = el("workspaceUpdateStatus");
+  const applyButton = el("workspaceUpdateApply");
+
+  const load = async (doRefresh) => {
+    container.innerHTML = workspaceResult(doRefresh ? "Проверяю GitHub…" : "Загружаю состояние…", "working");
+    try {
+      const data = doRefresh
+        ? await api("/api/update/check", {method: "POST"})
+        : await api("/api/update/status");
+      const u = data.update;
+      const mode = u.install_mode === "portable" ? "Portable ZIP" : "Git";
+      const worktree = u.install_mode === "portable"
+        ? "Portable установка"
+        : (!u.clean ? "Есть локальные изменения" : "Чистая");
+      let tone = "neutral";
+      let note = "Нажмите «Проверить GitHub».";
+      if (u.last_error) { tone = "error"; note = u.last_error; }
+      else if (u.restart_required) { tone = "warning"; note = "Обновление применено. Перезапустите Miyori."; }
+      else if (u.update_available) { tone = "warning"; note = "На GitHub доступна более новая версия."; }
+      else if (u.remote_sha) { tone = "success"; note = "Локальная версия синхронизирована с GitHub."; }
+
+      container.innerHTML =
+        '<div class="update-status-grid">' +
+          '<div><span>Режим</span><strong>' + escapeHtml(mode) + '</strong></div>' +
+          '<div><span>Локальная версия</span><strong>' + escapeHtml(shortSha(u.local_sha)) + '</strong></div>' +
+          '<div><span>GitHub версия</span><strong>' + escapeHtml(shortSha(u.remote_sha)) + '</strong></div>' +
+          '<div><span>Рабочая копия</span><strong>' + escapeHtml(worktree) + '</strong></div>' +
+          '<div><span>Автообновление</span><strong>' + (u.auto_update ? 'Включено' : 'Выключено') + '</strong></div>' +
+          '<div><span>Проверка</span><strong>' + escapeHtml(u.last_checked_at || '—') + '</strong></div>' +
+        '</div>' + workspaceResult(note, tone) +
+        (u.backup_path ? '<div class="sheet-note">Резервная копия: <code>' + escapeHtml(u.backup_path) + '</code></div>' : '');
+
+      applyButton.disabled = !u.update_available || !!u.last_error ||
+        (u.install_mode !== "portable" && (!u.clean || !u.origin_ok || u.current_branch !== u.branch || u.ahead > 0));
+    } catch (error) {
+      container.innerHTML = workspaceResult(error.message, "error");
+      applyButton.disabled = true;
+    }
+  };
+
+  el("workspaceUpdateCheck").onclick = () => load(true);
+  applyButton.onclick = async () => {
+    container.innerHTML = workspaceResult("Скачиваю и применяю безопасное обновление…", "working");
+    try {
+      const data = await api("/api/update/apply", {method: "POST"});
+      const u = data.update;
+      container.innerHTML = workspaceResult(
+        u.updated
+          ? "Обновление применено до " + shortSha(u.to_sha) + ". Перезапустите Miyori."
+          : (u.message || "Обновление не требуется."),
+        u.updated ? "success" : "neutral"
+      ) + (u.backup_path ? '<div class="sheet-note">Резервная копия: <code>' + escapeHtml(u.backup_path) + '</code></div>' : '');
+      applyButton.disabled = true;
+    } catch (error) {
+      container.innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  await load(refresh);
 }
 
-function renderUpdateStatus(status) {
-  el("updateLocalSha").textContent = shortSha(status.local_sha);
-  el("updateRemoteSha").textContent = shortSha(status.remote_sha);
-  el("updateWorktree").textContent = !status.git_available
-    ? "Git недоступен"
-    : !status.is_git_checkout
-      ? "Не git checkout"
-      : status.clean
-        ? "Чистая"
-        : "Есть изменения";
-  el("updateAutoState").textContent = status.auto_update
-    ? "Вкл. · каждые " + status.interval_minutes + " мин."
-    : "Выключено";
-
-  if (status.last_error) {
-    setSheetResult(updateResult, status.last_error, "error");
-  } else if (status.restart_required) {
-    setSheetResult(updateResult, "Обновление уже применено. Перезапустите Miyori.", "warning");
-  } else if (status.update_available) {
-    setSheetResult(
-      updateResult,
-      "Доступно обновление: +" + status.behind + " коммит(ов) из origin/" + status.branch + ".",
-      "warning"
+async function renderDocumentsWorkspace() {
+  showWorkspaceShell("documents", "Данные Miyori", "Документы / Облако / Miyori", "Файлы проекта, локальное хранилище и связь с Cloud.ru.");
+  workspaceBody.innerHTML =
+    '<div class="workspace-grid">' +
+      '<section class="workspace-card"><strong>Документы</strong><small>Материалы текущего проекта</small><div id="workspaceDocs">Загружаю…</div></section>' +
+      '<section class="workspace-card"><strong>Облако</strong><small>Cloud.ru используется как AI-провайдер</small><div id="workspaceCloudState">Загружаю…</div></section>' +
+      '<section class="workspace-card"><strong>Miyori</strong><small>Локальная память и RAG</small><div id="workspaceMiyoriState">Загружаю…</div></section>' +
+    '</div>';
+  try {
+    const [docs, status] = await Promise.all([
+      api("/api/projects/" + state.projectId + "/documents"),
+      api("/api/status")
+    ]);
+    el("workspaceDocs").innerHTML = docs.documents.length
+      ? docs.documents.map(d => '<div class="workspace-list-row"><strong>' + escapeHtml(d.filename) + '</strong><small>' + d.size_bytes + ' байт</small></div>').join("")
+      : '<div class="workspace-empty">Документов пока нет.</div>';
+    el("workspaceCloudState").innerHTML = workspaceResult(
+      status.provider_configured ? "Cloud.ru подключён · " + (status.model_id || "") : "Cloud.ru не настроен",
+      status.provider_configured ? "success" : "warning"
     );
-  } else if (status.local_sha && status.remote_sha) {
-    setSheetResult(updateResult, "Локальный проект синхронизирован с GitHub.", "success");
-  } else {
-    setSheetResult(updateResult, "Статус GitHub ещё не проверен.", "neutral");
-  }
-
-  const applyButton = el("applyProjectUpdate");
-  if (applyButton) {
-    applyButton.disabled =
-      !status.update_available ||
-      !status.clean ||
-      !status.origin_ok ||
-      status.current_branch !== status.branch ||
-      status.ahead > 0;
-  }
-}
-
-async function loadProjectUpdateStatus(refresh = false) {
-  setSheetResult(updateResult, refresh ? "Проверяю GitHub…" : "Загружаю состояние…", "working");
-  try {
-    const data = refresh
-      ? await api("/api/update/check", {method: "POST"})
-      : await api("/api/update/status");
-    renderUpdateStatus(data.update);
-    return data.update;
-  } catch (error) {
-    setSheetResult(updateResult, error.message, "error");
-    return null;
-  }
-}
-
-async function applyProjectUpdateNow() {
-  setSheetResult(updateResult, "Применяю безопасное fast-forward обновление…", "working");
-  try {
-    const data = await api("/api/update/apply", {method: "POST"});
-    renderUpdateStatus(data.update);
-    if (data.update.updated) {
-      setSheetResult(
-        updateResult,
-        "Проект обновлён до " + shortSha(data.update.to_sha) +
-        ". Перезапустите Miyori, чтобы запустить новый код.",
-        "success"
-      );
-    }
-  } catch (error) {
-    setSheetResult(updateResult, error.message, "error");
-  }
-}
-
-if (menuMobileApp) {
-  menuMobileApp.addEventListener("click", () => {
-    openSidebarSection(
-      "Мобильное приложение",
-      "Раздел подготовлен в навигации. Здесь позже появятся подключение устройства, QR-привязка, push-уведомления и мобильный клиент Miyori.",
+    el("workspaceMiyoriState").innerHTML = workspaceResult(
+      "RAG: " + (status.rag?.fts5 ? "Hybrid FTS5" : "Lexical fallback") +
+      " · chunks " + (status.rag?.indexed_chunks || 0),
       "neutral"
     );
-  });
+  } catch (error) {
+    workspaceBody.innerHTML = workspaceResult(error.message, "error");
+  }
 }
 
-if (menuAccount) {
-  menuAccount.addEventListener("click", async () => {
-    openSheet(accountOverlay);
-    try {
-      await loadCloudruProfile();
-    } catch (error) {
-      setSheetResult(cloudruResult, error.message, "error");
-    }
-  });
+async function renderProjectsWorkspace(kind) {
+  const isWork = kind === "work";
+  showWorkspaceShell(
+    kind,
+    "Проекты",
+    isWork ? "Рабочие проекты" : "Домашние проекты",
+    isWork ? "Рабочие пространства Miyori без чата." : "Личные и домашние пространства Miyori без чата."
+  );
+  try {
+    const data = await api("/api/projects");
+    workspaceBody.innerHTML =
+      '<section class="workspace-card workspace-card-wide"><div class="workspace-project-grid">' +
+      data.projects.map(project =>
+        '<button class="workspace-project-card" type="button" data-project-id="' + project.id + '">' +
+          '<span class="workspace-project-icon">' + (isWork ? '▰' : '⌂') + '</span>' +
+          '<strong>' + escapeHtml(project.name) + '</strong><small>Проект #' + project.id + '</small>' +
+        '</button>'
+      ).join("") +
+      '</div><div class="sheet-note">Сейчас проекты ещё не имеют постоянной категории «рабочий/домашний», поэтому список общий. Экран и навигация уже разделены.</div></section>';
+    workspaceBody.querySelectorAll("[data-project-id]").forEach(button => {
+      button.onclick = async () => {
+        state.projectId = Number(button.dataset.projectId);
+        projectSelect.value = String(state.projectId);
+        updateProjectLabel();
+        showChatWorkspace();
+        startNewChat();
+        await Promise.all([loadConversations(), loadMemory(), loadDocuments(), loadNexus()]);
+      };
+    });
+  } catch (error) {
+    workspaceBody.innerHTML = workspaceResult(error.message, "error");
+  }
 }
 
-if (menuSettings) {
-  menuSettings.addEventListener("click", () => {
-    openConsole("system");
-  });
+async function renderSettingsWorkspace() {
+  showWorkspaceShell("settings", "Система", "Настройки", "Настройки Miyori и состояние локальных модулей.");
+  try {
+    const status = await api("/api/status");
+    workspaceBody.innerHTML =
+      '<div class="workspace-grid">' +
+        '<section class="workspace-card"><strong>Cloud.ru</strong><small>AI-провайдер</small>' +
+        workspaceResult(status.provider_configured ? "Подключён · " + (status.model_id || "") : "Не настроен", status.provider_configured ? "success" : "warning") + '</section>' +
+        '<section class="workspace-card"><strong>RAG</strong><small>Поиск контекста</small>' +
+        workspaceResult((status.rag?.fts5 ? "FTS5 + lexical" : "Lexical fallback") + " · chunks " + (status.rag?.indexed_chunks || 0), "neutral") + '</section>' +
+        '<section class="workspace-card"><strong>Личность</strong><small>Persona Pack</small>' +
+        workspaceResult("v" + (status.persona?.version || "—") + " · активна", "success") + '</section>' +
+      '</div>';
+  } catch (error) {
+    workspaceBody.innerHTML = workspaceResult(error.message, "error");
+  }
 }
 
-if (menuProjectUpdate) {
-  menuProjectUpdate.addEventListener("click", async () => {
-    openSheet(updateOverlay);
-    await loadProjectUpdateStatus(false);
-  });
+function renderMobileWorkspace() {
+  showWorkspaceShell("mobile", "Клиенты", "Мобильное приложение", "Отдельная рабочая область будущего iOS / Android клиента.");
+  workspaceBody.innerHTML =
+    '<div class="workspace-grid">' +
+      '<section class="workspace-card workspace-card-wide"><div class="workspace-hero-icon">▣</div>' +
+      '<strong>Мобильная Miyori</strong><p>Этот раздел вынесен из чата. Здесь будут привязка устройства, QR-код, push-уведомления и синхронизация мобильного клиента.</p>' +
+      workspaceResult("Мобильный клиент ещё не реализован.", "neutral") + '</section>' +
+    '</div>';
 }
 
-if (cloudruForm) cloudruForm.addEventListener("submit", saveCloudruProfile);
-if (el("testCloudru")) el("testCloudru").addEventListener("click", testCloudruProfile);
-if (el("checkProjectUpdate")) el("checkProjectUpdate").addEventListener("click", () => loadProjectUpdateStatus(true));
-if (el("applyProjectUpdate")) el("applyProjectUpdate").addEventListener("click", applyProjectUpdateNow);
-if (el("closeAccountPanel")) el("closeAccountPanel").addEventListener("click", () => closeSheet(accountOverlay));
-if (el("closeUpdatePanel")) el("closeUpdatePanel").addEventListener("click", () => closeSheet(updateOverlay));
-
-for (const overlay of [accountOverlay, updateOverlay]) {
-  if (!overlay) continue;
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) closeSheet(overlay);
-  });
-}
+if (menuChat) menuChat.onclick = showChatWorkspace;
+if (el("workspaceBackToChat")) el("workspaceBackToChat").onclick = showChatWorkspace;
+if (menuAccount) menuAccount.onclick = renderAccountWorkspace;
+if (menuProjectUpdate) menuProjectUpdate.onclick = () => renderUpdateWorkspace(false);
+if (menuSettings) menuSettings.onclick = renderSettingsWorkspace;
+if (menuMobileApp) menuMobileApp.onclick = renderMobileWorkspace;
+if (menuDocumentsHub) menuDocumentsHub.onclick = renderDocumentsWorkspace;
+if (menuWorkProjects) menuWorkProjects.onclick = () => renderProjectsWorkspace("work");
+if (menuHomeProjects) menuHomeProjects.onclick = () => renderProjectsWorkspace("home");
 
 async function boot() {
   showWelcome();
+  showChatWorkspace();
   await loadStatus();
   try { await loadProjects(); } catch (error) { showError(error.message); }
   input.focus();
@@ -1650,5 +1733,3 @@ if (toggleConsole) {
     input.focus();
   });
 }
-
-
