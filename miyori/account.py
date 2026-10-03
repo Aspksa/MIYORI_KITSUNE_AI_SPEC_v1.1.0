@@ -120,17 +120,59 @@ async def test_cloudru(
 
     data = response.json()
     ids: list[str] = []
+    chat_models: list[dict] = []
     if isinstance(data, dict):
         raw = data.get("data")
         if isinstance(raw, list):
             for item in raw:
-                if isinstance(item, dict) and item.get("id"):
-                    ids.append(str(item["id"]))
+                if not isinstance(item, dict) or not item.get("id"):
+                    continue
+                model_id = str(item["id"])
+                ids.append(model_id)
+                metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+                model_type = str(metadata.get("type") or "").lower()
+                if not model_type or "llm" in model_type or "chat" in model_type or "text" in model_type:
+                    chat_models.append({
+                        "id": model_id,
+                        "name": metadata.get("name") or model_id,
+                        "type": metadata.get("type"),
+                    })
+
+    selected_found = bool(model and model in ids) if ids else None
+    if model and selected_found is False:
+        raise ValueError(
+            f"Model ID «{model}» не найден в /models. Выберите точный ID из списка Cloud.ru."
+        )
+
+    chat_ok = None
+    if model:
+        chat_url = f"{base}/chat/completions"
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "Ответь одним словом: OK"}],
+            "max_completion_tokens": 8,
+            "temperature": 0,
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            chat_response = await client.post(
+                chat_url,
+                headers={**headers, "Content-Type": "application/json"},
+                json=payload,
+            )
+        if chat_response.is_error:
+            detail = chat_response.text[:700]
+            raise RuntimeError(
+                f"Ключ работает, но chat/completions для модели «{model}» вернул "
+                f"HTTP {chat_response.status_code}: {detail or 'без текста ошибки'}"
+            )
+        chat_ok = True
 
     return {
         "ok": True,
         "models_found": len(ids),
         "selected_model": model or None,
-        "selected_model_found": bool(model and model in ids) if ids else None,
-        "sample_models": ids[:8],
+        "selected_model_found": selected_found,
+        "chat_ok": chat_ok,
+        "chat_models": chat_models[:80],
+        "sample_models": ids[:12],
     }
