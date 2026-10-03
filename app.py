@@ -92,7 +92,7 @@ class ToolExecuteRequest(BaseModel):
 
 
 class TaskCreateRequest(BaseModel):
-    task_type: str = Field(pattern="^(self_check|memory_consolidation)$")
+    task_type: str = Field(pattern="^(self_check|memory_consolidation|epistemic_review)$")
     payload: dict = Field(default_factory=dict)
 
 
