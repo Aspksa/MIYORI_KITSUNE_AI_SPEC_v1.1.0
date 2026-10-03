@@ -2839,3 +2839,88 @@ body.sheet-open { overflow: hidden; }
 .settings-form select:disabled {
   opacity: .65;
 }
+
+
+/* 00.00.24 — clean chat and centered system status */
+.system-status-launcher {
+  display: grid;
+  grid-template-columns: 32px minmax(0,1fr) 18px;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 10px 11px;
+  border: 1px solid #e5def2;
+  border-radius: 16px;
+  background: rgba(255,255,255,.82);
+  color: #4b405f;
+  text-align: left;
+  box-shadow: 0 10px 26px rgba(92,73,150,.05);
+}
+.system-status-launcher:hover {
+  border-color: #d7caf3;
+  background: #f7f3ff;
+}
+.system-status-launcher-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: #eef8f2;
+  color: #37a261;
+}
+.system-status-launcher strong {
+  display: block;
+  font-size: 10px;
+}
+.system-status-launcher small {
+  display: block;
+  margin-top: 2px;
+  color: #9b93aa;
+  font-size: 8px;
+}
+.system-status-sheet {
+  width: min(620px, 100%);
+}
+.system-status-modal-list {
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+.system-status-modal-list .system-status-row {
+  border: 1px solid #ece6f5;
+}
+.chat-header {
+  min-height: 64px;
+}
+.chat-title h2 {
+  font-size: 17px;
+  letter-spacing: .01em;
+}
+.messages {
+  padding-top: 36px;
+  padding-bottom: 110px;
+}
+.message {
+  margin-bottom: 18px;
+}
+.bubble {
+  max-width: min(760px, 86%);
+  border-radius: 18px;
+}
+.welcome-bubble.clean-welcome {
+  padding: 16px 18px;
+}
+.intent-message,
+.message.activity,
+.response-context {
+  display: none !important;
+}
+#miyoriConsole[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 700px) {
+  .system-status-modal-list {
+    grid-template-columns: 1fr;
+  }
+}
