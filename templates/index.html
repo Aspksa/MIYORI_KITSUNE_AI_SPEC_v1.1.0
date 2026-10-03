@@ -52,6 +52,42 @@
       </div>
 
       <div class="panel">
+        <div class="panel-header">
+          <span class="eyebrow">Мозг</span>
+          <span id="brainState" class="mini-status">ready</span>
+        </div>
+        <div id="brainPlan" class="brain-plan muted">План появится после запроса.</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="eyebrow">Руки / инструменты</span>
+          <button id="refreshTools" class="text-button" type="button">Обновить</button>
+        </div>
+        <div id="toolList" class="tool-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="eyebrow">Фоновые задачи</span>
+          <button id="refreshTasks" class="text-button" type="button">Обновить</button>
+        </div>
+        <div class="task-actions">
+          <button id="runSelfCheckTask" class="mini-button" type="button">Самопроверка</button>
+          <button id="runMemoryTask" class="mini-button" type="button">Память</button>
+        </div>
+        <div id="taskList" class="task-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="eyebrow">Развитие</span>
+          <button id="runDevelopmentCheck" class="text-button" type="button">Проверить</button>
+        </div>
+        <div id="developmentStats" class="development-stats muted">Нет данных.</div>
+      </div>
+
+      <div class="panel">
         <span class="eyebrow">Состояние</span>
         <div class="status-line">
           <span id="statusDot" class="dot"></span>
@@ -62,7 +98,7 @@
 
       <div class="panel compact">
         <span class="eyebrow">Версия</span>
-        <strong id="versionText">00.00.05</strong>
+        <strong id="versionText">00.00.06</strong>
       </div>
 
       <div class="sidebar-note">
