@@ -337,6 +337,31 @@ def save_original(
     return _data_relative(target)
 
 
+def move_active_document(
+    project_id: int,
+    stored_path: str,
+    filename: str,
+    folder_parts: list[str] | tuple[str, ...] | None = None,
+) -> str:
+    """Move an active original inside the same project Drive tree."""
+    source = resolve_data_path(stored_path)
+    if not source.exists() or not source.is_file():
+        raise ValueError("Оригинал документа не найден на диске.")
+
+    active_root = project_document_dir(project_id).resolve()
+    resolved_source = source.resolve()
+    if resolved_source != active_root and active_root not in resolved_source.parents:
+        raise ValueError("Документ находится вне активного хранилища проекта.")
+
+    directory = ensure_drive_folder(project_id, folder_parts)
+    if source.parent.resolve() == directory.resolve():
+        return _data_relative(source)
+
+    target = _unique_file_target(directory, filename)
+    shutil.move(str(source), str(target))
+    return _data_relative(target)
+
+
 def move_document_to_trash(
     project_id: int,
     stored_path: str,

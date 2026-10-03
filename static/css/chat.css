@@ -1081,3 +1081,41 @@ textarea::placeholder { color: #aaa2ba; }
     height: 76vh;
   }
 }
+
+
+/* 00.00.37 — answer sources */
+.message-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 11px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(118, 91, 171, .12);
+}
+.message-sources-label {
+  margin-right: 2px;
+  color: #968ca4;
+  font-size: 8px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.message-source-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 27px;
+  padding: 4px 8px;
+  border: 1px solid #ddd3ee;
+  border-radius: 9px;
+  background: #faf7ff;
+  color: #654ca5;
+  font-size: 8px;
+  font-weight: 700;
+  text-decoration: none;
+}
+a.message-source-chip:hover {
+  border-color: #c8b6e8;
+  background: #f2ecff;
+}

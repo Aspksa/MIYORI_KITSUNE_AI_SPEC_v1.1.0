@@ -22,7 +22,9 @@ async function openConversation(id, title) {
   state.conversationId = id;
   messages.innerHTML = "";
   for (const item of data.messages) {
-    if (item.role === "user" || item.role === "assistant") addMessage(item.role, item.content);
+    if (item.role === "user" || item.role === "assistant") {
+      addMessage(item.role, item.content, item.metadata?.sources || []);
+    }
   }
   conversationTitle.textContent = "Miyori Kitsune";
   await loadConversations();
@@ -97,7 +99,8 @@ async function loadMemory() {
       card.innerHTML =
         '<div class="memory-statement">' + escapeHtml(fact.statement) + '</div>' +
         '<div class="memory-meta"><span>#' + fact.id + '</span><span>' + escapeHtml(fact.status) + '</span>' +
-        '<span>' + escapeHtml(fact.source_kind || "source") + '</span></div>' +
+        '<span>' + escapeHtml(fact.memory_scope || "project") + '</span>' +
+        '<span>' + escapeHtml(fact.memory_kind || "fact") + '</span></div>' +
         conflictNote;
       memoryActions(fact, card);
       memoryList.appendChild(card);
@@ -113,7 +116,7 @@ function startNewChat() {
   showWelcome();
   brainPlan.innerHTML = '<span class="empty-copy">План появится после запроса.</span>';
   agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
-  agentBudget.textContent = "0/3";
+  agentBudget.textContent = "0/5";
   Promise.all([loadConversations(), loadTools(), loadNexus()]);
   input.focus();
 }
@@ -148,7 +151,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     state.conversationId = data.conversation_id;
-    addMessage("assistant", data.answer);
+    addMessage("assistant", data.answer, data.sources || []);
 
     // Технические данные обновляются внутри системы, но не добавляются в пользовательский чат.
     if (data.brain) {
@@ -169,6 +172,18 @@ form.addEventListener("submit", async (event) => {
             '</strong><span>' + escapeHtml(action.reason) + '</span><small>' +
             escapeHtml(action.status) + '</small></div>';
         }).join("");
+      }
+
+      for (const req of (data.agent.pending_permissions || [])) {
+        addActivityCard(
+          "Нужно подтверждение · " + toolLabel(req.tool_name),
+          permissionPreview(req),
+          "warning",
+          [
+            {label: "Разрешить", primary: true, onClick: async () => decidePermission(req.id, true, true)},
+            {label: "Отклонить", onClick: async () => decidePermission(req.id, false, true)}
+          ]
+        );
       }
     }
 

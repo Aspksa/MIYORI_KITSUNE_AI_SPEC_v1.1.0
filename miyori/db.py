@@ -176,6 +176,7 @@ def init_db() -> None:
                 conversation_id INTEGER NOT NULL,
                 role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
                 content TEXT NOT NULL,
+                metadata_json TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(conversation_id) REFERENCES conversations(id)
             );
@@ -201,6 +202,11 @@ def init_db() -> None:
                 source_id INTEGER,
                 confidence REAL,
                 verification_method TEXT,
+                memory_scope TEXT NOT NULL DEFAULT 'project'
+                    CHECK(memory_scope IN ('user','project')),
+                memory_kind TEXT NOT NULL DEFAULT 'fact'
+                    CHECK(memory_kind IN ('fact','preference','process','constraint')),
+                salience REAL NOT NULL DEFAULT 0.5,
                 observed_at TEXT NOT NULL,
                 valid_from TEXT,
                 valid_until TEXT,
@@ -348,6 +354,30 @@ def init_db() -> None:
         }
         if "kind" not in project_columns:
             conn.execute("ALTER TABLE projects ADD COLUMN kind TEXT NOT NULL DEFAULT 'home'")
+
+        message_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(messages)").fetchall()
+        }
+        if "metadata_json" not in message_columns:
+            conn.execute("ALTER TABLE messages ADD COLUMN metadata_json TEXT")
+
+        memory_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(memory_facts)").fetchall()
+        }
+        if "memory_scope" not in memory_columns:
+            conn.execute(
+                "ALTER TABLE memory_facts ADD COLUMN memory_scope TEXT NOT NULL DEFAULT 'project'"
+            )
+        if "memory_kind" not in memory_columns:
+            conn.execute(
+                "ALTER TABLE memory_facts ADD COLUMN memory_kind TEXT NOT NULL DEFAULT 'fact'"
+            )
+        if "salience" not in memory_columns:
+            conn.execute(
+                "ALTER TABLE memory_facts ADD COLUMN salience REAL NOT NULL DEFAULT 0.5"
+            )
 
         document_columns = {
             row["name"]
@@ -1246,14 +1276,26 @@ def conversation_messages(conversation_id: int, project_id: int) -> list[dict]:
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT id, role, content, created_at
+            SELECT id, role, content, metadata_json, created_at
             FROM messages
             WHERE conversation_id = ?
             ORDER BY id ASC
             """,
             (conversation_id,),
         ).fetchall()
-    return [dict(row) for row in rows]
+    result = []
+    for row in rows:
+        item = dict(row)
+        raw_metadata = item.pop("metadata_json", None)
+        if raw_metadata:
+            try:
+                item["metadata"] = json.loads(raw_metadata)
+            except json.JSONDecodeError:
+                item["metadata"] = {}
+        else:
+            item["metadata"] = {}
+        result.append(item)
+    return result
 
 
 def ensure_conversation(conversation_id: int | None, project_id: int) -> int:
@@ -1271,11 +1313,25 @@ def ensure_conversation(conversation_id: int | None, project_id: int) -> int:
         return int(cur.lastrowid)
 
 
-def add_message(conversation_id: int, role: str, content: str) -> int:
+def add_message(
+    conversation_id: int,
+    role: str,
+    content: str,
+    metadata: dict | None = None,
+) -> int:
     with connect() as conn:
         cur = conn.execute(
-            "INSERT INTO messages(conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)",
-            (conversation_id, role, content, utc_now()),
+            """
+            INSERT INTO messages(conversation_id, role, content, metadata_json, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                conversation_id,
+                role,
+                content,
+                json.dumps(metadata or {}, ensure_ascii=False),
+                utc_now(),
+            ),
         )
         message_id = int(cur.lastrowid)
 
@@ -1305,17 +1361,26 @@ def add_memory_fact(
     message_id: int | None = None,
     confidence: float | None = None,
     verification_method: str | None = None,
+    memory_scope: str = "project",
+    memory_kind: str = "fact",
+    salience: float = 0.5,
 ) -> dict:
     clean = statement.strip()
     if not clean:
         raise ValueError("Факт пустой.")
     if status not in {"candidate", "verified", "disputed", "superseded"}:
         raise ValueError("Недопустимый статус памяти.")
+    if memory_scope not in {"user", "project"}:
+        raise ValueError("Недопустимый scope памяти.")
+    if memory_kind not in {"fact", "preference", "process", "constraint"}:
+        raise ValueError("Недопустимый тип памяти.")
+    salience = max(0.0, min(1.0, float(salience)))
 
     with connect() as conn:
         duplicate = conn.execute(
             """
-            SELECT id, statement, status, confidence, verification_method, observed_at
+            SELECT id, statement, status, confidence, verification_method,
+                   memory_scope, memory_kind, salience, observed_at
             FROM memory_facts
             WHERE project_id = ? AND lower(statement) = lower(?) AND status != 'superseded'
             ORDER BY id DESC LIMIT 1
@@ -1338,17 +1403,18 @@ def add_memory_fact(
             """
             INSERT INTO memory_facts(
                 project_id, statement, status, source_id, confidence,
-                verification_method, observed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                verification_method, memory_scope, memory_kind, salience, observed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 project_id, clean, status, source_id, confidence,
-                verification_method, utc_now(),
+                verification_method, memory_scope, memory_kind, salience, utc_now(),
             ),
         )
         row = conn.execute(
             """
-            SELECT id, statement, status, confidence, verification_method, observed_at
+            SELECT id, statement, status, confidence, verification_method,
+                   memory_scope, memory_kind, salience, observed_at
             FROM memory_facts WHERE id = ?
             """,
             (fact_cur.lastrowid,),
@@ -1361,7 +1427,8 @@ def list_memory_facts(project_id: int) -> list[dict]:
         rows = conn.execute(
             """
             SELECT
-                f.id, f.statement, f.status, f.confidence, f.verification_method,
+                f.id, f.project_id, f.statement, f.status, f.confidence, f.verification_method,
+                f.memory_scope, f.memory_kind, f.salience,
                 f.observed_at, s.kind AS source_kind, s.conversation_id, s.message_id
             FROM memory_facts f
             LEFT JOIN memory_sources s ON s.id = f.source_id
@@ -1419,7 +1486,8 @@ def update_memory_status(project_id: int, fact_id: int, status: str) -> dict | N
         )
         row = conn.execute(
             """
-            SELECT id, statement, status, confidence, verification_method, observed_at
+            SELECT id, statement, status, confidence, verification_method,
+                   memory_scope, memory_kind, salience, observed_at
             FROM memory_facts WHERE id = ? AND project_id = ?
             """,
             (fact_id, project_id),
@@ -1440,41 +1508,96 @@ def _memory_tokens(text: str) -> set[str]:
     }
 
 
-def search_verified_memory(project_id: int, query: str, limit: int = 8) -> list[dict]:
+def search_verified_memory(
+    project_id: int,
+    query: str,
+    limit: int = 8,
+    *,
+    include_user: bool = True,
+    include_project: bool = True,
+) -> list[dict]:
     query_tokens = _memory_tokens(query)
+    visibility: list[str] = []
+    params: list[object] = []
+
+    if include_user:
+        visibility.append("f.memory_scope = 'user'")
+    if include_project:
+        visibility.append("(f.memory_scope = 'project' AND f.project_id = ?)")
+        params.append(project_id)
+    if not visibility:
+        return []
+
     with connect() as conn:
         rows = conn.execute(
-            """
-            SELECT id, statement, observed_at
-            FROM memory_facts
-            WHERE project_id = ? AND status = 'verified'
-            ORDER BY id DESC
-            LIMIT 200
+            f"""
+            SELECT f.id, f.project_id, f.statement, f.observed_at,
+                   f.memory_scope, f.memory_kind, f.salience,
+                   f.confidence, f.verification_method
+            FROM memory_facts f
+            WHERE f.status = 'verified'
+              AND ({' OR '.join(visibility)})
+            ORDER BY f.id DESC
+            LIMIT 300
             """,
-            (project_id,),
+            params,
         ).fetchall()
 
-    scored = []
+    scored: list[tuple[float, dict]] = []
+    seen_statements: set[str] = set()
     for recency, row in enumerate(rows):
-        statement_tokens = _memory_tokens(row["statement"])
+        item = dict(row)
+        normalized = " ".join(item["statement"].lower().split())
+        if normalized in seen_statements:
+            continue
+        seen_statements.add(normalized)
+
+        statement_tokens = _memory_tokens(item["statement"])
         overlap = len(query_tokens & statement_tokens)
-        exact_bonus = 3 if query.strip().lower() in row["statement"].lower() else 0
-        score = overlap * 10 + exact_bonus - min(recency, 50) * 0.02
+        exact_bonus = 3 if query.strip().lower() in item["statement"].lower() else 0
+        scope_bonus = 0.7 if item["memory_scope"] == "project" else 0.4
+        kind_bonus = 0.6 if item["memory_kind"] == "preference" else 0.0
+        score = (
+            overlap * 10
+            + exact_bonus
+            + scope_bonus
+            + kind_bonus
+            + float(item.get("salience") or 0.5)
+            - min(recency, 80) * 0.015
+        )
         if overlap or exact_bonus:
-            scored.append((score, dict(row)))
+            scored.append((score, item))
 
     if not scored:
-        return [dict(row) for row in rows[: min(limit, 3)]]
+        # No semantic match: only return a tiny amount of high-salience user
+        # preference memory. Never flood the prompt with unrelated project facts.
+        fallback = [
+            dict(row) for row in rows
+            if row["memory_scope"] == "user"
+            and row["memory_kind"] == "preference"
+            and float(row["salience"] or 0) >= 0.7
+        ]
+        return fallback[: min(limit, 2)]
 
     scored.sort(key=lambda item: item[0], reverse=True)
     return [row for _, row in scored[:limit]]
 
 
-def verified_memory_context(project_id: int, query: str, limit: int = 8) -> list[str]:
-    return [
-        row["statement"]
-        for row in search_verified_memory(project_id, query, limit=limit)
-    ]
+def verified_memory_context(
+    project_id: int,
+    query: str,
+    limit: int = 8,
+    *,
+    include_user: bool = True,
+    include_project: bool = True,
+) -> list[dict]:
+    return search_verified_memory(
+        project_id,
+        query,
+        limit=limit,
+        include_user=include_user,
+        include_project=include_project,
+    )
 
 
 def replace_memory_fact(
@@ -1490,7 +1613,7 @@ def replace_memory_fact(
     with connect() as conn:
         old = conn.execute(
             """
-            SELECT id, status FROM memory_facts
+            SELECT id, status, memory_scope, memory_kind, salience FROM memory_facts
             WHERE id = ? AND project_id = ?
             """,
             (fact_id, project_id),
@@ -1521,14 +1644,20 @@ def replace_memory_fact(
             """
             INSERT INTO memory_facts(
                 project_id, statement, status, source_id,
-                verification_method, observed_at, valid_from, supersedes_fact_id
-            ) VALUES (?, ?, 'verified', ?, 'user_correction', ?, ?, ?)
+                verification_method, memory_scope, memory_kind, salience,
+                observed_at, valid_from, supersedes_fact_id
+            ) VALUES (?, ?, 'verified', ?, 'user_correction', ?, ?, ?, ?, ?, ?)
             """,
-            (project_id, clean, source_id, now, now, fact_id),
+            (
+                project_id, clean, source_id,
+                old["memory_scope"], old["memory_kind"], old["salience"],
+                now, now, fact_id,
+            ),
         )
         row = conn.execute(
             """
             SELECT id, statement, status, confidence, verification_method,
+                   memory_scope, memory_kind, salience,
                    observed_at, valid_from, valid_until, supersedes_fact_id
             FROM memory_facts WHERE id = ?
             """,
@@ -1543,6 +1672,7 @@ def maybe_capture_user_memory(
     message_id: int,
     content: str,
 ) -> dict | None:
+    """Capture only explicit/stable memory; ordinary chat is not long-term memory."""
     text = content.strip()
     lowered = text.lower()
     triggers = (
@@ -1554,11 +1684,13 @@ def maybe_capture_user_memory(
         "мой любимый ",
         "моя любимая ",
         "для этого проекта ",
+        "в этом проекте ",
     )
     if not lowered.startswith(triggers):
         return None
 
     statement = text
+    explicit_remember = lowered.startswith(("запомни ", "запомни:"))
     if lowered.startswith("запомни:"):
         statement = text.split(":", 1)[1].strip()
     elif lowered.startswith("запомни "):
@@ -1567,15 +1699,44 @@ def maybe_capture_user_memory(
     if not statement:
         return None
 
+    preference_markers = (
+        "я предпочитаю", "мне нравится", "мне не нравится",
+        "мой любимый", "моя любимая",
+    )
+    project_markers = ("для этого проекта", "в этом проекте")
+
+    memory_scope = (
+        "project"
+        if lowered.startswith(project_markers)
+        else "user"
+        if lowered.startswith(preference_markers) or explicit_remember
+        else "project"
+    )
+    memory_kind = (
+        "preference"
+        if lowered.startswith(preference_markers)
+        else "constraint"
+        if any(marker in lowered for marker in ("всегда ", "никогда ", "обязательно "))
+        else "process"
+        if any(marker in lowered for marker in ("процесс", "порядок работы", "сначала "))
+        else "fact"
+    )
+
+    user_authoritative = memory_scope == "user" and (
+        memory_kind == "preference" or explicit_remember
+    )
     return add_memory_fact(
         project_id=project_id,
         statement=statement,
-        status="candidate",
+        status="verified" if user_authoritative else "candidate",
         source_kind="user_message",
         conversation_id=conversation_id,
         message_id=message_id,
-        confidence=None,
-        verification_method=None,
+        confidence=1.0 if user_authoritative else None,
+        verification_method="direct_user" if user_authoritative else None,
+        memory_scope=memory_scope,
+        memory_kind=memory_kind,
+        salience=0.9 if explicit_remember else 0.75 if memory_kind == "preference" else 0.6,
     )
 
 
@@ -2143,6 +2304,69 @@ def restore_document_folder_record(
             FROM document_folders WHERE id = ?
             """,
             (folder_id,),
+        ).fetchone()
+    return dict(row)
+
+
+def get_document_chunks(
+    project_id: int,
+    document_id: int,
+    *,
+    start: int = 0,
+    limit: int = 12,
+) -> list[dict]:
+    start = max(0, int(start))
+    limit = max(1, min(int(limit), 40))
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT c.id, c.chunk_index, c.content,
+                   d.id AS document_id, d.filename
+            FROM document_chunks c
+            JOIN documents d ON d.id = c.document_id
+            WHERE d.id = ? AND d.project_id = ? AND d.deleted_at IS NULL
+              AND c.chunk_index >= ?
+            ORDER BY c.chunk_index ASC
+            LIMIT ?
+            """,
+            (document_id, project_id, start, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def move_document_record(
+    project_id: int,
+    document_id: int,
+    folder_id: int | None,
+    stored_path: str,
+) -> dict | None:
+    with connect() as conn:
+        if folder_id is not None:
+            folder = conn.execute(
+                """
+                SELECT id FROM document_folders
+                WHERE id = ? AND project_id = ? AND deleted_at IS NULL
+                """,
+                (folder_id, project_id),
+            ).fetchone()
+            if not folder:
+                raise ValueError("Целевая папка не найдена.")
+        cur = conn.execute(
+            """
+            UPDATE documents SET folder_id = ?, stored_path = ?
+            WHERE id = ? AND project_id = ? AND deleted_at IS NULL
+            """,
+            (folder_id, stored_path, document_id, project_id),
+        )
+        if cur.rowcount != 1:
+            return None
+        row = conn.execute(
+            """
+            SELECT id, project_id, folder_id, filename, stored_path, mime_type,
+                   sha256, size_bytes, created_at
+            FROM documents WHERE id = ?
+            """,
+            (document_id,),
         ).fetchone()
     return dict(row)
 

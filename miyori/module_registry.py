@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.36"
+PROJECT_VERSION = "00.00.37"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "1.1.2",
+        "version": "2.0.0",
         "status": "active",
-        "description": "Центр настроек личности, поведения, режима работы, памяти и автономности Miyori.",
+        "description": "AI Core v2: Context Router, model-assisted Planner, Agent loop, layered memory, источники и безопасные действия.",
     },
     "account": {
         "name": "Личный кабинет",
@@ -29,7 +29,7 @@ MODULES = {
     },
     "drive": {
         "name": "Документы / Облако / Miyori",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "status": "active",
         "description": "Miyori Drive: физическое хранилище проекта, оригиналы, папки, безопасная корзина, восстановление, поиск по содержимому и RAG.",
     },
@@ -95,13 +95,13 @@ MODULES = {
     },
     "rag": {
         "name": "RAG Core",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "active",
         "description": "Hybrid FTS5 + lexical retrieval, память и проверенные знания.",
     },
     "epistemic": {
         "name": "Epistemic Core",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "active",
         "description": "Утверждения, источники, evidence, противоречия и верификация знаний.",
     },
@@ -120,6 +120,49 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.37",
+        "title": "Miyori AI Core v2",
+        "summary": "Новый контур принятия решений: Context Router, model-assisted Planner с deterministic fallback, пошаговый Agent Core, глубокая интеграция с Miyori Drive, сохраняемые источники ответов, многослойная память, человекочитаемая эпистемическая оценка и расширенный тестовый контур.",
+        "modules": [
+            {
+                "key": "miyori_ai",
+                "version": "2.0.0",
+                "changes": [
+                    "Добавлен Context Router: запрос получает только релевантные память, документы, знания и инструменты.",
+                    "Agent Core переведён с keyword-only выбора на model-assisted Planner loop до 5 шагов с deterministic fallback.",
+                    "Planner использует строгий JSON-контракт и не может выбирать инструменты вне registry.",
+                    "Write-действия Planner не обходят permission layer: выполнение останавливается до явного подтверждения.",
+                    "Источники рабочих документов сохраняются вместе с сообщением и отображаются при повторном открытии разговора."
+                ],
+            },
+            {
+                "key": "drive",
+                "version": "1.5.0",
+                "changes": [
+                    "Добавлены AI-инструменты каталога и чтения документов текущего проекта.",
+                    "Добавлены безопасные write-инструменты создания папки и перемещения документа через permission layer.",
+                    "Ответы Miyori получают стабильные ссылки на оригиналы документов Drive."
+                ],
+            },
+            {
+                "key": "rag",
+                "version": "1.1.0",
+                "changes": [
+                    "Retrieval получил управляемые каналы documents / user memory / project memory / epistemic knowledge.",
+                    "Context Router может полностью исключать ненужные каналы из текущего запроса."
+                ],
+            },
+            {
+                "key": "epistemic",
+                "version": "1.1.0",
+                "changes": [
+                    "Добавлены оценки Подтверждено / Вероятно / Есть противоречия / Недостаточно данных.",
+                    "Противоречия дополнительно выявляются по несовместимым числовым значениям при достаточном смысловом пересечении."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.36",
         "title": "Miyori Drive · рабочие документы и безопасное хранение",

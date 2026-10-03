@@ -80,13 +80,54 @@ function setBusy(value) {
   setPulse(value ? "thinking" : "ready");
 }
 
-function addMessage(role, text) {
+function addMessage(role, text, sources = []) {
   const article = document.createElement("article");
   article.className = "message " + role;
-  article.innerHTML =
-    '<div class="avatar">' + (role === "assistant" ? "狐" : "Вы") + '</div>' +
-    '<div class="bubble"><strong>' + (role === "assistant" ? "Миёри" : "Господин") +
-    '</strong><p>' + escapeHtml(text).replace(/\n/g, "<br>") + '</p></div>';
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = role === "assistant" ? "狐" : "Вы";
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+
+  const author = document.createElement("strong");
+  author.textContent = role === "assistant" ? "Миёри" : "Господин";
+
+  const body = document.createElement("p");
+  body.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+  bubble.append(author, body);
+
+  if (role === "assistant" && Array.isArray(sources) && sources.length) {
+    const sourceBox = document.createElement("div");
+    sourceBox.className = "message-sources";
+
+    const label = document.createElement("span");
+    label.className = "message-sources-label";
+    label.textContent = "Источники";
+    sourceBox.appendChild(label);
+
+    for (const source of sources) {
+      const title = source?.title || "Документ";
+      const indexes = Array.isArray(source?.chunk_indexes)
+        ? source.chunk_indexes.map((value) => Number(value) + 1).filter(Number.isFinite)
+        : [];
+      const chip = document.createElement(source?.download_url ? "a" : "span");
+      chip.className = "message-source-chip";
+      chip.textContent = indexes.length
+        ? title + " · фрагм. " + indexes.join(", ")
+        : title;
+
+      if (source?.download_url && String(source.download_url).startsWith("/api/projects/")) {
+        chip.href = source.download_url;
+        chip.title = "Скачать оригинал";
+      }
+      sourceBox.appendChild(chip);
+    }
+    bubble.appendChild(sourceBox);
+  }
+
+  article.append(avatar, bubble);
   messages.appendChild(article);
   messages.scrollTop = messages.scrollHeight;
 }

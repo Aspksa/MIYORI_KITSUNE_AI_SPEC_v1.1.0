@@ -146,6 +146,23 @@ function askToolArguments(toolName) {
     if (!query || !query.trim()) return null;
     return {query: query.trim()};
   }
+  if (toolName === "project_document_read") {
+    const documentId = prompt("ID документа:");
+    if (!documentId || !Number(documentId)) return null;
+    return {document_id: Number(documentId), start: 0, limit: 12};
+  }
+  if (toolName === "drive_folder_create") {
+    const name = prompt("Название новой папки:");
+    if (!name || !name.trim()) return null;
+    const parent = prompt("ID родительской папки (оставьте пустым для корня):");
+    return {name: name.trim(), parent_id: parent && Number(parent) ? Number(parent) : null};
+  }
+  if (toolName === "drive_document_move") {
+    const documentId = prompt("ID документа:");
+    if (!documentId || !Number(documentId)) return null;
+    const folderId = prompt("ID целевой папки (оставьте пустым для корня):");
+    return {document_id: Number(documentId), folder_id: folderId && Number(folderId) ? Number(folderId) : null};
+  }
   if (toolName === "workspace_read") {
     const path = prompt("Путь к файлу в workspace:");
     if (!path || !path.trim()) return null;
@@ -166,6 +183,10 @@ function toolLabel(name) {
     project_memory_search: "Память",
     project_document_search: "Документы",
     project_status: "Статус",
+    project_document_catalog: "Каталог Drive",
+    project_document_read: "Прочитать документ",
+    drive_folder_create: "Создать папку Drive",
+    drive_document_move: "Переместить документ",
     workspace_list: "Файлы",
     workspace_read: "Прочитать",
     workspace_create: "Создать файл",
@@ -178,6 +199,11 @@ function permissionPreview(request) {
   const args = request.arguments || {};
   const lines = [];
   if (args.path) lines.push("Файл: " + args.path);
+  if (args.name) lines.push("Папка: " + args.name);
+  if (args.document_id) lines.push("Документ ID: " + args.document_id);
+  if (Object.prototype.hasOwnProperty.call(args, "folder_id")) {
+    lines.push("Целевая папка ID: " + (args.folder_id ?? "корень"));
+  }
   if (typeof args.content === "string") {
     const preview = args.content.length > 500 ? args.content.slice(0, 500) + "…" : args.content;
     lines.push("Содержимое:\n" + preview);
@@ -220,6 +246,27 @@ function addToolResultCard(toolName, result) {
       note.textContent = "Показана только часть файла.";
       body.appendChild(note);
     }
+  } else if (toolName === "project_document_catalog") {
+    const docs = result.documents || [];
+    const folders = result.folders || [];
+    body.innerHTML = '<div class="result-title">Документы: ' + docs.length + ' · Папки: ' + folders.length + '</div>';
+    for (const item of docs.slice(0, 25)) {
+      const row = document.createElement("div");
+      row.className = "result-row";
+      row.innerHTML = '<div><strong>#' + item.id + ' ' + escapeHtml(item.filename) + '</strong><small>' +
+        Number(item.chunk_count || 0) + ' фрагм.</small></div>';
+      body.appendChild(row);
+    }
+  } else if (toolName === "project_document_read") {
+    const doc = result.document || {};
+    body.innerHTML = '<div class="result-title">' + escapeHtml(doc.filename || "Документ") + '</div>';
+    for (const item of (result.chunks || []).slice(0, 12)) {
+      const source = document.createElement("div");
+      source.className = "source-card";
+      source.innerHTML = '<strong>Фрагмент ' + (Number(item.chunk_index || 0) + 1) + '</strong><p>' +
+        escapeHtml((item.content || "").slice(0, 700)) + '</p>';
+      body.appendChild(source);
+    }
   } else if (toolName === "project_document_search") {
     const chunks = result.chunks || [];
     if (!chunks.length) body.textContent = "Подходящих фрагментов не найдено.";
@@ -246,7 +293,8 @@ function addToolResultCard(toolName, result) {
       const row = document.createElement("div");
       row.className = "fact-result";
       row.innerHTML = '<strong>#' + fact.id + '</strong><span>' +
-        escapeHtml(fact.statement) + '</span><small>' + escapeHtml(fact.status || "") + '</small>';
+        escapeHtml(fact.statement) + '</span><small>' +
+        escapeHtml((fact.memory_scope || "project") + " · " + (fact.memory_kind || "fact")) + '</small>';
       body.appendChild(row);
     }
   } else if (toolName === "project_status") {

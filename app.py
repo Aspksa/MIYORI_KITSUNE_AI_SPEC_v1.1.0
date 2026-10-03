@@ -92,6 +92,7 @@ from miyori.db import (
 from miyori.agent import run_agent
 from miyori.background import register_background_handlers
 from miyori.brain import build_context
+from miyori.context_router import route_context
 from miyori.development import run_project_self_check
 from miyori.documents import (
     MAX_FILE_BYTES,
@@ -127,6 +128,8 @@ from miyori.epistemic import (
 )
 from miyori.tasks import start_worker_monitor, wake_worker, worker_status
 from miyori.rag import init_rag, rag_status, retrieve as rag_retrieve
+from miyori.planner import MAX_AGENT_STEPS
+from miyori.sources import build_answer_sources
 from miyori.tools import execute_approved_request, execute_tool, list_tools
 from miyori.account import cloudru_profile, list_cloudru_models, save_cloudru_profile, test_cloudru
 from miyori.module_registry import module_manifest, release_history
@@ -199,7 +202,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.36", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.37", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -388,7 +391,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.36",
+        "version": "00.00.37",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -630,7 +633,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.36",
+        "project_version": "00.00.37",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1599,7 +1602,9 @@ async def send_message(request: ChatRequest) -> dict:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     user_message_id = add_message(conversation_id, "user", text)
-    maybe_capture_user_memory(
+    route = route_context(text)
+
+    captured_memory = maybe_capture_user_memory(
         request.project_id,
         conversation_id,
         user_message_id,
@@ -1613,20 +1618,57 @@ async def send_message(request: ChatRequest) -> dict:
     )
 
     context = recent_messages(conversation_id)
-    brain = build_context(request.project_id, text)
-    epistemic = trusted_claim_context(request.project_id, text, limit=6)
-    rag = rag_retrieve(request.project_id, text, limit=8)
+    tool_catalog = list_tools()
+    brain = build_context(
+        request.project_id,
+        text,
+        route,
+        tools_allowed=[item["name"] for item in tool_catalog],
+    )
+
     ai_preferences = get_ai_preferences()
+    use_rag = bool(ai_preferences.get("use_rag", 1))
+    use_verified_memory = bool(ai_preferences.get("use_verified_memory", 1))
+
+    include_documents = bool(route.use_documents and use_rag)
+    include_memory = bool(
+        (route.use_user_memory or route.use_project_memory)
+        and use_verified_memory
+    )
+    include_knowledge = bool(route.use_epistemic)
+
+    rag = rag_retrieve(
+        request.project_id,
+        text,
+        limit=route.max_rag_items,
+        include_documents=include_documents,
+        include_memory=include_memory,
+        include_knowledge=include_knowledge,
+        include_user_memory=route.use_user_memory,
+        include_project_memory=route.use_project_memory,
+    )
     rag_payload = rag.to_dict()
-    if not ai_preferences.get("use_rag", 1):
-        rag_payload = None
-    elif not ai_preferences.get("use_verified_memory", 1):
-        rag_payload["items"] = [
-            item
-            for item in rag_payload.get("items", [])
-            if item.get("source_type") != "memory"
-        ]
-    agent = run_agent(request.project_id, conversation_id, text)
+
+    epistemic = (
+        trusted_claim_context(request.project_id, text, limit=8)
+        if route.use_epistemic
+        else []
+    )
+
+    agent = await run_agent(
+        request.project_id,
+        conversation_id,
+        text,
+        route,
+        conversation_context=context[-8:],
+    )
+
+    sources = build_answer_sources(
+        request.project_id,
+        rag_payload,
+        agent.tool_context,
+    )
+
     try:
         answer = await chat(
             context,
@@ -1634,8 +1676,9 @@ async def send_message(request: ChatRequest) -> dict:
             document_context=None,
             brain_plan=brain.plan,
             tool_context=agent.tool_context,
-            epistemic_context=None,
+            epistemic_context=epistemic,
             rag_context=rag_payload,
+            answer_sources=sources,
         )
     except ProviderError as exc:
         raise HTTPException(
@@ -1646,31 +1689,33 @@ async def send_message(request: ChatRequest) -> dict:
             },
         ) from exc
 
-    add_message(conversation_id, "assistant", answer)
+    add_message(
+        conversation_id,
+        "assistant",
+        answer,
+        metadata={
+            "sources": sources,
+            "context_route": route.to_dict(),
+            "agent_run_id": agent.run_id,
+        },
+    )
+
     return {
         "conversation_id": conversation_id,
         "project_id": request.project_id,
         "answer": answer,
+        "sources": sources,
         "brain": {
             "plan": brain.plan,
-            "memory_items": len(brain.memory),
-            "document_items": len(brain.documents),
+            "context_route": brain.context_route,
+            "working_memory": brain.working_memory,
             "tools_allowed": brain.tools_allowed,
-            "sources": [
-                {
-                    "filename": item.get("filename"),
-                    "chunk_index": item.get("chunk_index"),
-                    "content": item.get("content", "")[:360],
-                }
-                for item in brain.documents
-            ],
         },
-        "rag": rag_payload or {
-            "query": text,
-            "items": [],
-            "retrieval_mode": "disabled_by_ai_preferences",
-            "total_chars": 0,
-            "candidates_seen": 0,
+        "rag": rag_payload,
+        "memory": {
+            "captured": captured_memory,
+            "user_scope_enabled": bool(route.use_user_memory and use_verified_memory),
+            "project_scope_enabled": bool(route.use_project_memory and use_verified_memory),
         },
         "epistemic": {
             "used_claims": [
@@ -1678,6 +1723,7 @@ async def send_message(request: ChatRequest) -> dict:
                     "id": item.get("id"),
                     "statement": item.get("statement"),
                     "status": item.get("status"),
+                    "assessment": item.get("assessment"),
                     "confidence": item.get("confidence"),
                     "claim_type": item.get("claim_type"),
                 }
@@ -1689,22 +1735,13 @@ async def send_message(request: ChatRequest) -> dict:
         "agent": {
             "run_id": agent.run_id,
             "actions": agent.actions,
-            "steps_used": len(agent.actions),
-            "max_steps": 3,
+            "steps_used": sum(
+                1 for action in agent.actions
+                if action.get("tool_name") and action.get("status") != "skipped"
+            ),
+            "max_steps": MAX_AGENT_STEPS,
+            "planner_mode": agent.planner_mode,
+            "pending_permissions": agent.pending_permissions,
         },
     }
 
-
-def open_browser() -> None:
-    webbrowser.open(f"http://{settings.host}:{settings.port}")
-
-
-if __name__ == "__main__":
-    if settings.open_browser:
-        threading.Timer(1.2, open_browser).start()
-    uvicorn.run(
-        "app:app",
-        host=settings.host,
-        port=settings.port,
-        reload=False,
-    )

@@ -120,6 +120,24 @@ def _tokens(text: str) -> set[str]:
     }
 
 
+def claim_assessment(
+    status: str,
+    confidence: float | None = None,
+    open_contradictions: int = 0,
+) -> str:
+    if int(open_contradictions or 0) > 0 or status == "disputed":
+        return "Есть противоречия"
+    if status == "verified":
+        return "Подтверждено"
+    if status == "supported":
+        return "Вероятно"
+    if status == "rejected":
+        return "Опровергнуто"
+    if status == "superseded":
+        return "Устарело"
+    return "Недостаточно данных"
+
+
 def infer_claim_type(statement: str) -> str:
     text = statement.lower()
     if any(marker in text for marker in ("мне нравится", "я предпочитаю", "хочу чтобы", "мне удобнее", "я люблю когда")):
@@ -390,11 +408,24 @@ def detect_contradictions(project_id: int, claim_id: int) -> list[dict]:
             continue
         other_words = set(re.findall(r"[а-яёa-z0-9_-]+", row["statement"].lower()))
         negation_differs = bool(current_words & negation_markers) != bool(other_words & negation_markers)
-        if not negation_differs:
+        current_numbers = set(re.findall(r"\b\d+(?:[.,]\d+)?\b", current["statement"]))
+        other_numbers = set(re.findall(r"\b\d+(?:[.,]\d+)?\b", row["statement"]))
+        numeric_conflict = (
+            len(shared) >= 3
+            and bool(current_numbers)
+            and bool(other_numbers)
+            and current_numbers != other_numbers
+            and current["claim_type"] == row["claim_type"]
+        )
+        if not negation_differs and not numeric_conflict:
             continue
 
         left, right = sorted((claim_id, int(row["id"])))
-        reason = "Похожие утверждения содержат различающуюся отрицательную формулировку; требуется проверка."
+        reason = (
+            "Похожие утверждения содержат разные числовые значения; требуется сверка источников."
+            if numeric_conflict and not negation_differs
+            else "Похожие утверждения содержат различающуюся отрицательную формулировку; требуется проверка."
+        )
         with connect() as conn:
             conn.execute(
                 """
@@ -431,7 +462,13 @@ def list_claims(project_id: int, status: str | None = None, limit: int = 100) ->
             f"""
             SELECT c.*,
                 SUM(CASE WHEN e.stance = 'supports' THEN 1 ELSE 0 END) AS supports,
-                SUM(CASE WHEN e.stance = 'contradicts' THEN 1 ELSE 0 END) AS contradictions
+                SUM(CASE WHEN e.stance = 'contradicts' THEN 1 ELSE 0 END) AS contradictions,
+                (
+                    SELECT COUNT(*)
+                    FROM epistemic_contradictions x
+                    WHERE x.project_id = c.project_id AND x.status = 'open'
+                      AND (x.left_claim_id = c.id OR x.right_claim_id = c.id)
+                ) AS open_contradictions
             FROM epistemic_claims c
             LEFT JOIN epistemic_evidence e ON e.claim_id = c.id
             {where}
@@ -441,7 +478,16 @@ def list_claims(project_id: int, status: str | None = None, limit: int = 100) ->
             """,
             params,
         ).fetchall()
-    return [dict(row) for row in rows]
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["assessment"] = claim_assessment(
+            item["status"],
+            item.get("confidence"),
+            item.get("open_contradictions", 0),
+        )
+        result.append(item)
+    return result
 
 
 def get_claim(project_id: int, claim_id: int) -> dict | None:
@@ -463,6 +509,11 @@ def get_claim(project_id: int, claim_id: int) -> dict | None:
     result = dict(row)
     result["evidence"] = _evidence_rows(project_id, claim_id)
     result["contradictions"] = [dict(item) for item in contradictions]
+    result["assessment"] = claim_assessment(
+        result["status"],
+        result.get("confidence"),
+        sum(1 for item in contradictions if item["status"] == "open"),
+    )
     return result
 
 
@@ -490,6 +541,12 @@ def epistemic_snapshot(project_id: int) -> dict:
         "claims": counts,
         "sources": int(sources),
         "open_contradictions": int(open_contradictions),
+        "assessment": {
+            "Подтверждено": counts.get("verified", 0),
+            "Вероятно": counts.get("supported", 0),
+            "Есть противоречия": int(open_contradictions),
+            "Недостаточно данных": counts.get("candidate", 0),
+        },
     }
 
 

@@ -181,8 +181,21 @@ def _document_lexical(project_id: int, query: str, limit: int = 20) -> list[RAGI
     return items
 
 
-def _memory(project_id: int, query: str, limit: int = 12) -> list[RAGItem]:
-    rows = search_verified_memory(project_id, query, limit=limit)
+def _memory(
+    project_id: int,
+    query: str,
+    limit: int = 12,
+    *,
+    include_user: bool = True,
+    include_project: bool = True,
+) -> list[RAGItem]:
+    rows = search_verified_memory(
+        project_id,
+        query,
+        limit=limit,
+        include_user=include_user,
+        include_project=include_project,
+    )
     query_tokens = set(_tokens(query))
     items = []
     for row in rows:
@@ -198,7 +211,12 @@ def _memory(project_id: int, query: str, limit: int = 12) -> list[RAGItem]:
                 content=statement[:MAX_ITEM_CHARS],
                 score=0.0,
                 locator=f"memory:{row['id']}",
-                metadata={"memory_id": row["id"], "observed_at": row.get("observed_at")},
+                metadata={
+                    "memory_id": row["id"],
+                    "observed_at": row.get("observed_at"),
+                    "memory_scope": row.get("memory_scope"),
+                    "memory_kind": row.get("memory_kind"),
+                },
             )
         )
     return items
@@ -267,29 +285,56 @@ def retrieve(
     *,
     limit: int = DEFAULT_LIMIT,
     max_context_chars: int = DEFAULT_CONTEXT_CHARS,
+    include_documents: bool = True,
+    include_memory: bool = True,
+    include_knowledge: bool = True,
+    include_user_memory: bool = True,
+    include_project_memory: bool = True,
 ) -> RAGContext:
     clean_query = " ".join(query.strip().split())
     if not clean_query:
         return RAGContext(query="", items=[], retrieval_mode="empty", total_chars=0, candidates_seen=0)
 
-    fts = _document_fts(project_id, clean_query, limit=max(limit * 3, 12))
-    lexical = _document_lexical(project_id, clean_query, limit=max(limit * 3, 12))
-    memory = _memory(project_id, clean_query, limit=max(limit * 2, 8))
-    knowledge = _knowledge(project_id, clean_query, limit=max(limit * 2, 8))
+    fts = (
+        _document_fts(project_id, clean_query, limit=max(limit * 3, 12))
+        if include_documents else []
+    )
+    lexical = (
+        _document_lexical(project_id, clean_query, limit=max(limit * 3, 12))
+        if include_documents else []
+    )
+    memory = (
+        _memory(
+            project_id,
+            clean_query,
+            limit=max(limit * 2, 8),
+            include_user=include_user_memory,
+            include_project=include_project_memory,
+        )
+        if include_memory else []
+    )
+    knowledge = (
+        _knowledge(project_id, clean_query, limit=max(limit * 2, 8))
+        if include_knowledge else []
+    )
 
-    rankings = [
-        ("document_fts", fts, 1.15),
-        ("document_lexical", lexical, 1.0),
-        ("verified_memory", memory, 0.95),
-        ("epistemic_knowledge", knowledge, 1.1),
-    ]
-    merged = _dedupe(_rrf_merge(rankings))
+    rankings = []
+    if fts:
+        rankings.append(("document_fts", fts, 1.15))
+    if lexical:
+        rankings.append(("document_lexical", lexical, 1.0))
+    if memory:
+        rankings.append(("verified_memory", memory, 0.95))
+    if knowledge:
+        rankings.append(("epistemic_knowledge", knowledge, 1.1))
+
+    merged = _dedupe(_rrf_merge(rankings)) if rankings else []
     candidates_seen = len(merged)
 
     selected: list[RAGItem] = []
     total_chars = 0
     per_type: dict[str, int] = {}
-    soft_caps = {"document": 5, "memory": 3, "knowledge": 4}
+    soft_caps = {"document": 6, "memory": 3, "knowledge": 4}
 
     for item in merged:
         if len(selected) >= max(1, min(limit, 20)):
@@ -308,7 +353,20 @@ def retrieve(
         total_chars += len(content)
         per_type[item.source_type] = per_type.get(item.source_type, 0) + 1
 
-    mode = "hybrid_fts_rrf" if fts else "hybrid_lexical_rrf"
+    active_channels = []
+    if include_documents:
+        active_channels.append("documents")
+    if include_memory:
+        active_channels.append("memory")
+    if include_knowledge:
+        active_channels.append("knowledge")
+
+    if include_documents:
+        base_mode = "hybrid_fts_rrf" if fts else "hybrid_lexical_rrf"
+    else:
+        base_mode = "context_rrf"
+    mode = base_mode if active_channels else "disabled"
+
     return RAGContext(
         query=clean_query,
         items=selected,
@@ -316,3 +374,4 @@ def retrieve(
         total_chars=total_chars,
         candidates_seen=candidates_seen,
     )
+
