@@ -51,7 +51,7 @@ from miyori.tools import execute_approved_request, execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.10")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.11")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -103,7 +103,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.10",
+        "version": "00.00.11",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
