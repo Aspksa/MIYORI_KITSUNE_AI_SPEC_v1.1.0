@@ -1507,7 +1507,27 @@ async function renderAccountWorkspace() {
       try {
         const catalog = await api("/api/account/cloudru/models");
         populateModels(catalog, p.model_id);
-        if (!catalog.chat_models?.length) {
+        const preferredDeepSeek = catalog.preferred_model_id || "deepseek-ai/DeepSeek-V4-Flash";
+        const currentValid = !!p.model_id && !!catalog.selected_model_found;
+        if (!currentValid && catalog.preferred_model_available) {
+          model.value = preferredDeepSeek;
+          const saved = await api("/api/account/cloudru", {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+              api_key: null,
+              model_id: preferredDeepSeek,
+              base_url: base.value.trim()
+            })
+          });
+          p.model_id = saved.cloudru.model_id;
+          modelState.textContent = "DeepSeek V4 Flash выбрана как основная модель.";
+          result.innerHTML = workspaceResult(
+            "DeepSeek V4 Flash сохранена как основная модель Miyori.",
+            "success"
+          );
+          await loadStatus();
+        } else if (!catalog.chat_models?.length) {
           result.innerHTML = workspaceResult("Cloud.ru не вернул чат-модели для этого ключа.", "warning");
         }
       } catch (error) {
