@@ -9,6 +9,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .portable_updater import PortableUpdateError, apply as apply_portable_update, status as portable_status
+
 ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_REPO = "Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0"
 EXPECTED_HTTPS = f"https://github.com/{EXPECTED_REPO}.git"
@@ -105,6 +107,12 @@ def _write_saved_state(payload: dict) -> None:
 
 
 def local_status(*, fetch: bool = False) -> dict:
+    if not (ROOT / ".git").exists():
+        result = portable_status(ROOT, _STATE_PATH, DEFAULT_BRANCH, fetch=fetch)
+        result["auto_update"] = AUTO_UPDATE
+        result["interval_minutes"] = INTERVAL_MINUTES
+        return result
+
     result = {
         "repository": EXPECTED_REPO,
         "repository_url": f"https://github.com/{EXPECTED_REPO}",
@@ -201,12 +209,19 @@ def local_status(*, fetch: bool = False) -> dict:
 
 
 def apply_update() -> dict:
+    if not (ROOT / ".git").exists():
+        try:
+            result = apply_portable_update(ROOT, _STATE_PATH, DEFAULT_BRANCH)
+            result["auto_update"] = AUTO_UPDATE
+            result["interval_minutes"] = INTERVAL_MINUTES
+            return result
+        except PortableUpdateError as exc:
+            raise UpdateError(str(exc)) from exc
+
     status = local_status(fetch=True)
 
     if not status["git_available"]:
         raise UpdateError("Git не установлен.")
-    if not status["is_git_checkout"]:
-        raise UpdateError("Локальная папка не является git checkout.")
     if not status["origin_ok"]:
         raise UpdateError("origin не совпадает с доверенным репозиторием Miyori.")
     if status["current_branch"] != DEFAULT_BRANCH:
@@ -263,15 +278,14 @@ def _monitor_loop() -> None:
         while True:
             try:
                 status = local_status(fetch=True)
-                if (
-                    AUTO_UPDATE
-                    and status.get("update_available")
-                    and status.get("clean")
-                    and status.get("origin_ok")
-                    and status.get("current_branch") == DEFAULT_BRANCH
-                    and status.get("ahead", 0) == 0
-                ):
-                    apply_update()
+                if AUTO_UPDATE and status.get("update_available"):
+                    if status.get("install_mode") == "portable" or (
+                        status.get("clean")
+                        and status.get("origin_ok")
+                        and status.get("current_branch") == DEFAULT_BRANCH
+                        and status.get("ahead", 0) == 0
+                    ):
+                        apply_update()
             except Exception as exc:
                 saved = _read_saved_state()
                 saved.update({"last_checked_at": _now(), "last_error": str(exc)})
