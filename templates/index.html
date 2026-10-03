@@ -15,7 +15,7 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.20</span>
+            <span class="version-pill" id="versionText">00.00.21</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
@@ -90,6 +90,11 @@
       </section>
 
       <nav class="main-side-menu" aria-label="Основное меню">
+        <button class="side-menu-item active" id="menuChat" type="button">
+          <span class="side-menu-icon">◉</span>
+          <span class="side-menu-copy"><strong>Чат с Миёри</strong><small>Основной диалог</small></span>
+          <span class="side-menu-chevron">›</span>
+        </button>
         <button class="side-menu-item" id="menuMobileApp" type="button">
           <span class="side-menu-icon">▣</span>
           <span class="side-menu-copy"><strong>Мобильное приложение</strong><small>iOS · Android</small></span>
@@ -103,6 +108,21 @@
         <button class="side-menu-item" id="menuSettings" type="button">
           <span class="side-menu-icon">⚙</span>
           <span class="side-menu-copy"><strong>Настройки</strong><small>Миёри и система</small></span>
+          <span class="side-menu-chevron">›</span>
+        </button>
+        <button class="side-menu-item" id="menuDocumentsHub" type="button">
+          <span class="side-menu-icon">▤</span>
+          <span class="side-menu-copy"><strong>Документы / Облако / Miyori</strong><small>Файлы и знания</small></span>
+          <span class="side-menu-chevron">›</span>
+        </button>
+        <button class="side-menu-item" id="menuWorkProjects" type="button">
+          <span class="side-menu-icon">▰</span>
+          <span class="side-menu-copy"><strong>Рабочие проекты</strong><small>Рабочие пространства</small></span>
+          <span class="side-menu-chevron">›</span>
+        </button>
+        <button class="side-menu-item" id="menuHomeProjects" type="button">
+          <span class="side-menu-icon">⌂</span>
+          <span class="side-menu-copy"><strong>Домашние проекты</strong><small>Личные пространства</small></span>
           <span class="side-menu-chevron">›</span>
         </button>
         <button class="side-menu-item update-project-item" id="menuProjectUpdate" type="button">
@@ -129,7 +149,7 @@
     </aside>
 
     <main class="chat-area">
-      <header class="chat-header">
+      <header class="chat-header" id="chatHeader">
         <div class="chat-title">
           <span class="section-caption" id="projectLabel">Личная AI-помощница</span>
           <h2 id="conversationTitle">Чат с Миёри</h2>
@@ -245,9 +265,21 @@
         </div>
       </section>
 
+      <section id="workspaceView" class="workspace-view" hidden>
+        <header class="workspace-page-header">
+          <div>
+            <span id="workspaceEyebrow" class="section-caption">Раздел</span>
+            <h2 id="workspaceTitle">Рабочая область</h2>
+            <p id="workspaceSubtitle">Отдельный экран без чата.</p>
+          </div>
+          <button id="workspaceBackToChat" class="primary-soft" type="button">← В чат</button>
+        </header>
+        <div id="workspaceBody" class="workspace-page-body"></div>
+      </section>
+
       <section id="messages" class="messages" aria-live="polite"></section>
 
-      <footer class="composer-wrap">
+      <footer class="composer-wrap" id="chatComposer">
         <form id="chatForm" class="composer">
           <div class="composer-field">
             <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Задать вопрос…" required></textarea>
