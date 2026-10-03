@@ -79,11 +79,18 @@ from miyori.epistemic import (
     trusted_claim_context,
     verify_claim,
 )
-from miyori.tasks import wake_worker
+from miyori.tasks import start_worker_monitor, wake_worker, worker_status
 from miyori.rag import init_rag, rag_status, retrieve as rag_retrieve
 from miyori.tools import execute_approved_request, execute_tool, list_tools
 from miyori.account import cloudru_profile, list_cloudru_models, save_cloudru_profile, test_cloudru
 from miyori.module_registry import module_manifest, release_history
+from miyori.system_settings import (
+    cleanup_runtime_logs,
+    load_system_settings,
+    open_data_folder,
+    save_system_settings,
+    system_snapshot,
+)
 from miyori.updater import (
     UpdateError,
     apply_update,
@@ -101,6 +108,7 @@ async def lifespan(app: FastAPI):
     init_rag()
     register_background_handlers()
     wake_worker()
+    start_worker_monitor()
     clear_restart_required()
     start_update_monitor()
     yield
@@ -179,6 +187,11 @@ class EvidenceCreateRequest(BaseModel):
     stance: str = Field(pattern="^(supports|contradicts|neutral)$")
     excerpt: str | None = Field(default=None, max_length=2000)
     weight: float = Field(default=1.0, ge=0.0, le=2.0)
+
+
+class SystemSettingsRequest(BaseModel):
+    general: dict = {}
+    automation: dict = {}
 
 
 class AiPreferencesRequest(BaseModel):
@@ -423,6 +436,75 @@ async def account_cloudru_test(request: CloudRuTestRequest, http_request: Reques
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/api/settings")
+def system_settings_get(request: Request) -> dict:
+    _require_local_admin(request)
+    return {
+        "settings": load_system_settings(),
+        "system": system_snapshot(),
+        "worker": worker_status(),
+        "update": update_status(fetch=False),
+        "modules": module_manifest(),
+    }
+
+
+@app.put("/api/settings")
+def system_settings_save(request: SystemSettingsRequest, http_request: Request) -> dict:
+    _require_local_admin(http_request)
+    try:
+        saved = save_system_settings({
+            "general": request.general,
+            "automation": request.automation,
+        })
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "settings": saved,
+        "restart_required": True,
+        "message": "Часть системных настроек применится после перезапуска Miyori.",
+    }
+
+
+@app.post("/api/settings/open-data")
+def settings_open_data(request: Request) -> dict:
+    _require_local_admin(request)
+    try:
+        open_data_folder()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.get("/api/settings/diagnostics")
+def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
+    _require_local_admin(request)
+    checks = run_project_self_check(project_id) if get_project(project_id) else []
+    update = update_status(fetch=False)
+    return {
+        "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        "project_version": "00.00.32",
+        "system": system_snapshot(),
+        "worker": worker_status(),
+        "update": update,
+        "modules": module_manifest(),
+        "self_check": [
+            {"name": item.name, "passed": item.passed, "details": item.details}
+            for item in checks
+        ],
+        "last_errors": [
+            error for error in [
+                update.get("last_error"),
+            ] if error
+        ],
+    }
+
+
+@app.post("/api/settings/cleanup-runtime")
+def settings_cleanup_runtime(request: Request) -> dict:
+    _require_local_admin(request)
+    return cleanup_runtime_logs()
 
 
 @app.get("/api/modules")
