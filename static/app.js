@@ -27,8 +27,9 @@ const developmentStats = el("developmentStats");
 const agentTrace = el("agentTrace");
 const agentBudget = el("agentBudget");
 const permissionList = el("permissionList");
-const inspector = el("inspector");
-const toggleInspector = el("toggleInspector");
+const miyoriConsole = el("miyoriConsole");
+const consoleHeader = el("consoleHeader");
+const toggleConsole = el("toggleConsole");
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -47,13 +48,16 @@ function setPulse(mode, label) {
     item.classList.toggle("active", item.dataset.pulse === mode);
   });
   const text = el("pulseText");
-  if (text) text.textContent = label || ({
+  const resolvedLabel = label || ({
     ready: "готова",
     thinking: "думаю",
     reading: "читаю",
     acting: "действую",
     waiting: "жду решения"
   }[mode] || mode);
+  if (text) text.textContent = resolvedLabel;
+  const consoleSummary = el("consoleSummary");
+  if (consoleSummary) consoleSummary.textContent = resolvedLabel;
 }
 
 function setBusy(value) {
@@ -149,11 +153,9 @@ async function loadNexus() {
         if (suggestion.kind === "documents") {
           input.value = "Проанализируй материалы текущего проекта и скажи, что важно.";
         } else if (suggestion.kind === "permission") {
-          activateInspectorTab("data");
-          document.body.classList.remove("inspector-hidden");
+          openConsole("data");
         } else if (suggestion.kind === "tasks" || suggestion.kind === "failed_tasks") {
-          activateInspectorTab("system");
-          document.body.classList.remove("inspector-hidden");
+          openConsole("system");
         } else {
           input.value = "";
         }
@@ -184,6 +186,74 @@ function addContextOrbit(brain, agent) {
   }
   messages.appendChild(orbit);
   messages.scrollTop = messages.scrollHeight;
+}
+
+function openConsole(tab = null) {
+  if (!miyoriConsole) return;
+  miyoriConsole.classList.remove("collapsed");
+  if (tab) activateInspectorTab(tab);
+}
+
+function toggleConsoleState() {
+  if (!miyoriConsole) return;
+  miyoriConsole.classList.toggle("collapsed");
+}
+
+function createLivingIntent(goal) {
+  const article = document.createElement("article");
+  article.className = "message intent-message";
+
+  const card = document.createElement("section");
+  card.className = "living-intent";
+  card.innerHTML =
+    '<button class="intent-head" type="button">' +
+      '<span class="intent-orb">◉</span>' +
+      '<span class="intent-title"><small>Living Intent</small><strong>' +
+        escapeHtml(goal.length > 90 ? goal.slice(0, 87) + "…" : goal) +
+      '</strong></span>' +
+      '<span class="intent-state">принято</span>' +
+      '<span class="intent-chevron">⌄</span>' +
+    '</button>' +
+    '<div class="intent-body">' +
+      '<div class="intent-track">' +
+        '<div class="intent-step active" data-intent-step="accepted"><i></i><span>Цель принята</span></div>' +
+        '<div class="intent-step" data-intent-step="context"><i></i><span>Собираю контекст</span></div>' +
+        '<div class="intent-step" data-intent-step="actions"><i></i><span>Выполняю действия</span></div>' +
+        '<div class="intent-step" data-intent-step="done"><i></i><span>Результат готов</span></div>' +
+      '</div>' +
+      '<div class="intent-meta">Можно свернуть — выполнение продолжится.</div>' +
+    '</div>';
+
+  const head = card.querySelector(".intent-head");
+  head.addEventListener("click", () => card.classList.toggle("collapsed"));
+
+  article.appendChild(card);
+  messages.appendChild(article);
+  messages.scrollTop = messages.scrollHeight;
+  return card;
+}
+
+function updateLivingIntent(card, phase, label = null) {
+  if (!card) return;
+  const order = ["accepted", "context", "actions", "done"];
+  const current = order.indexOf(phase);
+  card.querySelectorAll(".intent-step").forEach((step) => {
+    const index = order.indexOf(step.dataset.intentStep);
+    step.classList.toggle("active", index === current);
+    step.classList.toggle("completed", index < current || phase === "done");
+  });
+  const state = card.querySelector(".intent-state");
+  if (state) {
+    state.textContent = label || ({
+      accepted: "принято",
+      context: "контекст",
+      actions: "действия",
+      done: "готово",
+      error: "ошибка"
+    }[phase] || phase);
+  }
+  if (phase === "done") card.classList.add("complete");
+  if (phase === "error") card.classList.add("error");
 }
 
 async function api(url, options = {}) {
@@ -229,7 +299,7 @@ async function loadProjects() {
   updateProjectLabel();
   await Promise.all([
     loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus(), loadNexus()
+    loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
   ]);
 }
 
@@ -892,6 +962,8 @@ form.addEventListener("submit", async (event) => {
 
   showError("");
   addMessage("user", text);
+  const livingIntent = createLivingIntent(text);
+  updateLivingIntent(livingIntent, "context");
   input.value = "";
   input.style.height = "auto";
   setBusy(true);
@@ -914,6 +986,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     state.conversationId = data.conversation_id;
+    updateLivingIntent(livingIntent, "actions");
     addMessage("assistant", data.answer);
     if (data.brain) {
       brainState.textContent = "ready";
@@ -982,11 +1055,13 @@ form.addEventListener("submit", async (event) => {
       }
     }
     addContextOrbit(data.brain, data.agent);
+    updateLivingIntent(livingIntent, "done");
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
       loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
     ]);
   } catch (error) {
+    updateLivingIntent(livingIntent, "error", "ошибка");
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
   } finally {
@@ -1069,10 +1144,12 @@ document.querySelectorAll(".inspector-tab").forEach((button) => {
   button.addEventListener("click", () => activateInspectorTab(button.dataset.tab));
 });
 
-if (toggleInspector) {
-  toggleInspector.addEventListener("click", () => {
-    document.body.classList.toggle("inspector-hidden");
-    toggleInspector.textContent = document.body.classList.contains("inspector-hidden") ? "☰" : "☷";
+if (consoleHeader) {
+  consoleHeader.addEventListener("click", toggleConsoleState);
+}
+if (toggleConsole) {
+  toggleConsole.addEventListener("click", () => {
+    toggleConsoleState();
     input.focus();
   });
 }
