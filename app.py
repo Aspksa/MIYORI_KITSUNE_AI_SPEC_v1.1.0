@@ -51,7 +51,7 @@ from miyori.tools import execute_approved_request, execute_tool, list_tools
 
 ROOT = Path(__file__).resolve().parent
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.09")
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.10")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -103,7 +103,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.09",
+        "version": "00.00.10",
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
             settings.cloudru_api_key and settings.cloudru_model_id
@@ -237,6 +237,70 @@ def document_search(project_id: int, q: str = "") -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     return {"chunks": search_document_chunks(project_id, q, limit=12)}
+
+
+@app.get("/api/projects/{project_id}/nexus")
+def project_nexus(project_id: int) -> dict:
+    project = get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+
+    documents = list_documents(project_id)
+    memory = list_memory_facts(project_id)
+    permissions = list_permission_requests(project_id)
+    tasks = list_tasks(project_id)
+    development = development_snapshot(project_id)
+
+    verified_memory = [item for item in memory if item.get("status") == "verified"]
+    pending_permissions = [item for item in permissions if item.get("status") == "pending"]
+    active_tasks = [item for item in tasks if item.get("status") in {"queued", "running"}]
+    failed_tasks = [item for item in tasks if item.get("status") == "failed"]
+
+    suggestions = []
+    if pending_permissions:
+        suggestions.append({
+            "kind": "permission",
+            "label": "Решить ожидающие действия",
+            "detail": f"Ожидают решения: {len(pending_permissions)}",
+        })
+    if active_tasks:
+        suggestions.append({
+            "kind": "tasks",
+            "label": "Проверить активные задачи",
+            "detail": f"В работе или очереди: {len(active_tasks)}",
+        })
+    if failed_tasks:
+        suggestions.append({
+            "kind": "failed_tasks",
+            "label": "Разобрать ошибки задач",
+            "detail": f"Ошибок: {len(failed_tasks)}",
+        })
+    if documents:
+        suggestions.append({
+            "kind": "documents",
+            "label": "Работать с материалами проекта",
+            "detail": f"Документов: {len(documents)}",
+        })
+    if not suggestions:
+        suggestions.append({
+            "kind": "start",
+            "label": "Начать новую задачу",
+            "detail": "Опишите цель своими словами.",
+        })
+
+    return {
+        "project": project,
+        "counts": {
+            "documents": len(documents),
+            "verified_memory": len(verified_memory),
+            "pending_permissions": len(pending_permissions),
+            "active_tasks": len(active_tasks),
+            "failed_tasks": len(failed_tasks),
+            "checks_passed": development.get("checks_passed", 0),
+            "checks_total": development.get("checks_total", 0),
+        },
+        "suggestions": suggestions[:3],
+    }
 
 
 @app.get("/api/tools")
