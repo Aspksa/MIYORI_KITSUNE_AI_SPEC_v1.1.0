@@ -95,15 +95,13 @@ def save_cloudru_profile(
     return cloudru_profile()
 
 
-async def test_cloudru(
+async def list_cloudru_models(
     *,
     api_key: str | None = None,
     base_url: str | None = None,
-    model_id: str | None = None,
 ) -> dict:
     key = (api_key if api_key is not None else settings.cloudru_api_key).strip()
     base = (base_url or settings.cloudru_base_url or _DEFAULT_BASE).strip().rstrip("/")
-    model = (model_id if model_id is not None else settings.cloudru_model_id).strip()
 
     if not key:
         raise ValueError("Введите API-ключ Cloud.ru.")
@@ -115,64 +113,122 @@ async def test_cloudru(
         response = await client.get(url, headers=headers)
 
     if response.is_error:
-        detail = response.text[:500]
-        raise RuntimeError(f"Cloud.ru вернул HTTP {response.status_code}: {detail}")
-
-    data = response.json()
-    ids: list[str] = []
-    chat_models: list[dict] = []
-    if isinstance(data, dict):
-        raw = data.get("data")
-        if isinstance(raw, list):
-            for item in raw:
-                if not isinstance(item, dict) or not item.get("id"):
-                    continue
-                model_id = str(item["id"])
-                ids.append(model_id)
-                metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
-                model_type = str(metadata.get("type") or "").lower()
-                if not model_type or "llm" in model_type or "chat" in model_type or "text" in model_type:
-                    chat_models.append({
-                        "id": model_id,
-                        "name": metadata.get("name") or model_id,
-                        "type": metadata.get("type"),
-                    })
-
-    selected_found = bool(model and model in ids) if ids else None
-    if model and selected_found is False:
-        raise ValueError(
-            f"Model ID «{model}» не найден в /models. Выберите точный ID из списка Cloud.ru."
+        detail = response.text[:700]
+        raise RuntimeError(
+            f"Cloud.ru /models вернул HTTP {response.status_code}: "
+            f"{detail or 'без текста ошибки'}"
         )
 
-    chat_ok = None
-    if model:
-        chat_url = f"{base}/chat/completions"
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": "Ответь одним словом: OK"}],
-            "max_completion_tokens": 8,
-            "temperature": 0,
-        }
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            chat_response = await client.post(
-                chat_url,
-                headers={**headers, "Content-Type": "application/json"},
-                json=payload,
+    data = response.json()
+    models: list[dict] = []
+    ids: list[str] = []
+    if isinstance(data, dict) and isinstance(data.get("data"), list):
+        for item in data["data"]:
+            if not isinstance(item, dict) or not item.get("id"):
+                continue
+            model_id = str(item["id"])
+            ids.append(model_id)
+            metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            model_type = str(metadata.get("type") or "").strip()
+            normalized = model_type.lower()
+            is_chat = (
+                not normalized
+                or "llm" in normalized
+                or "chat" in normalized
+                or "text" in normalized
             )
-        if chat_response.is_error:
-            detail = chat_response.text[:700]
-            raise RuntimeError(
-                f"Ключ работает, но chat/completions для модели «{model}» вернул "
-                f"HTTP {chat_response.status_code}: {detail or 'без текста ошибки'}"
-            )
-        chat_ok = True
+            models.append({
+                "id": model_id,
+                "name": metadata.get("name") or model_id,
+                "type": model_type or None,
+                "is_chat": is_chat,
+                "max_model_len": item.get("max_model_len"),
+            })
 
+    chat_models = [item for item in models if item["is_chat"]]
     return {
         "ok": True,
         "models_found": len(ids),
-        "selected_model": model or None,
-        "selected_model_found": selected_found,
-        "chat_ok": chat_ok,
-        "chat_models": chat_models[:80],
-        "sample_models": ids[:12],
+        "models": models[:200],
+        "chat_models": chat_models[:200],
+        "selected_model": settings.cloudru_model_id or None,
+        "selected_model_found": bool(settings.cloudru_model_id and settings.cloudru_model_id in ids),
+    }
+
+
+async def test_cloudru(
+    *,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    model_id: str | None = None,
+) -> dict:
+    key = (api_key if api_key is not None else settings.cloudru_api_key).strip()
+    base = (base_url or settings.cloudru_base_url or _DEFAULT_BASE).strip().rstrip("/")
+    model = (model_id if model_id is not None else settings.cloudru_model_id).strip()
+
+    catalog = await list_cloudru_models(api_key=key, base_url=base)
+    ids = [item["id"] for item in catalog["models"]]
+
+    if not model:
+        return {
+            **catalog,
+            "ok": False,
+            "reason": "model_required",
+            "chat_ok": False,
+            "selected_model": None,
+            "message": "Ключ работает. Выберите Model ID из списка доступных LLM.",
+        }
+
+    if model not in ids:
+        return {
+            **catalog,
+            "ok": False,
+            "reason": "model_not_found",
+            "chat_ok": False,
+            "selected_model": model,
+            "selected_model_found": False,
+            "message": (
+                f"«{model}» не является доступным Model ID Foundation Models. "
+                "Выберите модель из списка Cloud.ru."
+            ),
+        }
+
+    chat_url = f"{base}/chat/completions"
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": "Ответь одним словом: OK"}],
+        "max_completion_tokens": 8,
+        "temperature": 0,
+    }
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        chat_response = await client.post(chat_url, headers=headers, json=payload)
+
+    if chat_response.is_error:
+        detail = chat_response.text[:700]
+        return {
+            **catalog,
+            "ok": False,
+            "reason": "chat_failed",
+            "chat_ok": False,
+            "selected_model": model,
+            "selected_model_found": True,
+            "http_status": chat_response.status_code,
+            "message": (
+                f"Модель «{model}» найдена, но chat/completions вернул "
+                f"HTTP {chat_response.status_code}: {detail or 'без текста ошибки'}"
+            ),
+        }
+
+    return {
+        **catalog,
+        "ok": True,
+        "reason": None,
+        "chat_ok": True,
+        "selected_model": model,
+        "selected_model_found": True,
+        "message": f"Cloud.ru и chat/completions для модели «{model}» работают.",
     }
