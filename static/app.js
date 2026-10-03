@@ -35,6 +35,8 @@ const personaStatusChip = el("personaStatusChip");
 const personaStatusText = el("personaStatusText");
 const truthStatusChip = el("truthStatusChip");
 const truthStatusText = el("truthStatusText");
+const ragStatusChip = el("ragStatusChip");
+const ragStatusText = el("ragStatusText");
 const memoryStatusChip = el("memoryStatusChip");
 const dbStatusChip = el("dbStatusChip");
 const docsStatusChip = el("docsStatusChip");
@@ -212,12 +214,14 @@ async function loadNexus() {
 }
 
 
-function addContextOrbit(brain, agent, epistemic) {
+function addContextOrbit(brain, agent, epistemic, rag) {
   const actions = agent?.actions?.filter((item) => item.status === "completed") || [];
-  const sources = brain?.sources || [];
-  const memoryCount = brain?.memory_items || 0;
+  const ragItems = rag?.items || [];
+  const sources = ragItems.filter((item) => item.source_type === "document");
+  const memoryItems = ragItems.filter((item) => item.source_type === "memory");
+  const knowledge = ragItems.filter((item) => item.source_type === "knowledge");
+  const memoryCount = memoryItems.length;
   const plan = brain?.plan || [];
-  const knowledge = epistemic?.used_claims || [];
 
   if (!memoryCount && !sources.length && !actions.length && !plan.length && !knowledge.length) return;
 
@@ -225,7 +229,7 @@ function addContextOrbit(brain, agent, epistemic) {
   drawer.className = "response-context collapsed";
 
   const summaryBits = [];
-  if (sources.length) summaryBits.push(sources.length + " источн.");
+  if (sources.length) summaryBits.push(sources.length + " докум.");
   if (memoryCount) summaryBits.push(memoryCount + " память");
   if (knowledge.length) summaryBits.push(knowledge.length + " знан.");
   if (actions.length) summaryBits.push(actions.length + " действ.");
@@ -251,20 +255,26 @@ function addContextOrbit(brain, agent, epistemic) {
       const item = document.createElement("div");
       item.className = "context-item";
       item.innerHTML =
-        '<strong>' + escapeHtml(source.filename || "Документ") +
-        ' · ' + source.chunk_index + '</strong>' +
+        '<strong>' + escapeHtml(source.title || "Документ") +
+        ' · ' + escapeHtml(source.locator || "") + '</strong>' +
         '<p>' + escapeHtml(source.content || "") + '</p>';
       section.appendChild(item);
     }
     body.appendChild(section);
   }
 
-  if (memoryCount) {
+  if (memoryItems.length) {
     const section = document.createElement("div");
-    section.className = "context-section compact";
-    section.innerHTML =
-      '<h4>Память</h4><div class="context-stat">Использовано подтверждённых фактов: <strong>' +
-      memoryCount + '</strong></div>';
+    section.className = "context-section";
+    section.innerHTML = '<h4>Память</h4>';
+    for (const memory of memoryItems) {
+      const item = document.createElement("div");
+      item.className = "context-item";
+      item.innerHTML =
+        '<strong>' + escapeHtml(memory.locator || "memory") + '</strong>' +
+        '<p>' + escapeHtml(memory.content || "") + '</p>';
+      section.appendChild(item);
+    }
     body.appendChild(section);
   }
 
@@ -275,13 +285,13 @@ function addContextOrbit(brain, agent, epistemic) {
     for (const claim of knowledge) {
       const item = document.createElement("div");
       item.className = "context-item";
-      const confidence = typeof claim.confidence === "number"
-        ? Math.round(claim.confidence * 100) + "%"
+      const confidence = typeof claim.metadata?.confidence === "number"
+        ? Math.round(claim.metadata.confidence * 100) + "%"
         : "—";
       item.innerHTML =
-        '<strong>' + escapeHtml(claim.status || "knowledge") +
+        '<strong>' + escapeHtml(claim.metadata?.status || "knowledge") +
         ' · ' + confidence + '</strong>' +
-        '<p>' + escapeHtml(claim.statement || "") + '</p>';
+        '<p>' + escapeHtml(claim.content || "") + '</p>';
       section.appendChild(item);
     }
     body.appendChild(section);
@@ -461,6 +471,13 @@ async function loadStatus() {
       dbStatusChip.textContent = "Готова";
       dbStatusChip.className = "soft-status ok";
     }
+    if (ragStatusChip && data.rag) {
+      ragStatusChip.textContent = data.rag.fts5 ? "Hybrid" : "Fallback";
+      ragStatusChip.className = data.rag.fts5 ? "soft-status ok" : "soft-status warn";
+      ragStatusText.textContent =
+        (data.rag.fts5 ? "FTS5 + lexical" : "lexical") +
+        " · chunks " + (data.rag.indexed_chunks || 0);
+    }
     if (personaStatusChip && data.persona) {
       personaStatusChip.textContent = "Активна";
       personaStatusChip.className = "soft-status ok";
@@ -496,6 +513,10 @@ async function loadStatus() {
     if (personaStatusChip) {
       personaStatusChip.textContent = "Ошибка";
       personaStatusChip.className = "soft-status error";
+    }
+    if (ragStatusChip) {
+      ragStatusChip.textContent = "Ошибка";
+      ragStatusChip.className = "soft-status error";
     }
     if (dbStatusChip) {
       dbStatusChip.textContent = "Недоступна";
@@ -1192,7 +1213,7 @@ form.addEventListener("submit", async (event) => {
   setProcessingStage("accepted", "Запрос получен");
   const livingIntent = createLivingIntent(text);
   updateLivingIntent(livingIntent, "context");
-  setProcessingStage("context", "Собираю память и документы");
+  setProcessingStage("context", "RAG ищет релевантный контекст");
   input.value = "";
   input.style.height = "auto";
   setBusy(true);
@@ -1237,26 +1258,19 @@ form.addEventListener("submit", async (event) => {
         planCard.appendChild(planBody);
       }
 
-      if (data.brain.sources?.length) {
-        const sourceCard = addActivityCard("Источники ответа", null, "neutral");
+      if (data.rag?.items?.length) {
+        const sourceCard = addActivityCard("RAG · найденный контекст", null, "neutral");
         const sourceBody = document.createElement("div");
         sourceBody.className = "activity-body source-list";
-        data.brain.sources.forEach((source) => {
+        data.rag.items.forEach((source) => {
           const item = document.createElement("div");
           item.className = "source-card";
           item.innerHTML =
-            '<strong>' + escapeHtml(source.filename || "Документ") +
-            ' · фрагмент ' + source.chunk_index + '</strong>' +
-            '<p>' + escapeHtml(source.content || "") + '</p>';
-          const ask = document.createElement("button");
-          ask.type = "button";
-          ask.textContent = "Спросить по источнику";
-          ask.onclick = () => {
-            input.value = "По источнику " + (source.filename || "документ") +
-              ", фрагмент " + source.chunk_index + ": ";
-            input.focus();
-          };
-          item.appendChild(ask);
+            '<strong>' + escapeHtml(source.source_type) + ' · ' +
+            escapeHtml(source.title || "Источник") + '</strong>' +
+            '<p>' + escapeHtml(source.content || "") + '</p>' +
+            '<small>' + escapeHtml(source.locator || "") +
+            ' · score ' + Number(source.score || 0).toFixed(5) + '</small>';
           sourceBody.appendChild(item);
         });
         sourceCard.appendChild(sourceBody);
@@ -1284,15 +1298,14 @@ form.addEventListener("submit", async (event) => {
         );
       }
     }
-    addContextOrbit(data.brain, data.agent, data.epistemic);
+    addContextOrbit(data.brain, data.agent, data.epistemic, data.rag);
     setProcessingStage("result", "Результат готов");
     updateLivingIntent(
       livingIntent,
       "done",
       "готово",
-      "Готово · " +
-        (data.brain?.document_items || 0) + " источн. · " +
-        (data.brain?.memory_items || 0) + " память · " +
+      "Готово · RAG " +
+        (data.rag?.items?.length || 0) + " фрагм. · " +
         ((data.agent?.actions || []).filter((item) => item.status === "completed").length) + " действ."
     );
     await Promise.all([
