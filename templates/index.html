@@ -15,7 +15,7 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.19</span>
+            <span class="version-pill" id="versionText">00.00.20</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
@@ -284,7 +284,8 @@
           </label>
           <label>
             <span>Model ID</span>
-            <input id="cloudruModelId" type="text" autocomplete="off" placeholder="ID модели Cloud.ru">
+            <input id="cloudruModelId" type="text" autocomplete="off" list="cloudruModelOptions" placeholder="Точный ID модели Cloud.ru">
+            <datalist id="cloudruModelOptions"></datalist>
           </label>
           <label>
             <span>Base URL</span>
