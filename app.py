@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import ipaddress
 import threading
 import webbrowser
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -155,6 +156,19 @@ def startup() -> None:
     start_update_monitor()
 
 
+def _require_local_admin(request: Request) -> None:
+    host = request.client.host if request.client else ""
+    try:
+        if ipaddress.ip_address(host).is_loopback:
+            return
+    except ValueError:
+        pass
+    raise HTTPException(
+        status_code=403,
+        detail="Эта операция разрешена только с локального устройства.",
+    )
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(ROOT / "templates" / "index.html")
@@ -177,12 +191,14 @@ def status() -> dict:
 
 
 @app.get("/api/account/cloudru")
-def account_cloudru_get() -> dict:
+def account_cloudru_get(request: Request) -> dict:
+    _require_local_admin(request)
     return {"cloudru": cloudru_profile()}
 
 
 @app.put("/api/account/cloudru")
-def account_cloudru_save(request: CloudRuProfileRequest) -> dict:
+def account_cloudru_save(request: CloudRuProfileRequest, http_request: Request) -> dict:
+    _require_local_admin(http_request)
     try:
         profile = save_cloudru_profile(
             api_key=request.api_key,
@@ -195,7 +211,8 @@ def account_cloudru_save(request: CloudRuProfileRequest) -> dict:
 
 
 @app.post("/api/account/cloudru/test")
-async def account_cloudru_test(request: CloudRuTestRequest) -> dict:
+async def account_cloudru_test(request: CloudRuTestRequest, http_request: Request) -> dict:
+    _require_local_admin(http_request)
     try:
         return await test_cloudru(
             api_key=request.api_key,
@@ -209,17 +226,20 @@ async def account_cloudru_test(request: CloudRuTestRequest) -> dict:
 
 
 @app.get("/api/update/status")
-def project_update_status(refresh: bool = False) -> dict:
+def project_update_status(request: Request, refresh: bool = False) -> dict:
+    _require_local_admin(request)
     return {"update": update_status(fetch=refresh)}
 
 
 @app.post("/api/update/check")
-def project_update_check() -> dict:
+def project_update_check(request: Request) -> dict:
+    _require_local_admin(request)
     return {"update": update_status(fetch=True)}
 
 
 @app.post("/api/update/apply")
-def project_update_apply() -> dict:
+def project_update_apply(request: Request) -> dict:
+    _require_local_admin(request)
     try:
         return {"update": apply_update()}
     except UpdateError as exc:
