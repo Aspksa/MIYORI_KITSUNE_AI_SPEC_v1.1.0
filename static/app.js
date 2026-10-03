@@ -31,6 +31,8 @@ const miyoriConsole = el("miyoriConsole");
 const consoleHeader = el("consoleHeader");
 const toggleConsole = el("toggleConsole");
 const aiStatusChip = el("aiStatusChip");
+const personaStatusChip = el("personaStatusChip");
+const personaStatusText = el("personaStatusText");
 const memoryStatusChip = el("memoryStatusChip");
 const dbStatusChip = el("dbStatusChip");
 const docsStatusChip = el("docsStatusChip");
@@ -422,6 +424,14 @@ async function loadStatus() {
       dbStatusChip.textContent = "Готова";
       dbStatusChip.className = "soft-status ok";
     }
+    if (personaStatusChip && data.persona) {
+      personaStatusChip.textContent = "Активна";
+      personaStatusChip.className = "soft-status ok";
+      personaStatusText.textContent =
+        "v" + data.persona.version + " · " +
+        data.persona.phrases + " фраз · " +
+        data.persona.dialogues + " диалогов";
+    }
     if (data.provider_configured) {
       statusDot.className = "dot ready";
       statusText.textContent = "Подключён";
@@ -445,6 +455,10 @@ async function loadStatus() {
     if (aiStatusChip) {
       aiStatusChip.textContent = "Недоступен";
       aiStatusChip.className = "soft-status error";
+    }
+    if (personaStatusChip) {
+      personaStatusChip.textContent = "Ошибка";
+      personaStatusChip.className = "soft-status error";
     }
     if (dbStatusChip) {
       dbStatusChip.textContent = "Недоступна";
