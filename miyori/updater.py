@@ -13,9 +13,29 @@ ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_REPO = "Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0"
 EXPECTED_HTTPS = f"https://github.com/{EXPECTED_REPO}.git"
 EXPECTED_SSH = f"git@github.com:{EXPECTED_REPO}.git"
-DEFAULT_BRANCH = os.getenv("MIYORI_UPDATE_BRANCH", "main").strip() or "main"
-AUTO_UPDATE = os.getenv("MIYORI_AUTO_UPDATE", "1").strip().lower() not in {"0", "false", "no", "off"}
-INTERVAL_MINUTES = max(5, int(os.getenv("MIYORI_UPDATE_INTERVAL_MINUTES", "15")))
+
+
+def _env_setting(name: str, default: str) -> str:
+    direct = os.getenv(name)
+    if direct is not None:
+        return direct
+    path = ROOT / ".env"
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            key, value = stripped.split("=", 1)
+            if key.strip() == name:
+                return value.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return default
+
+
+DEFAULT_BRANCH = _env_setting("MIYORI_UPDATE_BRANCH", "main").strip() or "main"
+AUTO_UPDATE = _env_setting("MIYORI_AUTO_UPDATE", "1").strip().lower() not in {"0", "false", "no", "off"}
+INTERVAL_MINUTES = max(5, int(_env_setting("MIYORI_UPDATE_INTERVAL_MINUTES", "15")))
 _STATE_PATH = ROOT / "data" / "update_state.json"
 
 _monitor_lock = threading.Lock()
