@@ -20,6 +20,11 @@ const modelText = el("modelText");
 const versionText = el("versionText");
 const projectLabel = el("projectLabel");
 const conversationTitle = el("conversationTitle");
+const brainPlan = el("brainPlan");
+const brainState = el("brainState");
+const toolList = el("toolList");
+const taskList = el("taskList");
+const developmentStats = el("developmentStats");
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -98,7 +103,10 @@ async function loadProjects() {
   if (!state.projectId && data.projects.length) state.projectId = data.projects[0].id;
   projectSelect.value = String(state.projectId);
   updateProjectLabel();
-  await Promise.all([loadConversations(), loadMemory(), loadDocuments()]);
+  await Promise.all([
+    loadConversations(), loadMemory(), loadDocuments(),
+    loadTools(), loadTasks(), loadDevelopment()
+  ]);
 }
 
 function updateProjectLabel() {
@@ -176,6 +184,100 @@ async function uploadDocument(file) {
     showError(error.message);
   } finally {
     documentInput.value = "";
+  }
+}
+
+async function loadTools() {
+  try {
+    const data = await api("/api/tools");
+    toolList.innerHTML = "";
+    for (const tool of data.tools) {
+      const row = document.createElement("div");
+      row.className = "tool-item";
+      row.innerHTML = "<strong>" + escapeHtml(tool.name) + "</strong><small>" +
+        escapeHtml(tool.description) + "</small>";
+      toolList.appendChild(row);
+    }
+  } catch (error) {
+    toolList.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + '</div>';
+  }
+}
+
+async function createBackgroundTask(taskType) {
+  if (!state.projectId) return;
+  try {
+    await api("/api/projects/" + state.projectId + "/tasks", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({task_type: taskType, payload: {}})
+    });
+    await loadTasks();
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+async function cancelTask(taskId) {
+  try {
+    await api("/api/projects/" + state.projectId + "/tasks/" + taskId + "/cancel", {
+      method: "POST"
+    });
+    await loadTasks();
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+async function loadTasks() {
+  if (!state.projectId) return;
+  try {
+    const data = await api("/api/projects/" + state.projectId + "/tasks");
+    taskList.innerHTML = "";
+    if (!data.tasks.length) {
+      taskList.innerHTML = '<div class="conversation-empty">Задач пока нет</div>';
+      return;
+    }
+    for (const task of data.tasks.slice(0, 10)) {
+      const row = document.createElement("div");
+      row.className = "task-item status-" + task.status;
+      row.innerHTML =
+        "<div><strong>#" + task.id + " " + escapeHtml(task.task_type) + "</strong>" +
+        "<small>" + escapeHtml(task.status) + "</small></div>";
+      if (task.status === "queued" || task.status === "running") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Отмена";
+        button.onclick = () => cancelTask(task.id);
+        row.appendChild(button);
+      }
+      taskList.appendChild(row);
+    }
+  } catch (error) {
+    taskList.innerHTML = '<div class="conversation-empty">' + escapeHtml(error.message) + '</div>';
+  }
+}
+
+async function loadDevelopment() {
+  if (!state.projectId) return;
+  try {
+    const data = await api("/api/projects/" + state.projectId + "/development");
+    const s = data.snapshot;
+    developmentStats.innerHTML =
+      "Факты: <b>" + s.verified_facts + "</b> · Документы: <b>" + s.documents +
+      "</b> · Задачи OK: <b>" + s.completed_tasks + "</b> · Ошибки: <b>" +
+      s.failed_tasks + "</b> · Проверки: <b>" + s.checks_passed + "/" + s.checks_total + "</b>";
+  } catch (error) {
+    developmentStats.textContent = error.message;
+  }
+}
+
+async function runDevelopmentCheck() {
+  if (!state.projectId) return;
+  try {
+    await api("/api/projects/" + state.projectId + "/development/check", {method: "POST"});
+    await loadDevelopment();
+  } catch (error) {
+    showError(error.message);
   }
 }
 
@@ -327,7 +429,10 @@ form.addEventListener("submit", async (event) => {
 
     state.conversationId = data.conversation_id;
     addMessage("assistant", data.answer);
-    await Promise.all([loadConversations(), loadMemory(), loadDocuments()]);
+    await Promise.all([
+    loadConversations(), loadMemory(), loadDocuments(),
+    loadTools(), loadTasks(), loadDevelopment()
+  ]);
   } catch (error) {
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
@@ -377,6 +482,11 @@ memorySearch.addEventListener("input", loadMemory);
 documentSearch.addEventListener("input", searchDocuments);
 documentInput.addEventListener("change", () => uploadDocument(documentInput.files[0]));
 el("refreshMemory").addEventListener("click", loadMemory);
+el("refreshTools").addEventListener("click", loadTools);
+el("refreshTasks").addEventListener("click", loadTasks);
+el("runSelfCheckTask").addEventListener("click", () => createBackgroundTask("self_check"));
+el("runMemoryTask").addEventListener("click", () => createBackgroundTask("memory_consolidation"));
+el("runDevelopmentCheck").addEventListener("click", runDevelopmentCheck);
 el("newChat").addEventListener("click", startNewChat);
 el("newChatSide").addEventListener("click", startNewChat);
 
