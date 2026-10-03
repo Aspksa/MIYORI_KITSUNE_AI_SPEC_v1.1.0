@@ -833,3 +833,47 @@ body.inspector-hidden .inspector { display: none; }
   .chat-action { min-width: 96px; }
   .activity-card { width: 94%; }
 }
+
+.structured-result { display: grid; gap: 7px; }
+.result-row {
+  display: flex; justify-content: space-between; gap: 10px; align-items: center;
+  padding: 8px 9px; border: 1px solid #29303a; border-radius: 9px; background: #0f141a;
+}
+.result-row strong { display: block; color: #d9dde3; font-size: 9px; }
+.result-row small { display: block; margin-top: 2px; color: #6f7886; font-size: 8px; }
+.result-row button,
+.source-card button {
+  padding: 5px 7px; border: 1px solid #353c47; border-radius: 8px;
+  background: #1a2029; color: #cdd2da; font-size: 8px;
+}
+.result-title { margin-bottom: 5px; color: #dce0e6; font-size: 10px; font-weight: 750; }
+.result-note { margin-top: 5px; color: #8b7447; font-size: 8px; }
+.fact-result {
+  display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 7px; align-items: start;
+  padding: 7px 8px; border: 1px solid #29303a; border-radius: 8px; background: #0f141a;
+}
+.fact-result strong { color: #b99cca; font-size: 8px; }
+.fact-result span { color: #c9cdd4; font-size: 9px; line-height: 1.4; }
+.fact-result small { color: #6d7683; font-size: 8px; text-transform: uppercase; }
+.status-grid {
+  display: grid; grid-template-columns: auto 1fr; gap: 5px 10px;
+  padding: 8px 9px; border: 1px solid #29303a; border-radius: 9px; background: #0f141a;
+}
+.status-grid span { color: #697381; font-size: 8px; text-transform: uppercase; }
+.status-grid strong { color: #d6dae1; font-size: 9px; }
+.plan-result { display: grid; gap: 6px; }
+.plan-row {
+  display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 7px; align-items: start;
+}
+.plan-row > span {
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 7px;
+  background: #211a26; color: #c4a6d5; font-size: 8px; font-weight: 800;
+}
+.plan-row > div { padding-top: 2px; color: #b9c0ca; font-size: 9px; line-height: 1.4; }
+.source-list { display: grid; gap: 7px; }
+.source-card {
+  padding: 8px 9px; border: 1px solid #29303a; border-radius: 9px; background: #0f141a;
+}
+.source-card strong { display: block; margin-bottom: 4px; color: #b99ccb; font-size: 9px; }
+.source-card p { margin: 0 0 7px; color: #929ca9; font-size: 9px; line-height: 1.45; }
+.chat-action.special { border-color: #3a3342; background: #17151d; }
