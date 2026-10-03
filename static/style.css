@@ -2332,3 +2332,81 @@ textarea::placeholder { color: #aaa2ba; }
     height: 76vh;
   }
 }
+
+
+/* 00.00.18 — primary sidebar navigation */
+.main-side-menu {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 8px;
+  border: 1px solid #ebe5f8;
+  border-radius: 18px;
+  background: rgba(255,255,255,.68);
+  box-shadow: 0 10px 28px rgba(105,85,160,.05);
+}
+.side-menu-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0,1fr) 18px;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: transparent;
+  color: #4c4264;
+  text-align: left;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
+}
+.side-menu-item:hover {
+  border-color: #e2d8f6;
+  background: #f6f1ff;
+  transform: translateY(-1px);
+}
+.side-menu-item:active {
+  transform: translateY(0);
+}
+.side-menu-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e2daf4;
+  border-radius: 11px;
+  background: #f2edff;
+  color: #7c5bd4;
+  font-size: 14px;
+}
+.side-menu-copy {
+  min-width: 0;
+}
+.side-menu-copy strong {
+  display: block;
+  overflow: hidden;
+  color: #403653;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-menu-copy small {
+  display: block;
+  margin-top: 2px;
+  color: #a098af;
+  font-size: 8px;
+}
+.side-menu-chevron {
+  color: #aaa1bb;
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
+}
+.update-project-item .side-menu-icon {
+  background: #eef8f2;
+  border-color: #d9eee1;
+  color: #3d9b61;
+}
+.update-project-item:hover {
+  border-color: #dceee2;
+  background: #f4fbf6;
+}
