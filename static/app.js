@@ -100,7 +100,7 @@ function showWelcome() {
     '<div id="nexusSuggestions" class="quiet-suggestions">' +
       '<div class="nexus-loading">Подбираю следующий шаг…</div>' +
     '</div>' +
-    '<button id="openInnerWorld" class="inner-world-link" type="button">◎ Внутренний мир Миёри</button>';
+    '<button id="openInnerWorld" class="inner-world-link" type="button">◎ Состояние и детали проекта</button>';
 
   article.append(avatar, bubble);
   messages.appendChild(article);
@@ -165,34 +165,115 @@ async function loadNexus() {
 
 
 function addContextOrbit(brain, agent) {
-  const chips = [];
-  if (brain?.memory_items) chips.push({icon: "✦", text: brain.memory_items + " память"});
-  if (brain?.document_items) chips.push({icon: "▤", text: brain.document_items + " источника"});
-  const actions = agent?.actions?.filter((item) => item.status === "completed").length || 0;
-  if (actions) chips.push({icon: "✋", text: actions + " действия"});
-  if (brain?.plan?.length) chips.push({icon: "◎", text: brain.plan.length + " шага"});
-  if (!chips.length) return;
+  const actions = agent?.actions?.filter((item) => item.status === "completed") || [];
+  const sources = brain?.sources || [];
+  const memoryCount = brain?.memory_items || 0;
+  const plan = brain?.plan || [];
 
-  const orbit = document.createElement("div");
-  orbit.className = "context-orbit";
-  for (const chip of chips) {
-    const item = document.createElement("span");
-    item.innerHTML = '<b>' + chip.icon + '</b>' + escapeHtml(chip.text);
-    orbit.appendChild(item);
+  if (!memoryCount && !sources.length && !actions.length && !plan.length) return;
+
+  const drawer = document.createElement("section");
+  drawer.className = "response-context collapsed";
+
+  const summaryBits = [];
+  if (sources.length) summaryBits.push(sources.length + " источн.");
+  if (memoryCount) summaryBits.push(memoryCount + " память");
+  if (actions.length) summaryBits.push(actions.length + " действ.");
+  if (plan.length) summaryBits.push(plan.length + " шага");
+
+  drawer.innerHTML =
+    '<button class="response-context-head" type="button">' +
+      '<span class="response-context-icon">◎</span>' +
+      '<span class="response-context-copy"><strong>Контекст ответа</strong><small>' +
+        escapeHtml(summaryBits.join(" · ")) +
+      '</small></span>' +
+      '<span class="response-context-chevron">⌄</span>' +
+    '</button>' +
+    '<div class="response-context-body"></div>';
+
+  const body = drawer.querySelector(".response-context-body");
+
+  if (sources.length) {
+    const section = document.createElement("div");
+    section.className = "context-section";
+    section.innerHTML = '<h4>Источники</h4>';
+    for (const source of sources) {
+      const item = document.createElement("div");
+      item.className = "context-item";
+      item.innerHTML =
+        '<strong>' + escapeHtml(source.filename || "Документ") +
+        ' · ' + source.chunk_index + '</strong>' +
+        '<p>' + escapeHtml(source.content || "") + '</p>';
+      section.appendChild(item);
+    }
+    body.appendChild(section);
   }
-  messages.appendChild(orbit);
+
+  if (memoryCount) {
+    const section = document.createElement("div");
+    section.className = "context-section compact";
+    section.innerHTML =
+      '<h4>Память</h4><div class="context-stat">Использовано подтверждённых фактов: <strong>' +
+      memoryCount + '</strong></div>';
+    body.appendChild(section);
+  }
+
+  if (plan.length) {
+    const section = document.createElement("div");
+    section.className = "context-section";
+    section.innerHTML = '<h4>План</h4>';
+    plan.forEach((step, index) => {
+      const item = document.createElement("div");
+      item.className = "context-plan-step";
+      item.innerHTML = '<span>' + (index + 1) + '</span><div>' + escapeHtml(step) + '</div>';
+      section.appendChild(item);
+    });
+    body.appendChild(section);
+  }
+
+  if (actions.length) {
+    const section = document.createElement("div");
+    section.className = "context-section";
+    section.innerHTML = '<h4>Действия</h4>';
+    for (const action of actions) {
+      const item = document.createElement("div");
+      item.className = "context-action";
+      item.innerHTML =
+        '<span>✋</span><div><strong>' +
+        escapeHtml(action.tool_name || "действие") +
+        '</strong><small>' + escapeHtml(action.reason || "выполнено") + '</small></div>';
+      section.appendChild(item);
+    }
+    body.appendChild(section);
+  }
+
+  const developer = document.createElement("button");
+  developer.type = "button";
+  developer.className = "developer-link";
+  developer.textContent = "Технические детали";
+  developer.onclick = () => openConsole("context");
+  body.appendChild(developer);
+
+  drawer.querySelector(".response-context-head").addEventListener("click", () => {
+    drawer.classList.toggle("collapsed");
+  });
+
+  messages.appendChild(drawer);
   messages.scrollTop = messages.scrollHeight;
 }
 
 function openConsole(tab = null) {
   if (!miyoriConsole) return;
   miyoriConsole.classList.remove("collapsed");
+  document.body.classList.add("developer-open");
   if (tab) activateInspectorTab(tab);
 }
 
 function toggleConsoleState() {
   if (!miyoriConsole) return;
+  const willClose = !miyoriConsole.classList.contains("collapsed");
   miyoriConsole.classList.toggle("collapsed");
+  document.body.classList.toggle("developer-open", !willClose);
 }
 
 function createLivingIntent(goal) {
@@ -1092,7 +1173,15 @@ form.addEventListener("submit", async (event) => {
       }
     }
     addContextOrbit(data.brain, data.agent);
-    updateLivingIntent(livingIntent, "done");
+    updateLivingIntent(
+      livingIntent,
+      "done",
+      "готово",
+      "Готово · " +
+        (data.brain?.document_items || 0) + " источн. · " +
+        (data.brain?.memory_items || 0) + " память · " +
+        ((data.agent?.actions || []).filter((item) => item.status === "completed").length) + " действ."
+    );
     await Promise.all([
       loadConversations(), loadMemory(), loadDocuments(),
       loadTools(), loadPermissions(), loadTasks(), loadDevelopment(), loadNexus()
