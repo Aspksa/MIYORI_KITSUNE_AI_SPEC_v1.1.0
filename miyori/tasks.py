@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable
+
+from .system_settings import load_system_settings
 
 from .db import (
     claim_next_task,
@@ -15,6 +18,7 @@ TaskHandler = Callable[[int, dict], dict]
 _handlers: dict[str, TaskHandler] = {}
 _worker_lock = threading.Lock()
 _worker_running = False
+_monitor_running = False
 
 
 def register_task_handler(name: str, handler: TaskHandler) -> None:
@@ -73,3 +77,37 @@ def wake_worker() -> None:
 
     thread = threading.Thread(target=_run_worker, daemon=True, name="miyori-task-worker")
     thread.start()
+
+
+def worker_status() -> dict:
+    cfg = load_system_settings()["automation"]
+    return {
+        "enabled": bool(cfg["background_tasks"]),
+        "interval_seconds": int(cfg["worker_interval_seconds"]),
+        "worker_running": _worker_running,
+        "monitor_running": _monitor_running,
+    }
+
+
+def _monitor_loop() -> None:
+    global _monitor_running
+    try:
+        while True:
+            cfg = load_system_settings()["automation"]
+            if cfg["background_tasks"]:
+                wake_worker()
+            time.sleep(max(5, int(cfg["worker_interval_seconds"])))
+    finally:
+        _monitor_running = False
+
+
+def start_worker_monitor() -> None:
+    global _monitor_running
+    if _monitor_running:
+        return
+    _monitor_running = True
+    threading.Thread(
+        target=_monitor_loop,
+        daemon=True,
+        name="miyori-task-monitor",
+    ).start()
