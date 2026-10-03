@@ -322,7 +322,28 @@ def list_memory_facts(project_id: int) -> list[dict]:
             """,
             (project_id,),
         ).fetchall()
-    return [dict(row) for row in rows]
+    facts = [dict(row) for row in rows]
+    active = [
+        fact for fact in facts
+        if fact["status"] in {"candidate", "verified"}
+    ]
+    for fact in facts:
+        fact["possible_conflict_ids"] = []
+
+    for index, left in enumerate(active):
+        left_tokens = _memory_tokens(left["statement"])
+        if len(left_tokens) < 2:
+            continue
+        for right in active[index + 1:]:
+            right_tokens = _memory_tokens(right["statement"])
+            shared = left_tokens & right_tokens
+            left_unique = left_tokens - right_tokens
+            right_unique = right_tokens - left_tokens
+            if len(shared) >= 2 and left_unique and right_unique:
+                left["possible_conflict_ids"].append(right["id"])
+                right["possible_conflict_ids"].append(left["id"])
+
+    return facts
 
 
 def update_memory_status(project_id: int, fact_id: int, status: str) -> dict | None:
