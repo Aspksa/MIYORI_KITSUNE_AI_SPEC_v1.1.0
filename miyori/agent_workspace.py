@@ -71,6 +71,7 @@ def init_agent_workspace_db() -> None:
                 role TEXT NOT NULL,
                 title TEXT NOT NULL,
                 instruction TEXT NOT NULL,
+                capability TEXT NOT NULL DEFAULT 'read_only' CHECK(capability IN ('read_only','standard')),
                 dependencies_json TEXT NOT NULL DEFAULT '[]',
                 step_budget INTEGER NOT NULL DEFAULT 3,
                 status TEXT NOT NULL CHECK(status IN (
@@ -95,6 +96,14 @@ def init_agent_workspace_db() -> None:
                 ON agent_workspace_nodes(workspace_id, id ASC);
             """
         )
+        columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(agent_workspace_nodes)").fetchall()
+        }
+        if "capability" not in columns:
+            conn.execute(
+                "ALTER TABLE agent_workspace_nodes ADD COLUMN capability TEXT NOT NULL DEFAULT 'read_only'"
+            )
 
 
 def _loads(value: str | None, fallback: Any) -> Any:
@@ -135,6 +144,9 @@ def _validate_node_specs(nodes: list[dict]) -> list[dict]:
         keys.add(key)
         role = str(raw.get("role") or "agent").strip()[:80]
         title = str(raw.get("title") or role).strip()[:160]
+        capability = str(raw.get("capability") or "read_only").strip()
+        if capability not in {"read_only", "standard"}:
+            raise ValueError(f"Недопустимая capability узла {key}.")
         instruction = str(raw.get("instruction") or "").strip()
         if not instruction:
             raise ValueError(f"Для узла {key} нужна инструкция.")
@@ -153,6 +165,7 @@ def _validate_node_specs(nodes: list[dict]) -> list[dict]:
                 "role": role,
                 "title": title,
                 "instruction": instruction[:6000],
+                "capability": capability,
                 "depends_on": dependencies,
                 "step_budget": budget,
             }
@@ -209,6 +222,7 @@ def default_agent_workspace_nodes(goal: str) -> list[dict]:
             "key": "risk_review",
             "role": "Ревьюер рисков",
             "title": "Риски и противоречия",
+            "capability": "read_only",
             "instruction": (
                 "Проверь проект, источники и утверждения на риски, противоречия и недостающие "
                 f"evidence относительно цели: {clean}. Ничего не изменяй."
@@ -220,6 +234,7 @@ def default_agent_workspace_nodes(goal: str) -> list[dict]:
             "key": "coordinator",
             "role": "Координатор",
             "title": "Сведение и действия",
+            "capability": "standard",
             "instruction": (
                 "Сверь handoff двух предыдущих агентов и продолжи цель: "
                 f"{clean}. Если требуется write-действие, используй обычный permission pipeline."
@@ -266,9 +281,9 @@ def create_agent_workspace(
             conn.execute(
                 """
                 INSERT INTO agent_workspace_nodes(
-                    workspace_id, node_key, role, title, instruction,
+                    workspace_id, node_key, role, title, instruction, capability,
                     dependencies_json, step_budget, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     workspace_id,
@@ -276,6 +291,7 @@ def create_agent_workspace(
                     item["role"],
                     item["title"],
                     item["instruction"],
+                    item["capability"],
                     json.dumps(item["depends_on"], ensure_ascii=False),
                     item["step_budget"],
                     status,
@@ -538,6 +554,7 @@ def _run_node(project_id: int, workspace_id: int, node: dict) -> dict:
                 [],
                 request_key=request_key,
                 max_steps=int(node["step_budget"]),
+                tool_permissions=("read",) if node.get("capability") == "read_only" else None,
             )
         )
         workflow = get_agent_workflow(result.workflow_id, project_id) or {}
@@ -576,6 +593,7 @@ def _run_node(project_id: int, workspace_id: int, node: dict) -> dict:
                 "node_key": node["node_key"],
                 "status": mapped,
                 "step_budget": int(node["step_budget"]),
+                "capability": node.get("capability"),
             },
         )
         return {"node_id": node["id"], "status": mapped, "workflow_id": result.workflow_id}
