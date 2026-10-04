@@ -6,6 +6,8 @@
     reply: null,
     topicId: null,
     voiceNote: null,
+    voiceBlob: null,
+    voiceBuffer: null,
     snapshot: null,
     folder: sessionStorage.getItem("miyori.chat.folder") || "all",
     pendingScheduleId: null,
@@ -267,7 +269,7 @@
     ux.topicId = null;
     ux.snapshot = null;
     clearReply();
-    clearVoiceDraft();
+    void clearVoiceDraft(true);
     renderTopicOptions([]);
     renderPins([]);
     document.querySelectorAll(".unread-divider").forEach(node => node.remove());
@@ -367,7 +369,7 @@
 
   async function afterConversationOpen() {
     clearReply();
-    clearVoiceDraft();
+    void clearVoiceDraft(true);
     ux.topicId = null;
     await Promise.all([refreshSnapshot(), refreshFolders()]);
     applyTopicFilter();
@@ -376,7 +378,7 @@
 
   async function afterSend(data, submittedText = "") {
     clearReply();
-    clearVoiceDraft();
+    await clearVoiceDraft(false);
     await refreshSnapshot();
     if (
       ux.pendingScheduleId &&
@@ -941,6 +943,127 @@
     } catch (_) {}
   }
 
+  async function uploadVoiceBlob(blob, durationMs) {
+    const formData = new FormData();
+    const suffix = blob.type === "audio/wav" ? "wav" : "webm";
+    formData.append("file", blob, "voice-note." + suffix);
+    formData.append("duration_ms", String(Math.max(0, Math.round(durationMs || 0))));
+    const response = await fetch("/api/projects/" + projectId() + "/voice-notes", {
+      method:"POST", body:formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Не удалось сохранить voice-note.");
+    return data.voice_note;
+  }
+
+  async function decodeVoiceBlob(blob) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    const context = new AudioCtx();
+    try {
+      return await context.decodeAudioData(await blob.arrayBuffer());
+    } finally {
+      await context.close().catch(() => {});
+    }
+  }
+
+  function drawVoiceWaveform(canvas, buffer, startSec = 0, endSec = null) {
+    if (!canvas || !buffer) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const width = canvas.width = Math.max(240, Math.floor(canvas.clientWidth || 320));
+    const height = canvas.height = 54;
+    ctx.clearRect(0,0,width,height);
+    const data = buffer.getChannelData(0);
+    const duration = Math.max(buffer.duration, 0.001);
+    const end = endSec == null ? duration : endSec;
+    const bars = Math.max(60, Math.floor(width / 3));
+    const block = Math.max(1, Math.floor(data.length / bars));
+    ctx.fillStyle = getComputedStyle(document.documentElement)
+      .getPropertyValue("--ui-border-strong").trim() || "currentColor";
+    for (let i=0;i<bars;i++) {
+      let peak = 0;
+      const from = i * block;
+      const to = Math.min(data.length, from + block);
+      for (let j=from;j<to;j++) peak = Math.max(peak, Math.abs(data[j]));
+      const x = Math.floor((i / bars) * width);
+      const h = Math.max(2, peak * (height - 8));
+      ctx.globalAlpha = 0.72;
+      ctx.fillRect(x, (height-h)/2, 2, h);
+    }
+    const startX = Math.max(0, Math.min(width, (startSec / duration) * width));
+    const endX = Math.max(0, Math.min(width, (end / duration) * width));
+    ctx.fillStyle = "rgba(0,0,0,.18)";
+    ctx.globalAlpha = 1;
+    if (startX > 0) ctx.fillRect(0,0,startX,height);
+    if (endX < width) ctx.fillRect(endX,0,width-endX,height);
+  }
+
+  function encodeTrimmedWav(buffer, startSec, endSec) {
+    const sampleRate = buffer.sampleRate;
+    const channels = Math.max(1, Math.min(2, buffer.numberOfChannels));
+    const startFrame = Math.max(0, Math.floor(startSec * sampleRate));
+    const endFrame = Math.min(buffer.length, Math.ceil(endSec * sampleRate));
+    const frames = Math.max(1, endFrame - startFrame);
+    const bytesPerSample = 2;
+    const dataSize = frames * channels * bytesPerSample;
+    const out = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(out);
+    const ascii = (offset, text) => {
+      for (let i=0;i<text.length;i++) view.setUint8(offset+i,text.charCodeAt(i));
+    };
+    ascii(0,"RIFF");
+    view.setUint32(4,36+dataSize,true);
+    ascii(8,"WAVE");
+    ascii(12,"fmt ");
+    view.setUint32(16,16,true);
+    view.setUint16(20,1,true);
+    view.setUint16(22,channels,true);
+    view.setUint32(24,sampleRate,true);
+    view.setUint32(28,sampleRate*channels*bytesPerSample,true);
+    view.setUint16(32,channels*bytesPerSample,true);
+    view.setUint16(34,16,true);
+    ascii(36,"data");
+    view.setUint32(40,dataSize,true);
+    const arrays = [];
+    for (let ch=0;ch<channels;ch++) arrays.push(buffer.getChannelData(ch));
+    let offset = 44;
+    for (let frame=startFrame;frame<endFrame;frame++) {
+      for (let ch=0;ch<channels;ch++) {
+        const sample = Math.max(-1, Math.min(1, arrays[ch][frame] || 0));
+        view.setInt16(offset, sample < 0 ? sample*0x8000 : sample*0x7fff, true);
+        offset += 2;
+      }
+    }
+    return new Blob([out], {type:"audio/wav"});
+  }
+
+  async function trimVoiceDraft(startSec, endSec) {
+    if (!ux.voiceBuffer || !ux.voiceNote) return;
+    const duration = ux.voiceBuffer.duration;
+    const start = Math.max(0, Math.min(Number(startSec)||0, duration));
+    const end = Math.max(start + 0.1, Math.min(Number(endSec)||duration, duration));
+    if (start <= 0.02 && end >= duration - 0.02) {
+      setStatus("Выбран весь voice-note; обрезка не требуется.");
+      return;
+    }
+    const trimmed = encodeTrimmedWav(ux.voiceBuffer,start,end);
+    const previous = ux.voiceNote;
+    try {
+      const next = await uploadVoiceBlob(trimmed,(end-start)*1000);
+      ux.voiceNote = next;
+      ux.voiceBlob = trimmed;
+      ux.voiceBuffer = await decodeVoiceBlob(trimmed).catch(() => null);
+      await fetch("/api/projects/" + projectId() + "/voice-notes/" + previous.id, {
+        method:"DELETE"
+      }).catch(() => {});
+      renderVoiceDraft();
+      setStatus("Voice-note обрезан и сохранён как новый фрагмент.");
+    } catch (error) {
+      showError(error.message);
+    }
+  }
+
   async function toggleVoiceNote() {
     if (ux.recording) {
       ux.recording.recorder.stop();
@@ -977,17 +1100,12 @@
         try { recognition?.stop(); } catch (_) {}
         ux.recording = null;
         $("voiceNoteButton")?.classList.remove("recording");
+        const durationMs = Math.round(performance.now()-startedAt);
         const blob = new Blob(chunks,{type:recorder.mimeType || "audio/webm"});
-        const formData = new FormData();
-        formData.append("file",blob,"voice-note.webm");
-        formData.append("duration_ms",String(Math.round(performance.now()-startedAt)));
         try {
-          const response = await fetch("/api/projects/" + projectId() + "/voice-notes", {
-            method:"POST",body:formData
-          });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.detail || "Не удалось сохранить voice-note.");
-          ux.voiceNote = data.voice_note;
+          ux.voiceBlob = blob;
+          ux.voiceBuffer = await decodeVoiceBlob(blob).catch(() => null);
+          ux.voiceNote = await uploadVoiceBlob(blob,durationMs);
           if (!input.value.trim() && ux.transcript) {
             input.value = ux.transcript;
             input.dispatchEvent(new Event("input",{bubbles:true}));
@@ -996,7 +1114,11 @@
             input.dispatchEvent(new Event("input",{bubbles:true}));
           }
           renderVoiceDraft();
-          setStatus("Голосовое сохранено. Текст можно проверить перед отправкой.");
+          setStatus(
+            ux.voiceBuffer
+              ? "Голосовое сохранено. Можно проверить транскрипцию и обрезать фрагмент."
+              : "Голосовое сохранено. Текст можно проверить перед отправкой."
+          );
         } catch (error) {
           showError(error.message);
         }
@@ -1024,20 +1146,76 @@
     audio.src = ux.voiceNote.url;
     const label = document.createElement("span");
     label.textContent = "Voice note" + (ux.transcript ? " · транскрипция готова" : " · без транскрипции");
+    host.append(audio,label);
+
+    if (ux.voiceBuffer?.duration > 0.25) {
+      const editor = document.createElement("div");
+      editor.className = "voice-wave-editor";
+      const canvas = document.createElement("canvas");
+      canvas.className = "voice-waveform";
+      canvas.setAttribute("aria-label","Форма голосовой записи");
+      const duration = ux.voiceBuffer.duration;
+      const controls = document.createElement("div");
+      controls.className = "voice-trim-controls";
+      const start = document.createElement("input");
+      start.type = "range";
+      start.min = "0";
+      start.max = String(Math.max(0.1,duration-0.1));
+      start.step = "0.05";
+      start.value = "0";
+      start.setAttribute("aria-label","Начало voice-note");
+      const end = document.createElement("input");
+      end.type = "range";
+      end.min = "0.1";
+      end.max = String(duration);
+      end.step = "0.05";
+      end.value = String(duration);
+      end.setAttribute("aria-label","Конец voice-note");
+      const range = document.createElement("small");
+      const sync = () => {
+        let a = Number(start.value);
+        let b = Number(end.value);
+        if (a >= b - 0.1) {
+          if (document.activeElement === start) a = Math.max(0,b-0.1);
+          else b = Math.min(duration,a+0.1);
+          start.value = String(a);
+          end.value = String(b);
+        }
+        range.textContent = a.toFixed(1) + "–" + b.toFixed(1) + " сек";
+        drawVoiceWaveform(canvas,ux.voiceBuffer,a,b);
+      };
+      start.oninput = sync;
+      end.oninput = sync;
+      const trim = button("Обрезать", "conversation-secondary-small");
+      trim.onclick = () => void trimVoiceDraft(Number(start.value),Number(end.value));
+      controls.append(start,end,range,trim);
+      editor.append(canvas,controls);
+      host.appendChild(editor);
+      requestAnimationFrame(sync);
+    }
+
     const remove = button("×", "conversation-ux-close");
     remove.setAttribute("aria-label","Удалить voice-note из сообщения");
-    remove.onclick = clearVoiceDraft;
-    host.append(audio,label,remove);
+    remove.onclick = () => void clearVoiceDraft(true);
+    host.appendChild(remove);
     host.hidden = false;
   }
 
-  function clearVoiceDraft() {
+  async function clearVoiceDraft(deleteRemote = true) {
+    const note = ux.voiceNote;
     ux.voiceNote = null;
+    ux.voiceBlob = null;
+    ux.voiceBuffer = null;
     ux.transcript = "";
     renderVoiceDraft();
+    if (deleteRemote && note?.id && projectId()) {
+      await fetch("/api/projects/" + projectId() + "/voice-notes/" + note.id, {
+        method:"DELETE"
+      }).catch(() => {});
+    }
   }
 
-  const observer = new MutationObserver(records => {
+    const observer = new MutationObserver(records => {
     for (const record of records) {
       for (const node of record.addedNodes) {
         if (!(node instanceof HTMLElement)) continue;
