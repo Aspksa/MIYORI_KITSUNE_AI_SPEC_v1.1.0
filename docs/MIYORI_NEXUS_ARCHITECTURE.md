@@ -28,7 +28,7 @@ Documents, Home, Voice и будущий Desktop-клиент.
 | Nervous system | workflow/task/audit events существуют раздельно | Частично | Ввести единый versioned event envelope без переписывания существующих таблиц |
 | Attention | Context Router и приоритет активного запроса | Частично | Отделить attention policy от retrieval policy |
 | Digital body | Несколько status chips и существующий `/nexus` snapshot | Частично | Нормализовать состояния `disabled/not_connected/ready/processing/degraded/error` |
-| Home | CRUD устройств и parental-control foundation | Частично | Capability API, discovery/heartbeat позже; не смешивать с UI shell |
+| Home | Inventory + authenticated heartbeat + explicit parental binding | Реализовано/частично | Подключить реальные device-agents/OS adapters позже; не симулировать enforcement |
 | Voice / ears / tongue | Нет STT/TTS runtime | Не реализовано | Capability boundary + permission-visible microphone state |
 | Desktop | `Miyori.bat`, browser auto-open | Не реализовано как shell | Desktop shell только после стабилизации API/events |
 | Generative UI | Нет typed renderer | Не реализовано | Только schema-driven surfaces; arbitrary model HTML запрещён |
@@ -59,7 +59,8 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **N8 / 00.00.52 — завершён.** Agent Workspace: persistent DAG coordinator поверх Workflow Engine, parallel-ready execution, per-node/total budgets, dependency handoff, approvals/recovery inheritance и отдельная Actions surface.
 - **N9 / 00.00.49 — завершён.** Living Presence: versioned presence contract выводит ready/working/waiting/attention/recovery/degraded только из NEXUS snapshot, Actions, Events и реального локального chat-request state; idle остаётся визуально тихим.
 - **N10 / 00.00.50 — завершён.** Proactive Miyori: canonical attention engine, state fingerprinting, persistent snooze/dismiss, initiative-aware chat shelf, channel ownership и запрет автоматического write/chat interruption.
-- **N6 Desktop Runtime отложен по решению владельца проекта. Следующий выбранный этап — N11 Home, затем N12 Digital Body.**
+- **N11 / 00.00.53 — завершён.** Home: explicit device identity, one-time heartbeat credential, TTL connectivity evidence, capability allowlist, parental binding и отдельная evidence-first Home surface. Legacy status не является connectivity; network scanning и fake OS enforcement запрещены.
+- **N6 Desktop Runtime отложен по решению владельца проекта. Следующий выбранный этап — N12 Digital Body.**
 
 ## Поэтапный план
 
