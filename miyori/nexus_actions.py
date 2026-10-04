@@ -374,7 +374,7 @@ def _workflow_card(
                 "tool_name": item.get("tool_name"),
                 "reason": item.get("reason"),
                 "status": item.get("status"),
-                "arguments": item.get("arguments") or {},
+                "argument_keys": sorted((item.get("arguments") or {}).keys()),
                 "result": item.get("result"),
                 "retry_count": int(item.get("retry_count") or 0),
                 "created_at": item.get("created_at"),
@@ -622,11 +622,10 @@ def build_nexus_action_center(project_id: int, *, limit: int = 60) -> dict:
         "cancelled": 7,
     }
     cards.sort(
-        key=lambda item: (
-            priority.get(str(item.get("state")), 99),
-            str(item.get("updated_at") or item.get("created_at") or ""),
-        )
+        key=lambda item: str(item.get("updated_at") or item.get("created_at") or ""),
+        reverse=True,
     )
+    cards.sort(key=lambda item: priority.get(str(item.get("state")), 99))
     cards = cards[:limit]
 
     counts = {state: 0 for state in sorted(NEXUS_ACTION_STATES)}
