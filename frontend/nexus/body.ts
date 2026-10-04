@@ -118,7 +118,7 @@ function createTextField(
 function buildAppearanceEditor(
   body: NexusDigitalBody,
   actions: BodyAppearanceActions,
-): HTMLElement {
+): HTMLDetailsElement {
   const details = document.createElement("details");
   details.className = "nexus-body-appearance-editor";
   const summary = document.createElement("summary");
@@ -304,6 +304,7 @@ function renderBody(
   const shell = document.createElement("div");
   shell.className = "nexus-body-shell";
   shell.appendChild(renderTrustedBodyVisual(body, presentation, effectiveState));
+  shell.title = presentation.label;
 
   const copy = document.createElement("div");
   copy.className = "nexus-body-copy";
@@ -332,22 +333,35 @@ function renderBody(
   const canon = document.createElement("details");
   canon.className = "nexus-body-canon";
   const summary = document.createElement("summary");
-  summary.textContent = "Канон образа";
+  summary.textContent = "Образ Миёри · закрыть";
   canon.appendChild(summary);
+  canon.open = host.dataset.appearanceOpen === "true";
+  canon.addEventListener("toggle", () => {
+    if (canon.isConnected) host.dataset.appearanceOpen = canon.open ? "true" : "false";
+  });
 
   const bodyCanon = document.createElement("div");
   bodyCanon.className = "nexus-body-canon-body";
-  appendTextList(bodyCanon, "Подтверждено", body.appearance.confirmed);
+  const extraCanon = document.createElement("details");
+  extraCanon.className = "nexus-canon-explanation";
+  const canonSummary = document.createElement("summary");
+  canonSummary.textContent = "Подробнее о каноне";
+  extraCanon.appendChild(canonSummary);
+  const canonFacts = document.createElement("div");
+  appendTextList(canonFacts, "Подтверждено", body.appearance.confirmed);
   appendTextList(
-    bodyCanon,
+    canonFacts,
     "Оставлено на ваш выбор",
     body.appearance.open_for_owner_choice,
   );
+  extraCanon.appendChild(canonFacts);
 
   const note = document.createElement("p");
   note.textContent =
     "Digital Body не придумывает цвет волос, глаз, число хвостов или наряд. Статический портрет, если вы его загрузите, не выдаётся за динамический rig.";
-  bodyCanon.append(note, buildAppearanceEditor(body, actions));
+  const editor = buildAppearanceEditor(body, actions);
+  editor.open = true;
+  bodyCanon.append(editor, extraCanon, note);
   canon.appendChild(bodyCanon);
   shell.appendChild(canon);
 

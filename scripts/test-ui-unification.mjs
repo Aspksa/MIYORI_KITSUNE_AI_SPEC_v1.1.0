@@ -13,15 +13,15 @@ assert.ok(
 );
 
 assert.ok(
-  !html.includes('id="menuSettings"') &&
+  html.includes('id="menuSettings"') &&
     html.includes('id="nexusNavSystem"') &&
-    html.includes("<strong>Настройки</strong><small>Система · клиенты · обновления</small>"),
-  "settings must have one visible navigation entry",
+    html.includes('data-nexus-view="system" type="button" hidden aria-hidden="true" tabindex="-1"'),
+  "settings must be visible only inside Дополнительно",
 );
 
 assert.ok(
   !html.includes("Проект и разговоры") &&
-    html.includes('<div class="workspace-details" hidden aria-hidden="true">') &&
+    html.includes('<div class="workspace-details" hidden aria-hidden="true" role="region" aria-label="История переписки">') &&
     html.includes('id="projectSelect"') &&
     html.includes('id="conversationList"'),
   "legacy project/conversation controls must stay available to runtime but hidden from the UI",

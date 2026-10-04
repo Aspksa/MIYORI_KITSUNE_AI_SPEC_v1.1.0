@@ -79,6 +79,8 @@ function showChatWorkspace() {
 
 function showWorkspaceShell(name, eyebrow, title, subtitle) {
   if (chatHeader) chatHeader.hidden = true;
+  const bodyHost = el("nexusBodyHost");
+  if (bodyHost) bodyHost.dataset.appearanceOpen = "false";
   if (messages) messages.hidden = true;
   if (chatComposer) chatComposer.hidden = true;
   if (workspaceView) {
@@ -169,7 +171,7 @@ function nexusActionPreviewMarkup(preview) {
     preview.reversible === false ? "без гарантированного отката" : null
   ].filter(Boolean).join(" · ");
   return '<details class="nexus-action-detail nexus-action-preview">' +
-    '<summary>Preview изменений</summary>' +
+    '<summary>Что изменится</summary>' +
     '<div class="nexus-action-detail-body">' +
       (preview.title ? '<strong>' + escapeHtml(preview.title) + '</strong>' : '') +
       (preview.summary ? '<p>' + escapeHtml(preview.summary) + '</p>' : '') +
@@ -182,10 +184,10 @@ function nexusActionPreviewMarkup(preview) {
 function nexusActionEvidenceMarkup(evidence) {
   if (!Array.isArray(evidence) || !evidence.length) return "";
   return '<details class="nexus-action-detail">' +
-    '<summary>Evidence · ' + evidence.length + '</summary>' +
+    '<summary>Источники проверки · ' + evidence.length + '</summary>' +
     '<div class="nexus-action-evidence-list">' +
       evidence.map(item =>
-        '<article><div><strong>' + escapeHtml(item.label || item.kind || "Evidence") + '</strong>' +
+        '<article><div><strong>' + escapeHtml(item.label || item.kind || "Источник") + '</strong>' +
           '<small>' + escapeHtml(item.status || "recorded") + '</small></div>' +
           (item.data !== null && item.data !== undefined
             ? '<pre>' + nexusActionJson(item.data) + '</pre>'
@@ -282,14 +284,14 @@ function nexusActionControlsMarkup(action) {
 function nexusActionCardMarkup(action) {
   const tool = action.tool || {};
   const meta = [
-    action.kind === "workflow" ? "Workflow #" + action.workflow_id :
-      action.kind === "task" ? "Task #" + action.task_id : "Tool action",
+    action.kind === "workflow" ? "Процесс #" + action.workflow_id :
+      action.kind === "task" ? "Задача #" + action.task_id : "Операция",
     tool.name || null,
-    tool.risk_level ? "risk: " + tool.risk_level : null,
+    tool.risk_level ? "Риск: " + tool.risk_level : null,
     action.updated_at ? nexusActionTime(action.updated_at) : null
   ].filter(Boolean).join(" · ");
   const progress = action.progress?.label
-    ? '<div class="nexus-action-progress"><span>Progress</span><strong>' +
+    ? '<div class="nexus-action-progress"><span>Ход выполнения</span><strong>' +
         escapeHtml(action.progress.label) + '</strong></div>'
     : "";
   const destructive = tool.destructive
@@ -312,7 +314,7 @@ function nexusActionCardMarkup(action) {
       nexusActionPreviewMarkup(action.preview) +
       nexusActionStepsMarkup(action) +
       nexusActionEvidenceMarkup(action.evidence) +
-      nexusActionResultMarkup("Result", action.result, "result") +
+      nexusActionResultMarkup("Результат", action.result, "result") +
       nexusActionResultMarkup("Ошибка", action.error, "error") +
       nexusActionHistoryMarkup(action.history) +
     '</div>' +
@@ -344,46 +346,53 @@ async function renderNexusActionsWorkspace() {
         '<small>' + escapeHtml(note) + '</small>' +
       '</div>';
 
-    const group = (title, note, items, empty) =>
-      '<section class="nexus-action-group">' +
-        '<header><div><strong>' + escapeHtml(title) + '</strong><small>' +
-          escapeHtml(note) + '</small></div><span>' + items.length + '</span></header>' +
-        '<div class="nexus-action-card-list">' +
-          (items.length ? items.map(nexusActionCardMarkup).join("") :
-            '<div class="nexus-actions-empty"><strong>' + escapeHtml(empty) + '</strong></div>') +
-        '</div>' +
-      '</section>';
+    const group = (title, note, items, empty, collapsed = false) => {
+      const body = '<div class="nexus-action-card-list">' +
+        (items.length ? items.map(nexusActionCardMarkup).join("") :
+          '<div class="nexus-actions-empty"><strong>' + escapeHtml(empty) + '</strong></div>') +
+        '</div>';
+      const label = '<strong>' + escapeHtml(title) + '</strong><small>' +
+        escapeHtml(note) + '</small><span>' + items.length + '</span>';
+      return collapsed
+        ? '<details class="nexus-action-group nexus-actions-history">' +
+            '<summary class="nexus-actions-history-summary">' + label + '</summary>' +
+            body + '</details>'
+        : '<section class="nexus-action-group"><header><div>' +
+            '<strong>' + escapeHtml(title) + '</strong><small>' +
+            escapeHtml(note) + '</small></div><span>' + items.length +
+          '</span></header>' + body + '</section>';
+    };
 
     workspaceBody.innerHTML =
       '<section class="nexus-actions-dashboard nexus-actions-v2">' +
         '<div class="nexus-actions-overview">' +
-          '<div><h3>Центр действий</h3>' +
-            '<p>Одна карточка соответствует одному реальному workflow, tool operation или background task. ' +
-            'Permission внутри workflow не считается отдельным действием.</p></div>' +
+          '<div><h3>Что делает Миёри</h3>' +
+            '<p>Здесь видны текущие задачи, ожидающие вашего решения, и завершённые результаты.</p></div>' +
           '<div class="nexus-actions-head-controls">' +
-            '<button id="nexusAgentWorkspaceOpen" class="primary-sheet-button" type="button">Agent Workspace</button>' +
+            '<button id="nexusAgentWorkspaceOpen" class="primary-sheet-button" type="button">Команда агентов</button>' +
             '<button id="nexusActionsRefresh" class="secondary-sheet-button" type="button">Обновить</button>' +
           '</div>' +
         '</div>' +
         '<div class="nexus-action-metrics">' +
-          metric("Требуют внимания", counts.attention, "permission · recovery · error",
+          metric("Нужно ваше решение", counts.attention, "Разрешения и ошибки",
             counts.attention ? "warning" : "success") +
-          metric("В работе", counts.active, "planned · running · verifying",
+          metric("Сейчас выполняется", counts.active, "Активные задачи",
             counts.active ? "working" : "neutral") +
-          metric("Проверяются", counts.verifying, "только реальный verify state",
-            counts.verifying ? "working" : "neutral") +
-          metric("История", counts.history, "completed · cancelled", "neutral") +
+          metric("Завершено", counts.history, "Сохранённые результаты", "neutral") +
         '</div>' +
         '<div class="nexus-action-groups">' +
-          group("Требуют внимания",
-            "Подтверждение, восстановление или ошибка требуют осознанного решения.",
-            attention, "Нет действий, требующих внимания.") +
-          group("В работе",
-            "Никакой симуляции прогресса: показываются только сохранённые runtime-состояния.",
-            active, "Активных действий нет.") +
-          group("История",
-            "Результаты, evidence и журнал выполнения остаются доступными после завершения.",
-            history, "История действий пока пуста.") +
+          (!attention.length && !active.length
+            ? '<div class="nexus-actions-quiet"><strong>Сейчас всё спокойно</strong>' +
+              '<p>Миёри не выполняет задач и не ждёт ваших решений.</p></div>'
+            : group("Требуют вашего внимания",
+                "Здесь можно подтвердить действия или устранить ошибку.",
+                attention, "Ничего не требует решения.") +
+              group("Выполняются сейчас",
+                "Показываются только реальные задачи.",
+                active, "Активных задач нет.")) +
+          group("История действий",
+            "Завершённые задачи и результаты — нажмите, чтобы посмотреть.",
+            history, "Пока нет завершённых задач.", true) +
         '</div>' +
       '</section>';
 

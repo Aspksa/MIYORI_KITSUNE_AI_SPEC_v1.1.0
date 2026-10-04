@@ -26,7 +26,7 @@ async function openConversation(id, title) {
       addMessage(item.role, item.content, item.metadata?.sources || []);
     }
   }
-  conversationTitle.textContent = "Miyori Kitsune";
+  conversationTitle.textContent = "Миёри";
   await loadConversations();
   input.focus();
 }
@@ -128,6 +128,8 @@ form.addEventListener("submit", async (event) => {
   if (!text) return;
 
   showError("");
+  const uploadStatus = el("composerUploadStatus");
+  if (uploadStatus) uploadStatus.textContent = "";
   addMessage("user", text);
   input.value = "";
   input.style.height = "auto";
@@ -250,7 +252,7 @@ input.addEventListener("input", () => {
   input.style.height = Math.min(input.scrollHeight, 180) + "px";
 });
 input.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     form.requestSubmit();
   }
@@ -266,3 +268,40 @@ el("runMemoryTask").addEventListener("click", () => createBackgroundTask("memory
 el("runDevelopmentCheck").addEventListener("click", runDevelopmentCheck);
 if (el("newChat")) el("newChat").addEventListener("click", startNewChat);
 if (el("newChatSide")) el("newChatSide").addEventListener("click", startNewChat);
+
+const composerAttach = el("composerAttach");
+if (composerAttach && documentInput) {
+  composerAttach.addEventListener("click", () => documentInput.click());
+}
+const chatHistoryButton = el("chatHistoryButton");
+conversationList?.addEventListener("click", (event) => {
+  if (!event.target.closest(".conversation-item")) return;
+  const drawer = document.querySelector(".workspace-details");
+  if (!drawer) return;
+  drawer.hidden = true;
+  drawer.setAttribute("aria-hidden", "true");
+  drawer.classList.remove("history-drawer-open");
+  chatHistoryButton?.setAttribute("aria-expanded", "false");
+});
+if (chatHistoryButton) {
+  chatHistoryButton.addEventListener("click", () => {
+    const drawer = document.querySelector(".workspace-details");
+    if (!drawer) return;
+    const visible = drawer.hidden;
+    drawer.hidden = !visible;
+    drawer.setAttribute("aria-hidden", visible ? "false" : "true");
+    drawer.classList.toggle("history-drawer-open", visible);
+    chatHistoryButton.setAttribute("aria-expanded", String(visible));
+  });
+}
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    const drawer = document.querySelector(".workspace-details");
+    if (drawer && !drawer.hidden) {
+      drawer.hidden = true;
+      drawer.setAttribute("aria-hidden", "true");
+      drawer.classList.remove("history-drawer-open");
+      chatHistoryButton?.setAttribute("aria-expanded", "false");
+    }
+  }
+});

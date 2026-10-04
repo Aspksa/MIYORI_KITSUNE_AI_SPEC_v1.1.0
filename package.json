@@ -7,7 +7,8 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "jsdom": "25.0.1"
   },
   "scripts": {
     "typecheck:nexus": "tsc -p tsconfig.nexus.json --noEmit",
@@ -25,6 +26,7 @@
     "test:nexus-body": "node scripts/test-nexus-body.mjs",
     "test:nexus-appearance": "node scripts/test-nexus-appearance.mjs",
     "test:nexus-body-renderer": "node scripts/test-nexus-body-renderer.mjs",
-    "test:ui-unification": "node scripts/test-ui-unification.mjs"
+    "test:ui-unification": "node scripts/test-ui-unification.mjs",
+    "test:chat-experience": "node scripts/test-chat-experience.mjs"
   }
 }

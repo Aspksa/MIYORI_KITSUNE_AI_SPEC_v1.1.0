@@ -39,8 +39,8 @@ assert.ok(
   "Actions workspace must consume the unified authoritative action contract",
 );
 assert.ok(
-  workspace.includes("Preview изменений") &&
-    workspace.includes("Evidence") &&
+  workspace.includes("Что изменится") &&
+    workspace.includes("Источники проверки") &&
     workspace.includes("История"),
   "Actions workspace must expose preview, evidence and execution history",
 );
