@@ -2,8 +2,35 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.40.**  
+**Внутренняя версия приложения: 00.00.41.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.41
+
+`00.00.41` — **Extraction Integrity · честная полнота чтения оригинала**.
+
+После `00.00.40` Miyori умеет доказуемо пройти весь **извлечённый** текст по конкретному вопросу. `00.00.41` отделяет это от другой задачи: насколько полно сам parser смог прочитать исходный файл.
+
+Теперь у документа две независимые метрики:
+
+- **extraction coverage** — какая доля исходного файла доступна текстовому parser-у;
+- **AI coverage** — какая доля уже извлечённого текста реально прошла глубокий анализ.
+
+Это важно для сложных PDF/Office-файлов: AI coverage может быть 100%, но extraction coverage — меньше 100%, если часть страниц является сканом, слайд состоит только из изображения или в документе есть визуальные объекты, которые пока не интерпретируются.
+
+Что добавлено:
+
+- PDF считает страницы с текстовым слоем и отдельно перечисляет страницы без извлекаемого текста;
+- DOCX извлекает основной текст, таблицы, headers/footers, footnotes/endnotes/comments; media/charts фиксируются как непроанализированная визуальная часть;
+- XLSX сохраняет формулы даже без cached value и отмечает изображения/диаграммы;
+- PPTX учитывает слайды без текста, speaker notes, media и charts;
+- Document Intelligence хранит persistent extraction manifest: status, coverage, warnings, details;
+- exhaustive Q&A хранит scan coverage, source extraction coverage и overall coverage;
+- при неполном извлечении exhaustive-ответ получает обязательный caveat, а confidence не остаётся `high`;
+- Drive показывает две отдельные шкалы и предупреждения по оригиналу;
+- миграция старой SQLite выполняется in-place и не стирает историю анализа/вопросов.
+
+Важно: OCR и полноценный multimodal vision ещё не реализованы. `00.00.41` не скрывает этот пробел, а делает его измеримым и видимым.
 
 ## Состояние релиза 00.00.40
 
@@ -150,7 +177,7 @@ data/
 - `miyori/brain.py` — публичный операционный план;
 - `miyori/context_router.py` — маршрутизация памяти, документов, знаний и tools;
 - `miyori/document_intelligence.py` — document graph, outline, coverage, глубокий поиск и hierarchical map→reduce;
-- `miyori/document_questions.py` — exhaustive Q&A по всему документу, evidence, per-question coverage и fingerprint recovery;
+- `miyori/document_questions.py` — exhaustive Q&A по всему документу, evidence, scan/source/overall coverage и fingerprint recovery;
 - `miyori/planner.py` — Planner schema, fallback и безопасная валидация решений;
 - `miyori/agent.py` — persistent/resumable Agent Workflow Engine;
 - `miyori/sources.py` — манифест источников ответа;
@@ -274,6 +301,7 @@ Document Intelligence дополнительно проверяет:
 - `00.00.37` — Miyori AI Core v2: Context Router + Planner + Agent loop + layered memory + sources + epistemic assessments + tool safety tests;
 - `00.00.38` — AI Reliability & Workflow Engine: persistent workflows + permission resume + idempotency + Tool Registry v2 + audit + crash recovery + CI;
 - `00.00.39` — Document Intelligence: structural document graph + hierarchical full-text analysis + coverage tracking + deep search + Drive UI + Agent/RAG integration;
-- `00.00.40` — Exhaustive Document Q&A: all-window verification + evidence/locators + question coverage + fingerprint recovery.
+- `00.00.40` — Exhaustive Document Q&A: all-window verification + evidence/locators + question coverage + fingerprint recovery;
+- `00.00.41` — Extraction Integrity: source extraction coverage + Office/PDF completeness manifest + truthful exhaustive coverage.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

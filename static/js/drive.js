@@ -216,6 +216,13 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
       const coverage = Math.max(0, Math.min(100, Math.round(
         Number(profile.coverage_ratio || 0) * 100
       )));
+      const extractionCoverage = Math.max(0, Math.min(100, Math.round(
+        Number(profile.extraction_coverage || 0) * 100
+      )));
+      const extractionStatus = profile.extraction_status || "unknown";
+      const extractionWarnings = Array.isArray(profile.extraction_warnings)
+        ? profile.extraction_warnings
+        : [];
       const outline = profile.outline || [];
       const analysis = profile.analysis || {};
       const keyPoints = analysis.key_points || [];
@@ -239,16 +246,38 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
             '<div><span>Разделов</span><strong>' + Number(profile.section_count || 0) + '</strong></div>' +
             '<div><span>Структурных узлов</span><strong>' + Number(profile.node_count || 0) + '</strong></div>' +
           '</div>' +
+          '<div class="drive-intelligence-coverage extraction-coverage">' +
+            '<div><strong>Извлечение из оригинала</strong><span>' + extractionCoverage + '%</span></div>' +
+            '<div class="drive-intelligence-progress"><i style="width:' + extractionCoverage + '%"></i></div>' +
+            '<small>Статус: ' + escapeHtml(extractionStatus) +
+              (extractionStatus === "complete"
+                ? " · текстовые данные оригинала извлечены полностью в рамках поддерживаемого parser-а."
+                : extractionStatus === "text_only"
+                  ? " · текст извлечён, но изображения/диаграммы пока не интерпретируются визуально."
+                  : extractionStatus === "partial"
+                    ? " · часть страниц/слайдов не содержит доступного текстового слоя."
+                    : extractionStatus === "needs_ocr"
+                      ? " · для полного чтения нужен OCR."
+                      : "") +
+            '</small>' +
+          '</div>' +
+          (extractionWarnings.length
+            ? '<div class="drive-extraction-warnings">' +
+              extractionWarnings.slice(0, 20).map(item =>
+                '<div><span>!</span><p>' + escapeHtml(item) + '</p></div>'
+              ).join("") +
+              '</div>'
+            : '') +
           '<div class="drive-intelligence-coverage">' +
-            '<div><strong>Глубокое покрытие</strong><span>' + coverage + '%</span></div>' +
+            '<div><strong>AI-анализ извлечённого текста</strong><span>' + coverage + '%</span></div>' +
             '<div class="drive-intelligence-progress"><i style="width:' + coverage + '%"></i></div>' +
             '<small>' +
               (status === "complete"
-                ? "Miyori прошла весь извлечённый текст документа и построила итоговый синтез."
+                ? "Miyori прошла весь доступный извлечённый текст и построила итоговый синтез."
                 : status === "analyzing" || status === "queued"
-                  ? "Анализ выполняется по всему документу последовательно, окно за окном."
+                  ? "Анализ выполняется последовательно, окно за окном."
                   : status === "needs_ocr"
-                    ? "Оригинал сохранён, но текст PDF нужно распознать OCR перед полным анализом."
+                    ? "AI-анализ невозможен до появления извлекаемого текста."
                     : "Локальная структура готова. Полный AI-анализ можно запустить отдельно.") +
             '</small>' +
           '</div>' +
@@ -269,6 +298,8 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
               (questions.length
                 ? questions.slice(0, 8).map(item => {
                     const qCoverage = Math.max(0, Math.min(100, Math.round(Number(item.coverage_ratio || 0) * 100)));
+                    const qExtraction = Math.max(0, Math.min(100, Math.round(Number(item.extraction_coverage || 0) * 100)));
+                    const qOverall = Math.max(0, Math.min(100, Math.round(Number(item.overall_coverage_ratio || 0) * 100)));
                     const answer = item.answer || {};
                     const evidence = Array.isArray(answer.evidence) ? answer.evidence : [];
                     const stateLabel = ({
@@ -281,7 +312,9 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
                     }[item.status] || item.status || "");
                     return '<article class="drive-exhaustive-run status-' + escapeHtml(item.status || "") + '">' +
                       '<header><div><strong>' + escapeHtml(item.question || "") + '</strong>' +
-                      '<small>' + escapeHtml(stateLabel) + ' · покрытие ' + qCoverage + '%</small></div>' +
+                      '<small>' + escapeHtml(stateLabel) +
+                      ' · scan ' + qCoverage + '% · original ' + qExtraction +
+                      '% · overall ' + qOverall + '%</small></div>' +
                       (answer.confidence ? '<span>' + escapeHtml(String(answer.confidence)) + '</span>' : '') +
                       '</header>' +
                       (answer.answer

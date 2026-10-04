@@ -23,7 +23,7 @@ from .provider import (
 )
 
 
-QUESTION_ENGINE_VERSION = "1.0.0"
+QUESTION_ENGINE_VERSION = "1.1.0"
 
 
 def init_document_questions_db() -> None:
@@ -44,6 +44,9 @@ def init_document_questions_db() -> None:
                 scanned_chars INTEGER NOT NULL DEFAULT 0,
                 total_chars INTEGER NOT NULL DEFAULT 0,
                 coverage_ratio REAL NOT NULL DEFAULT 0.0,
+                extraction_status TEXT NOT NULL DEFAULT 'unknown',
+                extraction_coverage REAL NOT NULL DEFAULT 0.0,
+                overall_coverage_ratio REAL NOT NULL DEFAULT 0.0,
                 answer_json TEXT NOT NULL DEFAULT '{}',
                 model_id TEXT,
                 engine_version TEXT NOT NULL,
@@ -81,6 +84,22 @@ def init_document_questions_db() -> None:
                 ON document_question_windows(question_id, window_index);
             """
         )
+        question_columns = {
+            row["name"]
+            for row in conn.execute(
+                "PRAGMA table_info(document_questions)"
+            ).fetchall()
+        }
+        extraction_columns = {
+            "extraction_status": "TEXT NOT NULL DEFAULT 'unknown'",
+            "extraction_coverage": "REAL NOT NULL DEFAULT 0.0",
+            "overall_coverage_ratio": "REAL NOT NULL DEFAULT 0.0",
+        }
+        for column, ddl in extraction_columns.items():
+            if column not in question_columns:
+                conn.execute(
+                    f"ALTER TABLE document_questions ADD COLUMN {column} {ddl}"
+                )
 
 
 def _loads(value: str | None, fallback):
@@ -110,6 +129,12 @@ def _question_row(row) -> dict | None:
         return None
     item = dict(row)
     item["coverage_ratio"] = float(item.get("coverage_ratio") or 0.0)
+    item["extraction_coverage"] = float(
+        item.get("extraction_coverage") or 0.0
+    )
+    item["overall_coverage_ratio"] = float(
+        item.get("overall_coverage_ratio") or 0.0
+    )
     item["answer"] = _loads(item.pop("answer_json", None), {})
     return item
 
@@ -287,8 +312,10 @@ def enqueue_exhaustive_document_question(
             """
             INSERT INTO document_questions(
                 project_id, document_id, source_sha256, question,
-                question_hash, status, engine_version, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?)
+                question_hash, status, extraction_status,
+                extraction_coverage, overall_coverage_ratio,
+                engine_version, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, 0.0, ?, ?, ?)
             """,
             (
                 project_id,
@@ -296,6 +323,8 @@ def enqueue_exhaustive_document_question(
                 document["sha256"],
                 clean,
                 digest,
+                str((profile or {}).get("extraction_status") or "unknown"),
+                float((profile or {}).get("extraction_coverage") or 0.0),
                 QUESTION_ENGINE_VERSION,
                 now,
                 now,
@@ -412,6 +441,11 @@ async def run_exhaustive_document_question(
 
     profile, windows = build_document_windows(project_id, document_id)
     total_chars = max(1, sum(int(window["source_chars"]) for window in windows))
+    extraction_status = str(profile.get("extraction_status") or "unknown")
+    extraction_coverage = max(
+        0.0,
+        min(1.0, float(profile.get("extraction_coverage") or 0.0)),
+    )
 
     with connect() as conn:
         existing_rows = conn.execute(
@@ -431,12 +465,16 @@ async def run_exhaustive_document_question(
             """
             UPDATE document_questions
             SET status = 'analyzing', total_chars = ?, scanned_chars = 0,
-                coverage_ratio = 0.0, model_id = ?, last_error = NULL,
+                coverage_ratio = 0.0, extraction_status = ?,
+                extraction_coverage = ?, overall_coverage_ratio = 0.0,
+                model_id = ?, last_error = NULL,
                 updated_at = ?, finished_at = NULL
             WHERE id = ? AND project_id = ?
             """,
             (
                 total_chars,
+                extraction_status,
+                extraction_coverage,
                 settings.cloudru_model_id,
                 utc_now(),
                 question_id,
@@ -518,16 +556,19 @@ async def run_exhaustive_document_question(
             window_results.append(result)
             scanned_chars += int(window["source_chars"])
             coverage = min(1.0, scanned_chars / total_chars)
+            overall_coverage = coverage * extraction_coverage
             with connect() as conn:
                 conn.execute(
                     """
                     UPDATE document_questions
-                    SET scanned_chars = ?, coverage_ratio = ?, updated_at = ?
+                    SET scanned_chars = ?, coverage_ratio = ?,
+                        overall_coverage_ratio = ?, updated_at = ?
                     WHERE id = ? AND project_id = ?
                     """,
                     (
                         scanned_chars,
                         coverage,
+                        overall_coverage,
                         utc_now(),
                         question_id,
                         project_id,
@@ -557,13 +598,35 @@ async def run_exhaustive_document_question(
             window_results,
             coverage_ratio=coverage,
         )
+        overall_coverage = coverage * extraction_coverage
         answer["coverage_ratio"] = coverage
+        answer["scan_coverage_ratio"] = coverage
+        answer["source_extraction_status"] = extraction_status
+        answer["source_extraction_coverage"] = extraction_coverage
+        answer["overall_coverage_ratio"] = overall_coverage
+        answer["source_extraction_warnings"] = (
+            profile.get("extraction_warnings") or []
+        )[:50]
         answer["windows_scanned"] = len(windows)
         answer["windows_relevant"] = sum(
             1 for item in window_results if item.get("relevant")
         )
         answer["document_id"] = document_id
         answer["question_id"] = question_id
+
+        if extraction_status != "complete" or extraction_coverage < 0.995:
+            caveat = (
+                "Полностью проверен только извлечённый текст. "
+                f"Из оригинала извлечено примерно {extraction_coverage * 100:.1f}%; "
+                "неизвлечённые страницы/изображения/диаграммы могут содержать "
+                "дополнительную информацию."
+            )
+            caveats = list(answer.get("caveats") or [])
+            if caveat not in caveats:
+                caveats.insert(0, caveat)
+            answer["caveats"] = caveats[:80]
+            if answer.get("confidence") == "high":
+                answer["confidence"] = "medium"
 
         status = "complete" if coverage >= 0.995 else "partial"
         now = utc_now()
@@ -572,7 +635,9 @@ async def run_exhaustive_document_question(
                 """
                 UPDATE document_questions
                 SET status = ?, scanned_chars = ?, total_chars = ?,
-                    coverage_ratio = ?, answer_json = ?, model_id = ?,
+                    coverage_ratio = ?, extraction_status = ?,
+                    extraction_coverage = ?, overall_coverage_ratio = ?,
+                    answer_json = ?, model_id = ?,
                     last_error = NULL, updated_at = ?, finished_at = ?
                 WHERE id = ? AND project_id = ?
                 """,
@@ -581,6 +646,9 @@ async def run_exhaustive_document_question(
                     scanned_chars,
                     total_chars,
                     coverage,
+                    extraction_status,
+                    extraction_coverage,
+                    overall_coverage,
                     json.dumps(answer, ensure_ascii=False),
                     settings.cloudru_model_id,
                     now,
@@ -600,6 +668,8 @@ async def run_exhaustive_document_question(
             details={
                 "document_id": document_id,
                 "coverage_ratio": coverage,
+                "extraction_coverage": extraction_coverage,
+                "overall_coverage_ratio": overall_coverage,
                 "windows_total": len(windows),
                 "windows_relevant": answer["windows_relevant"],
             },
@@ -610,13 +680,16 @@ async def run_exhaustive_document_question(
 
     except Exception as exc:
         coverage = min(1.0, scanned_chars / total_chars)
+        overall_coverage = coverage * extraction_coverage
         status = "partial" if scanned_chars else "failed"
         with connect() as conn:
             conn.execute(
                 """
                 UPDATE document_questions
                 SET status = ?, scanned_chars = ?, total_chars = ?,
-                    coverage_ratio = ?, last_error = ?, updated_at = ?
+                    coverage_ratio = ?, extraction_status = ?,
+                    extraction_coverage = ?, overall_coverage_ratio = ?,
+                    last_error = ?, updated_at = ?
                 WHERE id = ? AND project_id = ?
                 """,
                 (
@@ -624,6 +697,9 @@ async def run_exhaustive_document_question(
                     scanned_chars,
                     total_chars,
                     coverage,
+                    extraction_status,
+                    extraction_coverage,
+                    overall_coverage,
                     str(exc)[:2000],
                     utc_now(),
                     question_id,

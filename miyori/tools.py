@@ -190,6 +190,10 @@ def project_document_understanding(
             "table_count": profile.get("table_count"),
             "node_count": profile.get("node_count"),
             "coverage_ratio": profile.get("coverage_ratio"),
+            "extraction_status": profile.get("extraction_status"),
+            "extraction_coverage": profile.get("extraction_coverage"),
+            "extraction_warnings": profile.get("extraction_warnings") or [],
+            "extraction_details": profile.get("extraction_details") or {},
             "summary": profile.get("summary_long") or profile.get("summary_short"),
             "keywords": profile.get("keywords") or [],
             "analysis": profile.get("analysis") or {},
@@ -211,6 +215,9 @@ def project_document_outline(project_id: int, document_id: int) -> dict:
         "title": profile.get("title"),
         "status": profile.get("status"),
         "coverage_ratio": profile.get("coverage_ratio"),
+        "extraction_status": profile.get("extraction_status"),
+        "extraction_coverage": profile.get("extraction_coverage"),
+        "extraction_warnings": profile.get("extraction_warnings") or [],
         "outline": profile.get("outline") or [],
     }
 

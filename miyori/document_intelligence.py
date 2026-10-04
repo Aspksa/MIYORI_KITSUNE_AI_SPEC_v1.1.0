@@ -26,7 +26,7 @@ from .provider import (
     synthesize_document_analysis,
 )
 
-PARSER_VERSION = "1.0.0"
+PARSER_VERSION = "1.1.0"
 ANALYSIS_WINDOW_CHARS = 18_000
 SYNTHESIS_INPUT_CHARS = 24_000
 
@@ -65,6 +65,10 @@ def init_document_intelligence_db() -> None:
                 node_count INTEGER NOT NULL DEFAULT 0,
                 analyzed_chars INTEGER NOT NULL DEFAULT 0,
                 coverage_ratio REAL NOT NULL DEFAULT 0.0,
+                extraction_status TEXT NOT NULL DEFAULT 'unknown',
+                extraction_coverage REAL NOT NULL DEFAULT 0.0,
+                extraction_warnings_json TEXT NOT NULL DEFAULT '[]',
+                extraction_details_json TEXT NOT NULL DEFAULT '{}',
                 summary_short TEXT,
                 summary_long TEXT,
                 outline_json TEXT NOT NULL DEFAULT '[]',
@@ -145,6 +149,24 @@ def init_document_intelligence_db() -> None:
                 """
             )
 
+        intelligence_columns = {
+            row["name"]
+            for row in conn.execute(
+                "PRAGMA table_info(document_intelligence)"
+            ).fetchall()
+        }
+        extraction_columns = {
+            "extraction_status": "TEXT NOT NULL DEFAULT 'unknown'",
+            "extraction_coverage": "REAL NOT NULL DEFAULT 0.0",
+            "extraction_warnings_json": "TEXT NOT NULL DEFAULT '[]'",
+            "extraction_details_json": "TEXT NOT NULL DEFAULT '{}'",
+        }
+        for column, ddl in extraction_columns.items():
+            if column not in intelligence_columns:
+                conn.execute(
+                    f"ALTER TABLE document_intelligence ADD COLUMN {column} {ddl}"
+                )
+
 
 def _loads(value: str | None, fallback):
     if not value:
@@ -220,7 +242,18 @@ def _profile_row(row) -> dict | None:
     item["outline"] = _loads(item.pop("outline_json", None), [])
     item["keywords"] = _loads(item.pop("keywords_json", None), [])
     item["analysis"] = _loads(item.pop("analysis_json", None), {})
+    item["extraction_warnings"] = _loads(
+        item.pop("extraction_warnings_json", None),
+        [],
+    )
+    item["extraction_details"] = _loads(
+        item.pop("extraction_details_json", None),
+        {},
+    )
     item["coverage_ratio"] = float(item.get("coverage_ratio") or 0.0)
+    item["extraction_coverage"] = float(
+        item.get("extraction_coverage") or 0.0
+    )
     return item
 
 
@@ -329,6 +362,14 @@ def build_local_document_intelligence(
     outline: list[dict] = []
     heading_stack: list[tuple[int, int]] = []
     section_count = 0
+    extraction = dict(structured.metadata.get("extraction") or {})
+    extraction_status = str(extraction.get("status") or "unknown")
+    extraction_coverage = max(
+        0.0,
+        min(1.0, float(extraction.get("coverage") or 0.0)),
+    )
+    extraction_warnings = list(extraction.get("warnings") or [])
+    extraction_details = dict(extraction.get("details") or {})
 
     with connect() as conn:
         conn.execute(
@@ -422,11 +463,13 @@ def build_local_document_intelligence(
                 document_id, project_id, status, parser_version, source_sha256,
                 title, document_kind, language, char_count, word_count,
                 page_count, section_count, table_count, node_count,
-                analyzed_chars, coverage_ratio, summary_short, summary_long,
+                analyzed_chars, coverage_ratio, extraction_status,
+                extraction_coverage, extraction_warnings_json,
+                extraction_details_json, summary_short, summary_long,
                 outline_json, keywords_json, analysis_json, analysis_model,
                 last_error, created_at, updated_at
             ) VALUES (?, ?, 'indexed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0.0,
-                      ?, NULL, ?, ?, '{}', NULL, NULL, ?, ?)
+                      ?, ?, ?, ?, ?, NULL, ?, ?, '{}', NULL, NULL, ?, ?)
             ON CONFLICT(document_id) DO UPDATE SET
                 project_id = excluded.project_id,
                 status = 'indexed',
@@ -443,6 +486,10 @@ def build_local_document_intelligence(
                 node_count = excluded.node_count,
                 analyzed_chars = 0,
                 coverage_ratio = 0.0,
+                extraction_status = excluded.extraction_status,
+                extraction_coverage = excluded.extraction_coverage,
+                extraction_warnings_json = excluded.extraction_warnings_json,
+                extraction_details_json = excluded.extraction_details_json,
                 summary_short = excluded.summary_short,
                 summary_long = NULL,
                 outline_json = excluded.outline_json,
@@ -466,6 +513,10 @@ def build_local_document_intelligence(
                 int(section_count),
                 int(structured.metadata.get("table_count") or 0),
                 int(node_count),
+                extraction_status,
+                extraction_coverage,
+                json.dumps(extraction_warnings, ensure_ascii=False),
+                json.dumps(extraction_details, ensure_ascii=False),
                 local_summary,
                 json.dumps(outline, ensure_ascii=False),
                 json.dumps(_top_keywords(structured.text), ensure_ascii=False),
@@ -498,15 +549,22 @@ def mark_document_intelligence_unavailable(
                 document_id, project_id, status, parser_version, source_sha256,
                 title, document_kind, language, char_count, word_count,
                 page_count, section_count, table_count, node_count,
-                analyzed_chars, coverage_ratio, summary_short, summary_long,
+                analyzed_chars, coverage_ratio, extraction_status,
+                extraction_coverage, extraction_warnings_json,
+                extraction_details_json, summary_short, summary_long,
                 outline_json, keywords_json, analysis_json, last_error,
                 created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, 'document', NULL, 0, 0, 0, 0, 0, 0,
-                      0, 0.0, NULL, NULL, '[]', '[]', '{}', ?, ?, ?)
+                      0, 0.0, ?, 0.0, ?, '{}', NULL, NULL,
+                      '[]', '[]', '{}', ?, ?, ?)
             ON CONFLICT(document_id) DO UPDATE SET
                 status = excluded.status,
                 parser_version = excluded.parser_version,
                 source_sha256 = excluded.source_sha256,
+                extraction_status = excluded.extraction_status,
+                extraction_coverage = excluded.extraction_coverage,
+                extraction_warnings_json = excluded.extraction_warnings_json,
+                extraction_details_json = excluded.extraction_details_json,
                 last_error = excluded.last_error,
                 updated_at = excluded.updated_at
             """,
@@ -517,6 +575,8 @@ def mark_document_intelligence_unavailable(
                 PARSER_VERSION,
                 document["sha256"],
                 Path(document["filename"]).stem,
+                "needs_ocr" if status == "needs_ocr" else "unavailable",
+                json.dumps([error[:2000]], ensure_ascii=False),
                 error[:2000],
                 now,
                 now,
@@ -648,6 +708,9 @@ def document_context_packet(
         "title": profile.get("title"),
         "status": profile.get("status"),
         "coverage_ratio": profile.get("coverage_ratio", 0.0),
+        "extraction_status": profile.get("extraction_status"),
+        "extraction_coverage": profile.get("extraction_coverage", 0.0),
+        "extraction_warnings": profile.get("extraction_warnings") or [],
         "summary": profile.get("summary_long") or profile.get("summary_short"),
         "keywords": profile.get("keywords") or [],
         "outline": (profile.get("outline") or [])[:250],
@@ -693,6 +756,8 @@ def search_project_document_intelligence(
                         "title": profile.get("title"),
                         "status": profile.get("status"),
                         "coverage_ratio": profile.get("coverage_ratio"),
+                        "extraction_status": profile.get("extraction_status"),
+                        "extraction_coverage": profile.get("extraction_coverage"),
                         "summary": profile.get("summary_long") or profile.get("summary_short"),
                         "locator": "document:overview",
                     },
@@ -1220,8 +1285,33 @@ def document_intelligence_status(project_id: int) -> dict:
             (project_id,),
         ).fetchone()["avg_coverage"]
     counts = {row["status"]: int(row["n"]) for row in rows}
+    with connect() as conn:
+        extraction_rows = conn.execute(
+            """
+            SELECT di.extraction_status, COUNT(*) AS n
+            FROM document_intelligence di
+            JOIN documents d ON d.id = di.document_id
+            WHERE di.project_id = ? AND d.deleted_at IS NULL
+            GROUP BY di.extraction_status
+            """,
+            (project_id,),
+        ).fetchall()
+        extraction_coverage = conn.execute(
+            """
+            SELECT COALESCE(AVG(di.extraction_coverage), 0.0) AS avg_coverage
+            FROM document_intelligence di
+            JOIN documents d ON d.id = di.document_id
+            WHERE di.project_id = ? AND d.deleted_at IS NULL
+            """,
+            (project_id,),
+        ).fetchone()["avg_coverage"]
     return {
         "counts": counts,
         "average_coverage": float(coverage or 0.0),
+        "extraction_counts": {
+            row["extraction_status"]: int(row["n"])
+            for row in extraction_rows
+        },
+        "average_extraction_coverage": float(extraction_coverage or 0.0),
         "parser_version": PARSER_VERSION,
     }

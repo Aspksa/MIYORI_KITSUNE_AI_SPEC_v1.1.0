@@ -5,7 +5,9 @@ import io
 import json
 import re
 import shutil
+import zipfile
 from dataclasses import dataclass, field
+from xml.etree import ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -282,6 +284,58 @@ class StructuredDocument:
     metadata: dict = field(default_factory=dict)
 
 
+def _extraction_manifest(
+    *,
+    status: str = "complete",
+    coverage: float = 1.0,
+    warnings: list[str] | None = None,
+    details: dict | None = None,
+) -> dict:
+    return {
+        "status": status,
+        "coverage": max(0.0, min(1.0, float(coverage))),
+        "warnings": list(warnings or []),
+        "details": dict(details or {}),
+    }
+
+
+def _zip_inventory(data: bytes, prefix: str) -> list[str]:
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            return [
+                name for name in archive.namelist()
+                if name.startswith(prefix)
+            ]
+    except (zipfile.BadZipFile, OSError):
+        return []
+
+
+def _zip_xml_texts(data: bytes, names: list[str]) -> list[tuple[str, str]]:
+    result: list[tuple[str, str]] = []
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            available = set(archive.namelist())
+            for name in names:
+                if name not in available:
+                    continue
+                try:
+                    root = ET.fromstring(archive.read(name))
+                except (ET.ParseError, KeyError):
+                    continue
+                parts = [
+                    str(node.text or "").strip()
+                    for node in root.iter()
+                    if node.tag.rsplit("}", 1)[-1] == "t"
+                    and str(node.text or "").strip()
+                ]
+                text = " ".join(parts).strip()
+                if text:
+                    result.append((name, text))
+    except (zipfile.BadZipFile, OSError):
+        pass
+    return result
+
+
 _HEADING_PREFIX_RE = re.compile(
     r"^(глава|раздел|часть|приложение|chapter|section|part|appendix)\b",
     re.IGNORECASE,
@@ -424,7 +478,15 @@ def _structured_text(filename: str, data: bytes) -> StructuredDocument:
         title=title,
         text=canonical,
         blocks=blocks,
-        metadata={"page_count": 0, "table_count": 0},
+        metadata={
+            "page_count": 0,
+            "table_count": 0,
+            "extraction": _extraction_manifest(
+                status="complete",
+                coverage=1.0,
+                details={"source": "plain_text"},
+            ),
+        },
     )
 
 
@@ -475,7 +537,15 @@ def _structured_json(filename: str, data: bytes) -> StructuredDocument:
         title=Path(filename).stem,
         text=canonical,
         blocks=blocks,
-        metadata={"page_count": 0, "table_count": 0},
+        metadata={
+            "page_count": 0,
+            "table_count": 0,
+            "extraction": _extraction_manifest(
+                status="complete",
+                coverage=1.0,
+                details={"source": "json_tree"},
+            ),
+        },
     )
 
 
@@ -487,12 +557,14 @@ def _structured_pdf(filename: str, data: bytes) -> StructuredDocument:
 
     blocks: list[DocumentBlock] = []
     extracted_pages = 0
+    missing_text_pages: list[int] = []
     for page_index, page in enumerate(reader.pages, start=1):
         try:
             page_text = (page.extract_text() or "").strip()
         except Exception:
             page_text = ""
         if not page_text:
+            missing_text_pages.append(page_index)
             continue
         extracted_pages += 1
         page_blocks = _blocks_from_lines(
@@ -520,6 +592,17 @@ def _structured_pdf(filename: str, data: bytes) -> StructuredDocument:
             "Оригинал можно хранить в Drive, но для полного понимания нужен OCR."
         )
 
+    page_count = len(reader.pages)
+    page_coverage = extracted_pages / max(1, page_count)
+    warnings: list[str] = []
+    if missing_text_pages:
+        preview = ", ".join(str(item) for item in missing_text_pages[:30])
+        suffix = "…" if len(missing_text_pages) > 30 else ""
+        warnings.append(
+            "На страницах без извлекаемого текста нужен OCR/визуальный анализ: "
+            f"{preview}{suffix}"
+        )
+
     title = next((item.title for item in blocks if item.title), None) or Path(filename).stem
     canonical = "\n\n".join(item.text for item in blocks).strip()
     return StructuredDocument(
@@ -529,12 +612,22 @@ def _structured_pdf(filename: str, data: bytes) -> StructuredDocument:
         text=canonical,
         blocks=blocks,
         metadata={
-            "page_count": len(reader.pages),
+            "page_count": page_count,
             "extracted_page_count": extracted_pages,
             "table_count": 0,
+            "extraction": _extraction_manifest(
+                status="complete" if not missing_text_pages else "partial",
+                coverage=page_coverage,
+                warnings=warnings,
+                details={
+                    "page_count": page_count,
+                    "text_pages": extracted_pages,
+                    "missing_text_pages": missing_text_pages,
+                    "visual_semantics_supported": False,
+                },
+            ),
         },
     )
-
 
 def _structured_docx(filename: str, data: bytes) -> StructuredDocument:
     try:
@@ -597,11 +690,65 @@ def _structured_docx(filename: str, data: bytes) -> StructuredDocument:
                 metadata={"table": table_index, "rows": len(rows)},
             )
 
+    seen_header_footer: set[str] = set()
+    header_footer_count = 0
+    for section_index, section in enumerate(document.sections, start=1):
+        for kind, container in (("header", section.header), ("footer", section.footer)):
+            text = "\n".join(
+                paragraph.text.strip()
+                for paragraph in container.paragraphs
+                if paragraph.text.strip()
+            ).strip()
+            if not text or text in seen_header_footer:
+                continue
+            seen_header_footer.add(text)
+            header_footer_count += 1
+            _append_block(
+                blocks,
+                kind,
+                text,
+                f"docx:section:{section_index}:{kind}",
+                title=("Колонтитул" if kind == "header" else "Нижний колонтитул"),
+                metadata={"section": section_index, "kind": kind},
+            )
+
+    auxiliary_xml = _zip_xml_texts(
+        data,
+        [
+            "word/footnotes.xml",
+            "word/endnotes.xml",
+            "word/comments.xml",
+        ],
+    )
+    for xml_name, text in auxiliary_xml:
+        kind = Path(xml_name).stem
+        _append_block(
+            blocks,
+            kind,
+            text,
+            f"docx:{kind}",
+            title=kind,
+            metadata={"source_xml": xml_name},
+        )
+
+    media_count = len(_zip_inventory(data, "word/media/"))
+    chart_count = len(_zip_inventory(data, "word/charts/"))
+    warnings: list[str] = []
+    if media_count:
+        warnings.append(
+            f"В DOCX найдено изображений/медиа: {media_count}; их визуальное содержание не распознано."
+        )
+    if chart_count:
+        warnings.append(
+            f"В DOCX найдено диаграмм: {chart_count}; их визуальная семантика не интерпретирована."
+        )
+
     if not blocks:
         raise ValueError("В DOCX не найден текст.")
 
     title = next((item.title for item in blocks if item.kind == "heading"), None) or Path(filename).stem
     canonical = "\n\n".join(item.text for item in blocks).strip()
+    status = "text_only" if warnings else "complete"
     return StructuredDocument(
         filename=filename,
         format="docx",
@@ -612,75 +759,134 @@ def _structured_docx(filename: str, data: bytes) -> StructuredDocument:
             "page_count": 0,
             "table_count": len(document.tables),
             "paragraph_count": paragraph_index,
+            "header_footer_count": header_footer_count,
+            "auxiliary_text_parts": len(auxiliary_xml),
+            "media_count": media_count,
+            "chart_count": chart_count,
+            "extraction": _extraction_manifest(
+                status=status,
+                coverage=1.0,
+                warnings=warnings,
+                details={
+                    "paragraphs": paragraph_index,
+                    "tables": len(document.tables),
+                    "headers_footers": header_footer_count,
+                    "footnotes_endnotes_comments": len(auxiliary_xml),
+                    "media_count": media_count,
+                    "chart_count": chart_count,
+                    "visual_semantics_supported": False,
+                },
+            ),
         },
     )
 
-
 def _structured_xlsx(filename: str, data: bytes) -> StructuredDocument:
     try:
-        workbook = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        values_book = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        formulas_book = load_workbook(io.BytesIO(data), read_only=True, data_only=False)
     except Exception as exc:
         raise ValueError("Не удалось открыть XLSX.") from exc
 
     blocks: list[DocumentBlock] = []
     total_rows = 0
+    formula_count = 0
+    nonempty_sheets = 0
+    sheet_count = len(values_book.worksheets)
     try:
-        for sheet in workbook.worksheets:
+        for sheet_index, values_sheet in enumerate(values_book.worksheets):
+            formulas_sheet = formulas_book.worksheets[sheet_index]
             _append_block(
                 blocks,
                 "heading",
-                sheet.title,
-                f"xlsx:sheet:{sheet.title}",
-                title=sheet.title,
+                values_sheet.title,
+                f"xlsx:sheet:{values_sheet.title}",
+                title=values_sheet.title,
                 level=1,
-                metadata={"sheet": sheet.title},
+                metadata={"sheet": values_sheet.title},
             )
             batch: list[str] = []
             batch_start = 1
             current_row = 0
-            for row_index, row in enumerate(sheet.iter_rows(values_only=True), start=1):
-                values = ["" if value is None else str(value) for value in row]
-                if not any(value.strip() for value in values):
+            sheet_has_data = False
+            value_rows = values_sheet.iter_rows(values_only=True)
+            formula_rows = formulas_sheet.iter_rows(values_only=True)
+            for row_index, (value_row, formula_row) in enumerate(
+                zip(value_rows, formula_rows),
+                start=1,
+            ):
+                rendered: list[str] = []
+                width = max(len(value_row), len(formula_row))
+                for col in range(width):
+                    value = value_row[col] if col < len(value_row) else None
+                    formula = formula_row[col] if col < len(formula_row) else None
+                    if isinstance(formula, str) and formula.startswith("="):
+                        formula_count += 1
+                        if value is None or str(value) == str(formula):
+                            rendered.append(f"[formula: {formula}]")
+                        else:
+                            rendered.append(f"{value} [formula: {formula}]")
+                    else:
+                        rendered.append("" if value is None else str(value))
+
+                if not any(item.strip() for item in rendered):
                     continue
+                sheet_has_data = True
                 current_row = row_index
                 total_rows += 1
                 if not batch:
                     batch_start = row_index
-                batch.append(" | ".join(values))
+                batch.append(" | ".join(rendered))
                 if len(batch) >= 80:
                     _append_block(
                         blocks,
                         "table",
                         "\n".join(batch),
-                        f"xlsx:sheet:{sheet.title}:rows:{batch_start}-{row_index}",
-                        title=f"{sheet.title} · строки {batch_start}–{row_index}",
+                        f"xlsx:sheet:{values_sheet.title}:rows:{batch_start}-{row_index}",
+                        title=f"{values_sheet.title} · строки {batch_start}–{row_index}",
                         level=2,
                         metadata={
-                            "sheet": sheet.title,
+                            "sheet": values_sheet.title,
                             "row_start": batch_start,
                             "row_end": row_index,
                         },
                     )
                     batch = []
+            if sheet_has_data:
+                nonempty_sheets += 1
             if batch:
                 _append_block(
                     blocks,
                     "table",
                     "\n".join(batch),
-                    f"xlsx:sheet:{sheet.title}:rows:{batch_start}-{current_row}",
-                    title=f"{sheet.title} · строки {batch_start}–{current_row}",
+                    f"xlsx:sheet:{values_sheet.title}:rows:{batch_start}-{current_row}",
+                    title=f"{values_sheet.title} · строки {batch_start}–{current_row}",
                     level=2,
                     metadata={
-                        "sheet": sheet.title,
+                        "sheet": values_sheet.title,
                         "row_start": batch_start,
                         "row_end": current_row,
                     },
                 )
     finally:
-        workbook.close()
+        values_book.close()
+        formulas_book.close()
 
     if not blocks:
         raise ValueError("В XLSX не найдено данных.")
+
+    media_count = len(_zip_inventory(data, "xl/media/"))
+    chart_count = len(_zip_inventory(data, "xl/charts/"))
+    warnings: list[str] = []
+    if media_count:
+        warnings.append(
+            f"В XLSX найдено изображений/медиа: {media_count}; их визуальное содержание не распознано."
+        )
+    if chart_count:
+        warnings.append(
+            f"В XLSX найдено диаграмм: {chart_count}; их визуальная семантика не интерпретирована."
+        )
+    sheet_coverage = nonempty_sheets / max(1, sheet_count)
+    status = "text_only" if warnings else "complete"
 
     canonical = "\n\n".join(item.text for item in blocks).strip()
     return StructuredDocument(
@@ -692,11 +898,27 @@ def _structured_xlsx(filename: str, data: bytes) -> StructuredDocument:
         metadata={
             "page_count": 0,
             "table_count": sum(1 for item in blocks if item.kind == "table"),
-            "sheet_count": len([item for item in blocks if item.kind == "heading"]),
+            "sheet_count": sheet_count,
             "row_count": total_rows,
+            "formula_count": formula_count,
+            "media_count": media_count,
+            "chart_count": chart_count,
+            "extraction": _extraction_manifest(
+                status=status,
+                coverage=sheet_coverage if sheet_count else 1.0,
+                warnings=warnings,
+                details={
+                    "sheets": sheet_count,
+                    "nonempty_sheets": nonempty_sheets,
+                    "rows": total_rows,
+                    "formulas": formula_count,
+                    "media_count": media_count,
+                    "chart_count": chart_count,
+                    "visual_semantics_supported": False,
+                },
+            ),
         },
     )
-
 
 def _structured_pptx(filename: str, data: bytes) -> StructuredDocument:
     try:
@@ -706,6 +928,8 @@ def _structured_pptx(filename: str, data: bytes) -> StructuredDocument:
 
     blocks: list[DocumentBlock] = []
     table_count = 0
+    text_slides = 0
+    slides_without_text: list[int] = []
     for slide_index, slide in enumerate(presentation.slides, start=1):
         slide_parts: list[str] = []
         title = None
@@ -727,6 +951,7 @@ def _structured_pptx(filename: str, data: bytes) -> StructuredDocument:
                     slide_parts.append("\n".join(rows))
 
         if slide_parts:
+            text_slides += 1
             _append_block(
                 blocks,
                 "slide",
@@ -736,10 +961,48 @@ def _structured_pptx(filename: str, data: bytes) -> StructuredDocument:
                 level=1,
                 metadata={"slide": slide_index},
             )
+        else:
+            slides_without_text.append(slide_index)
+
+    note_parts = _zip_xml_texts(
+        data,
+        sorted(_zip_inventory(data, "ppt/notesSlides/")),
+    )
+    for note_index, (xml_name, text) in enumerate(note_parts, start=1):
+        _append_block(
+            blocks,
+            "speaker_notes",
+            text,
+            f"pptx:notes:{note_index}",
+            title=f"Заметки докладчика {note_index}",
+            metadata={"source_xml": xml_name},
+        )
 
     if not blocks:
         raise ValueError("В PPTX не найден текст.")
 
+    media_count = len(_zip_inventory(data, "ppt/media/"))
+    chart_count = len(_zip_inventory(data, "ppt/charts/"))
+    warnings: list[str] = []
+    if slides_without_text:
+        preview = ", ".join(str(item) for item in slides_without_text[:30])
+        suffix = "…" if len(slides_without_text) > 30 else ""
+        warnings.append(
+            "Слайды без извлекаемого текста требуют визуального анализа: "
+            f"{preview}{suffix}"
+        )
+    if media_count:
+        warnings.append(
+            f"В PPTX найдено изображений/медиа: {media_count}; их визуальное содержание не распознано."
+        )
+    if chart_count:
+        warnings.append(
+            f"В PPTX найдено диаграмм: {chart_count}; их визуальная семантика не интерпретирована."
+        )
+
+    slide_count = len(presentation.slides)
+    slide_coverage = text_slides / max(1, slide_count)
+    status = "partial" if slides_without_text else ("text_only" if warnings else "complete")
     canonical = "\n\n".join(item.text for item in blocks).strip()
     return StructuredDocument(
         filename=filename,
@@ -748,12 +1011,29 @@ def _structured_pptx(filename: str, data: bytes) -> StructuredDocument:
         text=canonical,
         blocks=blocks,
         metadata={
-            "page_count": len(presentation.slides),
-            "slide_count": len(presentation.slides),
+            "page_count": slide_count,
+            "slide_count": slide_count,
+            "text_slide_count": text_slides,
             "table_count": table_count,
+            "speaker_note_count": len(note_parts),
+            "media_count": media_count,
+            "chart_count": chart_count,
+            "extraction": _extraction_manifest(
+                status=status,
+                coverage=slide_coverage,
+                warnings=warnings,
+                details={
+                    "slides": slide_count,
+                    "slides_with_text": text_slides,
+                    "slides_without_text": slides_without_text,
+                    "speaker_notes": len(note_parts),
+                    "media_count": media_count,
+                    "chart_count": chart_count,
+                    "visual_semantics_supported": False,
+                },
+            ),
         },
     )
-
 
 def extract_structured_document(filename: str, data: bytes) -> StructuredDocument:
     if len(data) > MAX_FILE_BYTES:

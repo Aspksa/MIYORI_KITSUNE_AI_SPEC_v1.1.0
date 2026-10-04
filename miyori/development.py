@@ -19,6 +19,8 @@ def run_project_self_check(project_id: int) -> list[CheckResult]:
     rag = rag_status()
     intelligence = document_intelligence_status(project_id)
     intelligence_failed = int((intelligence.get("counts") or {}).get("failed", 0))
+    extraction_counts = intelligence.get("extraction_counts") or {}
+    extraction_unknown = int(extraction_counts.get("unknown", 0))
     rag_ok = (not rag["fts5"]) or rag["indexed_chunks"] == snapshot["document_chunks"]
     checks = [
         CheckResult(
@@ -49,8 +51,21 @@ def run_project_self_check(project_id: int) -> list[CheckResult]:
             intelligence_failed == 0,
             (
                 f"failed={intelligence_failed}; "
-                f"avg_coverage={float(intelligence.get('average_coverage') or 0.0):.3f}; "
+                f"avg_ai_coverage={float(intelligence.get('average_coverage') or 0.0):.3f}; "
+                f"avg_extraction_coverage={float(intelligence.get('average_extraction_coverage') or 0.0):.3f}; "
+                f"extraction={extraction_counts}; "
                 f"parser={intelligence.get('parser_version')}"
+            ),
+        ),
+        CheckResult(
+            "extraction_integrity",
+            extraction_unknown == 0,
+            (
+                f"unknown={extraction_unknown}; "
+                f"complete={int(extraction_counts.get('complete', 0))}; "
+                f"text_only={int(extraction_counts.get('text_only', 0))}; "
+                f"partial={int(extraction_counts.get('partial', 0))}; "
+                f"needs_ocr={int(extraction_counts.get('needs_ocr', 0))}"
             ),
         ),
         CheckResult(

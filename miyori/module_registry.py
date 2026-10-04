@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.40"
+PROJECT_VERSION = "00.00.41"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.3.0",
+        "version": "2.4.0",
         "status": "active",
-        "description": "AI Core v2.3: persistent workflows, Document Intelligence, различение retrieval и exhaustive verification, проверяемые источники.",
+        "description": "AI Core v2.4: persistent workflows, Document Intelligence, extraction integrity, exhaustive verification и проверяемые источники.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -35,15 +35,15 @@ MODULES = {
     },
     "drive": {
         "name": "Документы / Облако / Miyori",
-        "version": "1.7.0",
+        "version": "1.8.0",
         "status": "active",
-        "description": "Miyori Drive: оригиналы, структура документов, безопасная корзина, восстановление, Document Intelligence, поиск и RAG.",
+        "description": "Miyori Drive: оригиналы, extraction integrity, структура документов, безопасная корзина, Document Intelligence, поиск и RAG.",
     },
     "document_intelligence": {
         "name": "Document Intelligence",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "status": "active",
-        "description": "Структурное понимание и exhaustive Q&A: полный проход документа, evidence с locator-ами, coverage tracking, recovery и hierarchical synthesis.",
+        "description": "Структурное понимание, extraction integrity и exhaustive Q&A: отдельное покрытие оригинала и AI, evidence, recovery и synthesis.",
     },
     "projects": {
         "name": "Проекты",
@@ -132,6 +132,44 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.41",
+        "title": "Extraction Integrity · честная полнота чтения оригинала",
+        "summary": "Miyori теперь отдельно измеряет полноту извлечения данных из оригинального файла и полноту AI-анализа уже извлечённого текста. Это исключает ложное «100% понимание», если PDF, презентация или Office-файл содержит непрочитанные страницы, изображения, диаграммы или другие визуальные объекты.",
+        "modules": [
+            {
+                "key": "document_intelligence",
+                "version": "1.2.0",
+                "changes": [
+                    "Добавлены extraction_status, extraction_coverage, extraction_warnings и extraction_details.",
+                    "PDF считает покрытие по страницам с доступным текстовым слоем и явно отмечает страницы, которым нужен OCR.",
+                    "DOCX дополнительно извлекает headers/footers и текст footnotes/endnotes/comments; изображения и диаграммы фиксируются как непроанализированная визуальная часть.",
+                    "XLSX сохраняет формулы даже при отсутствии cached value и считает изображения/диаграммы.",
+                    "PPTX учитывает слайды без текста, speaker notes, media и charts.",
+                    "Parser version повышен до 1.1.0; старые базы обновляются in-place."
+                ],
+            },
+            {
+                "key": "drive",
+                "version": "1.8.0",
+                "changes": [
+                    "Экран понимания показывает две независимые шкалы: извлечение из оригинала и AI-анализ извлечённого текста.",
+                    "Предупреждения extraction manifest видны пользователю непосредственно в карточке документа.",
+                    "Exhaustive Q&A показывает scan/original/overall coverage вместо одного неоднозначного процента."
+                ],
+            },
+            {
+                "key": "miyori_ai",
+                "version": "2.4.0",
+                "changes": [
+                    "Document Intelligence tools возвращают extraction status/coverage/warnings вместе с AI coverage.",
+                    "Если оригинал извлечён частично, exhaustive-ответ автоматически получает caveat и не может выдавать отсутствие факта как доказанное для всего оригинала.",
+                    "Confidence полного вопроса понижается при неполном извлечении исходного файла.",
+                    "Development Self-Check отдельно контролирует extraction integrity."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.40",
         "title": "Exhaustive Document Q&A · проверка всего документа по вопросу",

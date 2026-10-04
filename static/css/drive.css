@@ -1279,3 +1279,40 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* 00.00.41 — extraction integrity */
+.drive-intelligence-coverage.extraction-coverage .drive-intelligence-progress i {
+  color: #5d8c7a;
+}
+.drive-extraction-warnings {
+  display: grid;
+  gap: 7px;
+}
+.drive-extraction-warnings > div {
+  display: grid;
+  grid-template-columns: 22px minmax(0,1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid #eadcc9;
+  border-radius: 10px;
+  background: #fffaf4;
+}
+.drive-extraction-warnings span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: #f5e8d8;
+  color: #9a6b3c;
+  font-size: 9px;
+  font-weight: 900;
+}
+.drive-extraction-warnings p {
+  margin: 0;
+  color: #82684e;
+  font-size: 10px;
+  line-height: 1.45;
+}
