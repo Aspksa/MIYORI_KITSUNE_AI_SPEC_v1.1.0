@@ -33,5 +33,5 @@ const details=$("messages").querySelector("details.chat-answer-insights");
 assert.ok(details && !details.open,"Diagnostics should be closed by default");
 assert.match(details.textContent,/не гарантированы/);
 assert.match(details.textContent,/320/);
-assert.ok(!$("messages").querySelectorAll(".chat-answer-insights").length===false);
+assert.equal($("messages").querySelectorAll(".chat-answer-insights").length,1);
 console.log("Chat Intelligence minimal diagnostics UI contract OK.");
