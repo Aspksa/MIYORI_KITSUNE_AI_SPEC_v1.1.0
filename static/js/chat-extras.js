@@ -240,13 +240,16 @@
         {method:"POST"}
       );
       window.miyoriDrafts.save();
+      state.pendingRequest = null;
       state.conversationId = Number(fork.conversation_id);
+      window.miyoriForkReadOnly = true;
       showWelcome();
       window.miyoriChatAttachments.useExisting(fork.attachments || []);
       $("messageInput").value = isEdit ? text : fork.message;
       $("messageInput").dispatchEvent(new Event("input", {bubbles:true}));
       form.requestSubmit();
     } catch (error) {
+      window.miyoriForkReadOnly = false;
       showError(error.message);
     }
   }
