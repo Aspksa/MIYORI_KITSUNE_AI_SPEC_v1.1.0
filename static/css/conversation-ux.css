@@ -96,3 +96,9 @@
 @media(prefers-reduced-motion:reduce){
   .conversation-pin-chip,.conversation-format-button,.conversation-reaction{scroll-behavior:auto;transition:none!important}
 }
+
+.voice-wave-editor{width:min(100%,420px);display:grid;gap:6px}
+.voice-waveform{display:block;width:100%;height:54px;border-radius:8px;background:var(--ui-surface)}
+.voice-trim-controls{display:grid;grid-template-columns:1fr 1fr auto auto;gap:6px;align-items:center}
+.voice-trim-controls input[type="range"]{min-width:70px}
+.voice-trim-controls small{font-size:11px;color:var(--ui-muted);white-space:nowrap}
