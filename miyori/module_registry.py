@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.47"
+PROJECT_VERSION = "00.00.48"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.5.0",
+        "version": "0.6.0",
         "status": "active",
-        "description": "NEXUS Knowledge: grouped Memory/Documents/Epistemic navigation, provenance/evidence, coverage, quiet tabs/disclosure UI и совместимость с Drive.",
+        "description": "NEXUS Generative UI: trusted versioned surfaces, закрытый component registry, safe DOM renderer и quiet contextual shelf поверх Actions/Knowledge.",
     },
     "settings": {
         "name": "Настройки",
@@ -144,6 +144,25 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.48",
+        "title": "NEXUS Generative UI · trusted surfaces",
+        "summary": "N7 добавляет versioned surface contract и закрытый TypeScript renderer registry. Модель не получает права генерировать HTML/JS; contextual UI строится только из реального NEXUS state и по умолчанию не мешает Chat.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.6.0",
+                "changes": [
+                    "Добавлен /api/projects/{project_id}/nexus/surfaces.",
+                    "Surface specs ограничены allowlist kind/component и policy model_html_allowed=false, script_allowed=false.",
+                    "Frontend renderer использует createElement/textContent и отклоняет неизвестные компоненты.",
+                    "Chat получил закрытый по умолчанию quiet surface shelf вместо постоянных карточек.",
+                    "Surface refresh привязан к authoritative NEXUS snapshot fingerprint.",
+                    "Generative UI module переведён в ready; ui_contract публикует разрешённые surface components."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.47",
         "title": "NEXUS Knowledge · provenance, evidence и coverage без шума",
