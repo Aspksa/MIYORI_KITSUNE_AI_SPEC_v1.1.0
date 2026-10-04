@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.53"
+PROJECT_VERSION = "00.00.54"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,15 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
+        "version": "1.2.0",
+        "status": "active",
+        "description": "NEXUS Digital Body Runtime поверх Presence/Voice/Actions/Home: state-driven presentation без fake liveness и без выдумывания незаданных деталей внешности.",
+    },
+    "digital_body": {
+        "name": "Digital Body Miyori",
         "version": "1.0.0",
         "status": "active",
-        "description": "NEXUS Home: authenticated heartbeat evidence, explicit device identity binding, Agent Workspace и безопасные Actions/Knowledge/Voice surfaces.",
+        "description": "Канонический body-state contract: нейтральная оболочка, runtime pose/expression/gesture и owner-open appearance choices из Persona Pack.",
     },
     "settings": {
         "name": "Настройки",
@@ -144,6 +150,36 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.54",
+        "title": "NEXUS Digital Body Runtime · canon + real state",
+        "summary": "N12 связывает канонический образ Persona Pack с реальными Presence/Voice/interaction states. Digital Body не использует random liveness, timer idle animation или sentiment-to-emotion и не фиксирует детали внешности, которые Persona Pack оставляет на выбор владельца.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "1.2.0",
+                "changes": [
+                    "Добавлен versioned /api/projects/{project_id}/nexus/body.",
+                    "Server presentation выводится из существующего NEXUS Presence.",
+                    "Browser может временно переопределить pose только explicit Voice/interaction runtime state.",
+                    "Idle возвращает тело к server state; отдельный таймер жизни отсутствует.",
+                    "Primary Chat получил Digital Body surface рядом с Living Presence."
+                ],
+            },
+            {
+                "key": "digital_body",
+                "version": "1.0.0",
+                "changes": [
+                    "Persona Pack является источником confirmed/open appearance fields.",
+                    "Подтверждены взрослая героиня-кицунэ, лисьи ушки, пушистые хвосты и выразительный взгляд.",
+                    "Цвет волос, цвет глаз, точное число хвостов и основной наряд остаются незаданными до выбора владельца.",
+                    "Neutral monochrome shell не изображает незаданные hair/eye/outfit/tail-count attributes.",
+                    "Pose/expression/gesture меняются только по реальному runtime state.",
+                    "Random liveness, idle timers, model-authored motion и sentiment-to-expression запрещены contract-ом."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.53",
         "title": "NEXUS Home · authenticated device evidence",
