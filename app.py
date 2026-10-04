@@ -211,6 +211,7 @@ from miyori.documents import (
 from miyori.document_vision import (
     document_vision_status,
     init_document_vision_db,
+    mark_document_vision_queued,
 )
 
 from miyori.document_intelligence import (
