@@ -32,17 +32,19 @@
     attachmentsHost.hidden = staged.filter(item => !item.removed).length === 0;
     for (const entry of staged.filter(item => !item.removed)) {
       const chip = make("div", "chat-attachment-chip");
+      const extension = (entry.filename.split(".").pop() || "FILE").toUpperCase();
+      const fileSize = entry.size ? " · " + Math.max(1, Math.ceil(entry.size / 1024)) + " КБ" : "";
       const icon = make("span", "chat-file-icon", "▤");
       const detail = make("span", "chat-file-detail");
       detail.append(
         make("strong", "", entry.filename),
-        make("small", "", entry.error
-          ? "Ошибка · " + entry.error
+        make("small", "", extension + fileSize + " · " + (entry.error
+          ? "Ошибка: " + entry.error
           : entry.pending
-            ? "Загружается в текущий проект…"
+            ? "Загружается…"
             : entry.readable
-              ? "Прикреплено к этому вопросу"
-              : "Нет извлекаемого текста — нужен OCR")
+              ? "В этом вопросе"
+              : "Нет извлекаемого текста — нужен OCR"))
       );
       const remove = make("button", "chat-remove-file", "×");
       remove.type = "button";
@@ -274,11 +276,11 @@
     }
   });
 
-  let historyQuery = "";
+  let searchDelay = null;
   const searchInput = $("conversationSearch");
   searchInput?.addEventListener("input", () => {
-    historyQuery = searchInput.value;
-    void loadConversations();
+    if (searchDelay) clearTimeout(searchDelay);
+    searchDelay = setTimeout(() => void loadConversations(), 170);
   });
   const savedAnswersButton = $("savedAnswersButton");
   let showingSaved = false;
