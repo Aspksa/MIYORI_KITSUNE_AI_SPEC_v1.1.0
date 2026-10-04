@@ -79,6 +79,11 @@ function setBusy(value) {
   projectSelect.disabled = value;
   sendButton.textContent = value ? "Думаю…" : "Отправить";
   setPulse(value ? "thinking" : "ready");
+  window.dispatchEvent(
+    new CustomEvent("miyori:interaction-state", {
+      detail: {state: value ? "thinking" : "idle"}
+    })
+  );
 }
 
 function addMessage(role, text, sources = []) {
