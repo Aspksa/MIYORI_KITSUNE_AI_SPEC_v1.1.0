@@ -943,3 +943,16 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
 
   await renderDrive();
 }
+
+
+window.miyoriOpenDocument = async function(documentId) {
+  const id = Number(documentId);
+  if (!Number.isInteger(id) || id <= 0) return false;
+  await renderDocumentsWorkspace();
+  const button = workspaceBody.querySelector(
+    '[data-drive-understand="' + id + '"]'
+  );
+  if (!button) return false;
+  button.click();
+  return true;
+};
