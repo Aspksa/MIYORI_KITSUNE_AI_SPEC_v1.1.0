@@ -7,6 +7,7 @@ export const NEXUS_PRESENCE_SCHEMA_VERSION = "1.0.0";
 export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0";
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0";
 export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0";
+export const NEXUS_HOME_SCHEMA_VERSION = "1.0.0";
 export function isNexusOperationalState(value) {
     return [
         "disabled",
