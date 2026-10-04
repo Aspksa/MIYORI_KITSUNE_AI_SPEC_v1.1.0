@@ -3429,7 +3429,7 @@ def mark_interrupted_runtime_for_recovery() -> dict:
             """
             UPDATE tool_operations
             SET status = 'recovery_required', updated_at = ?
-            WHERE status = 'running'
+            WHERE status IN ('running','verifying')
             """,
             (now,),
         ).rowcount
