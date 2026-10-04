@@ -20,6 +20,11 @@ from miyori.chat_intelligence import plan_chat_query,enhance_context_route
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
+from miyori.document_comparisons import (
+    init_document_comparisons_db,
+    enqueue_document_comparison,
+    get_document_comparison,
+)
 from miyori.conversation_ui import (
     attached_document_context,
     chat_message_page,
@@ -281,6 +286,7 @@ async def lifespan(app: FastAPI):
     init_chat_metrics_db()
     init_document_intelligence_db()
     init_document_questions_db()
+    init_document_comparisons_db()
     init_agent_workspace_db()
     init_nexus_home_db()
     init_appearance_db()
@@ -314,6 +320,12 @@ async def no_cache_static_assets(request: Request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
+
+
+class ComparisonRequest(BaseModel):
+    question: str = Field(min_length=1,max_length=5000)
+    document_ids: list[int] = Field(min_length=2,max_length=5)
+    conversation_id: int | None = None
 
 
 class ChatRequest(BaseModel):
@@ -1734,6 +1746,29 @@ def document_intelligence_analyze(
         "task": task,
         "intelligence": get_document_intelligence(project_id, document_id),
     }
+
+
+@app.post("/api/projects/{project_id}/document-comparisons")
+def document_comparison_create(project_id: int, request: ComparisonRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404,detail="Проект не найден.")
+    try:
+        comparison=enqueue_document_comparison(
+            project_id,request.document_ids,request.question,
+            conversation_id=request.conversation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+    wake_worker()
+    return {"comparison":comparison}
+
+
+@app.get("/api/projects/{project_id}/document-comparisons/{comparison_id}")
+def document_comparison_get(project_id: int, comparison_id: int) -> dict:
+    try:
+        return {"comparison":get_document_comparison(project_id,comparison_id)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404,detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/documents/{document_id}/questions")
