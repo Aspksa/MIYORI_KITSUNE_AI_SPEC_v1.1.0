@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .config import settings
@@ -623,7 +623,7 @@ def remember_message_candidate(
         project_id=project_id,
         statement=clean,
         status="candidate",
-        source_kind="user_message",
+        source_kind=f"{msg['role']}_message",
         conversation_id=conversation_id,
         message_id=message_id,
         confidence=None,
@@ -784,23 +784,22 @@ def complete_schedule(project_id: int, schedule_id: int) -> dict:
         if not row:
             raise LookupError("Отложенный запрос не найден.")
         repeat_mode = str(row["repeat_mode"])
-        if repeat_mode == "daily":
-            db.execute(
-                """
-                UPDATE chat_scheduled_messages
-                SET scheduled_for=datetime(scheduled_for,'+1 day'),
-                    dispatched_at=?,status='scheduled'
-                WHERE id=? AND project_id=?
-                """, (utc_now(), schedule_id, project_id)
+        next_time = None
+        if repeat_mode in {"daily", "weekly"}:
+            parsed = datetime.fromisoformat(
+                str(row["scheduled_for"]).replace("Z", "+00:00")
             )
-        elif repeat_mode == "weekly":
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            delta = timedelta(days=1 if repeat_mode == "daily" else 7)
+            next_time = (parsed.astimezone(timezone.utc) + delta).isoformat()
             db.execute(
                 """
                 UPDATE chat_scheduled_messages
-                SET scheduled_for=datetime(scheduled_for,'+7 day'),
-                    dispatched_at=?,status='scheduled'
+                SET scheduled_for=?,dispatched_at=?,status='scheduled'
                 WHERE id=? AND project_id=?
-                """, (utc_now(), schedule_id, project_id)
+                """,
+                (next_time, utc_now(), schedule_id, project_id),
             )
         else:
             db.execute(
@@ -819,7 +818,6 @@ def complete_schedule(project_id: int, schedule_id: int) -> dict:
     result = dict(updated)
     result["auto_send"] = bool(result["auto_send"])
     return result
-
 
 def smart_search(
     project_id: int,
