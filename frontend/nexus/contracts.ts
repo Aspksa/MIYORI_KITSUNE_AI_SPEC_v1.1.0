@@ -376,12 +376,26 @@ export interface NexusAgentWorkspaceNode {
   role: string;
   title: string;
   instruction: string;
+  capability: "read_only" | "standard";
   dependencies: string[];
   step_budget: number;
   status: NexusAgentWorkspaceNodeStatus;
   workflow_id: number | null;
   result: unknown;
   error: unknown;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface NexusAgentWorkspaceSummary {
+  id: number;
+  project_id: number;
+  goal: string;
+  status: NexusAgentWorkspaceStatus;
+  max_parallel: number;
+  total_step_budget: number;
   created_at: string;
   updated_at: string;
   started_at: string | null;
