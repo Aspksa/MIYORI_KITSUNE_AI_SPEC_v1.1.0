@@ -25,8 +25,9 @@ function renderPresence(host, presence, interaction) {
     if (["thinking", "listening", "transcribing", "speaking", "interrupted", "voice_error"].includes(interaction)) {
         host.dataset.mode =
             interaction === "voice_error" ? "attention" :
-            interaction === "interrupted" ? "waiting" :
-            "working";
+                interaction === "interrupted" ? "waiting" :
+                    interaction === "listening" || interaction === "transcribing" || interaction === "speaking"
+                        ? "working" : "working";
         const row = document.createElement("div");
         row.className = "nexus-presence-row";
         const mark = document.createElement("span");
@@ -34,14 +35,14 @@ function renderPresence(host, presence, interaction) {
         mark.setAttribute("aria-hidden", "true");
         const copy = document.createElement("span");
         const title = document.createElement("strong");
-        title.textContent = ({
+        title.textContent = {
             thinking: "Думаю над сообщением",
             listening: "Слушаю",
             transcribing: "Распознаю речь",
             speaking: "Говорю",
             interrupted: "Голос остановлен",
             voice_error: "Проблема с голосом",
-        })[interaction] || "Работаю";
+        }[interaction] || "Работаю";
         const detail = document.createElement("small");
         detail.textContent =
             interaction === "thinking"
