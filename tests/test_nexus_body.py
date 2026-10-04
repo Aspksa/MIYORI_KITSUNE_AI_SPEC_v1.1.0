@@ -107,7 +107,7 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
         self.assertTrue(body["render_policy"]["owner_global_appearance_profile"])
         self.assertTrue(body["render_policy"]["static_portrait_is_non_dynamic"])
 
-    def test_body_exposes_trusted_renderer_registry_without_fake_dynamic_claim(self) -> None:
+    def test_body_exposes_installed_trusted_dynamic_renderer(self) -> None:
         with patch(
             "miyori.nexus_body.build_nexus_presence",
             return_value=self._presence("ready"),
@@ -115,10 +115,11 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
             body = build_nexus_body(self.project_id)
 
         renderer = body["renderer"]
-        self.assertEqual(renderer["schema_version"], "1.0.0")
-        self.assertEqual(renderer["selected_adapter"], "neutral_shell")
-        self.assertFalse(renderer["selected_dynamic"])
-        self.assertEqual(renderer["dynamic_extension"]["status"], "not_installed")
+        self.assertEqual(renderer["schema_version"], "1.1.0")
+        self.assertEqual(renderer["selected_adapter"], "trusted_vector_rig")
+        self.assertTrue(renderer["selected_dynamic"])
+        self.assertEqual(renderer["dynamic_extension"]["status"], "installed")
+        self.assertEqual(renderer["dynamic_extension"]["adapter_id"], "trusted_vector_rig")
         self.assertFalse(renderer["dynamic_extension"]["may_execute_asset_javascript"])
         self.assertFalse(renderer["dynamic_extension"]["may_override_operational_state"])
         self.assertTrue(renderer["policy"]["trusted_registry_only"])
@@ -190,6 +191,7 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
         self.assertFalse(policy["sentiment_to_expression_allowed"])
         self.assertFalse(policy["model_authored_motion_allowed"])
         self.assertTrue(policy["state_transition_motion_allowed"])
+        self.assertTrue(policy["contract_driven_active_motion_allowed"])
         self.assertTrue(policy["reduced_motion_must_be_respected"])
 
     def test_render_policy_keeps_owner_choices_open(self) -> None:
@@ -198,6 +200,8 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
 
         policy = body["render_policy"]
         self.assertTrue(policy["neutral_shell_until_owner_appearance_choice"])
+        self.assertTrue(policy["trusted_vector_rig_installed"])
+        self.assertFalse(policy["dynamic_renderer_may_invent_appearance"])
         self.assertFalse(policy["invent_open_appearance_choices_allowed"])
         self.assertFalse(policy["tail_count_may_be_invented"])
         self.assertFalse(policy["hair_color_may_be_invented"])

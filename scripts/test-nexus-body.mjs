@@ -65,8 +65,9 @@ assert.ok(
 
 assert.ok(
   css.includes("/* N12 — Digital Body Runtime.") &&
-    !css.includes("@keyframes"),
-  "Digital Body visual layer must stay state-driven and keyframe-free",
+    css.includes("@keyframes nexus-rig-active") &&
+    css.includes("@media (prefers-reduced-motion: reduce)"),
+  "Digital Body motion must stay contract-driven and respect reduced motion",
 );
 
 assert.ok(

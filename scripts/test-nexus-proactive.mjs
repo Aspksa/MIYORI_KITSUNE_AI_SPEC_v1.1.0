@@ -71,7 +71,7 @@ assert.ok(
 );
 assert.ok(
   css.includes("/* N10 — Proactive Miyori.") &&
-    !css.includes("@keyframes"),
+    [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)].every((match) => ["nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].includes(match[1])),
   "Proactive visual layer must remain quiet and animation-free",
 );
 

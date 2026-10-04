@@ -489,7 +489,9 @@ export async function fetchNexusBody(
     payload.renderer.policy?.asset_authored_javascript_allowed !== false ||
     payload.renderer.policy?.model_select_adapter_allowed !== false ||
     payload.renderer.policy?.unknown_adapter_fallback !== "neutral_shell" ||
-    payload.renderer.dynamic_extension?.status !== "not_installed" ||
+    payload.renderer.dynamic_extension?.status !== "installed" ||
+    payload.renderer.dynamic_extension?.adapter_id !== "trusted_vector_rig" ||
+    payload.renderer.policy?.dynamic_motion_source !== "versioned_presentation_channels_only" ||
     payload.renderer.dynamic_extension?.may_execute_asset_javascript !== false ||
     payload.renderer.dynamic_extension?.may_override_operational_state !== false ||
     payload.appearance.appearance_profile_schema_version !== MIYORI_APPEARANCE_SCHEMA_VERSION ||
@@ -499,6 +501,8 @@ export async function fetchNexusBody(
     payload.appearance.asset.supports_expression !== false ||
     payload.render_policy?.owner_global_appearance_profile !== true ||
     payload.render_policy?.static_portrait_is_non_dynamic !== true ||
+    payload.render_policy?.trusted_vector_rig_installed !== true ||
+    payload.render_policy?.dynamic_renderer_may_invent_appearance !== false ||
     payload.render_policy?.invent_open_appearance_choices_allowed !== false ||
     payload.render_policy?.body_state_source !== "presence_plus_explicit_local_runtime"
   ) {

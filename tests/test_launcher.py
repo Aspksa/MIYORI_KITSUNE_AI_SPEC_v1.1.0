@@ -43,6 +43,18 @@ class LauncherUnitTests(unittest.TestCase):
     def test_runtime_files_exist_in_repository(self) -> None:
         self.assertEqual(launcher.ensure_runtime_files(), [])
 
+    def test_tee_exposes_tty_contract_required_by_uvicorn(self) -> None:
+        import io
+
+        class TtyStream(io.StringIO):
+            def isatty(self) -> bool:
+                return True
+
+        tee = launcher._Tee(io.StringIO(), TtyStream())
+        self.assertTrue(tee.isatty())
+        self.assertIsInstance(tee.encoding, str)
+        self.assertIsInstance(tee.errors, str)
+
 
 class WindowsBatchContractTests(unittest.TestCase):
     def setUp(self) -> None:

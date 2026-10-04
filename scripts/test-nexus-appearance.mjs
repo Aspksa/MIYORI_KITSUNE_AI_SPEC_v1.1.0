@@ -72,8 +72,9 @@ assert.ok(
 assert.ok(
   css.includes("/* N12.1 — Owner Appearance Profile.") &&
     css.includes(".nexus-body-portrait.has-static-asset") &&
-    !css.includes("@keyframes"),
-  "Appearance Profile styling must not add fake animation",
+    css.includes("@keyframes nexus-rig-active") &&
+    css.includes("@media (prefers-reduced-motion: reduce)"),
+  "Appearance Profile must stay separate while N12.3 motion remains state-driven",
 );
 
 console.log("NEXUS Appearance Profile contract OK.");

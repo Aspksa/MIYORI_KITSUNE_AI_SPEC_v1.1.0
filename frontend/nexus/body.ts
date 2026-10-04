@@ -70,6 +70,11 @@ function appendTextList(
 }
 
 function appearanceStateText(body: NexusDigitalBody): string {
+  if (body.renderer.selected_adapter === "trusted_vector_rig") {
+    return body.appearance.configuration_state === "appearance_unconfigured"
+      ? "Динамическое тело активно · внешность нейтральная"
+      : "Динамическое тело активно · выбранные параметры сохранены";
+  }
   if (body.appearance.configuration_state === "appearance_configured") {
     return body.appearance.asset.kind === "static_portrait"
       ? "Внешность выбрана · статический портрет"

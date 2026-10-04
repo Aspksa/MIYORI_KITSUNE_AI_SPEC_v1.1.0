@@ -63,6 +63,34 @@ class _Tee:
             except OSError:
                 continue
 
+    def isatty(self) -> bool:
+        for stream in self.streams:
+            probe = getattr(stream, "isatty", None)
+            if not callable(probe):
+                continue
+            try:
+                if probe():
+                    return True
+            except (OSError, ValueError):
+                continue
+        return False
+
+    @property
+    def encoding(self) -> str:
+        for stream in self.streams:
+            value = getattr(stream, "encoding", None)
+            if value:
+                return str(value)
+        return "utf-8"
+
+    @property
+    def errors(self) -> str:
+        for stream in self.streams:
+            value = getattr(stream, "errors", None)
+            if value:
+                return str(value)
+        return "replace"
+
 
 def python_supported(version_info=None) -> bool:
     version = version_info or sys.version_info

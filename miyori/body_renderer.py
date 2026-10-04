@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-BODY_RENDERER_SCHEMA_VERSION = "1.0.0"
+BODY_RENDERER_SCHEMA_VERSION = "1.1.0"
 
 _TRUSTED_ADAPTERS = (
     {
@@ -38,6 +38,23 @@ _TRUSTED_ADAPTERS = (
             "показывается отдельным индикатором и подписью."
         ),
     },
+    {
+        "id": "trusted_vector_rig",
+        "label": "Trusted vector rig",
+        "installed": True,
+        "dynamic": True,
+        "requires_asset_kind": None,
+        "supports": {
+            "pose": True,
+            "expression": True,
+            "gesture": True,
+        },
+        "semantics": (
+            "Встроенный neutral vector rig двигается только из versioned "
+            "pose/expression/gesture/state channels. Он не выбирает цвет волос, "
+            "глаз, число хвостов или основной наряд владельца."
+        ),
+    },
 )
 
 
@@ -50,8 +67,11 @@ def _asset_kind(appearance: dict[str, Any]) -> str | None:
 
 
 def select_renderer_adapter(appearance: dict[str, Any]) -> str:
-    if _asset_kind(appearance) == "static_portrait":
+    kind = _asset_kind(appearance)
+    if kind == "static_portrait":
         return "static_portrait"
+    if kind is None:
+        return "trusted_vector_rig"
     return "neutral_shell"
 
 
@@ -72,7 +92,10 @@ def build_body_renderer_contract(appearance: dict[str, Any]) -> dict:
             "state": "body.state_or_explicit_local_runtime",
         },
         "dynamic_extension": {
-            "status": "not_installed",
+            "status": "installed",
+            "adapter_id": "trusted_vector_rig",
+            "engine": "trusted_dom_css_vector_v1",
+            "asset_requirement": "builtin_neutral_vector",
             "adapter_contract_required": True,
             "must_be_trusted_registry_entry": True,
             "must_consume_existing_presentation_channels": True,
@@ -88,5 +111,6 @@ def build_body_renderer_contract(appearance: dict[str, Any]) -> dict:
             "unknown_adapter_fallback": "neutral_shell",
             "static_portrait_is_dynamic": False,
             "dynamic_renderer_claim_requires_installed_adapter": True,
+            "dynamic_motion_source": "versioned_presentation_channels_only",
         },
     }

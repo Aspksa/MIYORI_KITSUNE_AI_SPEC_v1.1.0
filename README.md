@@ -2,8 +2,27 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.56.**  
+**Внутренняя версия приложения: 00.00.57.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.57
+
+`00.00.57` — **NEXUS Real Dynamic Renderer Integration + Windows launcher compatibility fix**.
+
+N12.3 завершает первый настоящий динамический renderer Миёри без подмены архитектурной истины:
+
+- в закрытый trusted registry установлен `trusted_vector_rig`;
+- встроенный vector rig действительно двигает голову, корпус, руки, глаза и рот по существующим `pose / expression / gesture / state`;
+- активные движения запускаются только реальными состояниями working / thinking / listening / speaking / recovery и не используются как idle-liveness;
+- `prefers-reduced-motion` полностью отключает transition/animation motion;
+- renderer не выбирает цвет волос, глаз, точное число хвостов или основной наряд;
+- static portrait по-прежнему остаётся non-dynamic;
+- неизвестный asset/adapter по-прежнему fail-closed возвращается к `neutral_shell`;
+- asset-authored JavaScript, dynamic import/eval, model-selected renderer и random/timer liveness запрещены;
+- Digital Body contract обновлён до 1.3, renderer contract — до 1.1;
+- Windows portable launcher исправлен для актуального Uvicorn: `_Tee` теперь предоставляет `isatty / encoding / errors`, поэтому logging formatter не падает при запуске.
+
+Итог: Миёри получила первое реально движущееся доверенное тело, которое уже связано с её настоящим runtime state. Финальные owner appearance choices остаются под контролем владельца.
 
 ## Состояние релиза 00.00.56
 

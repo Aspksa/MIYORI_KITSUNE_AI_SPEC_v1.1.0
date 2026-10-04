@@ -62,8 +62,9 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **N11 / 00.00.53 — завершён.** Home: explicit device identity, one-time heartbeat credential, TTL connectivity evidence, capability allowlist, parental binding и отдельная evidence-first Home surface. Legacy status не является connectivity; network scanning и fake OS enforcement запрещены.
 - **N12 / 00.00.54 — Digital Body Runtime завершён.** Persona canon связан с Presence/Voice/interaction state; fake liveness и sentiment inference запрещены. Финальный portrait asset намеренно остаётся не настроенным до выбора владельцем цвета волос, цвета глаз, точного числа хвостов и основного наряда.
 - **N12.1 / 00.00.55 — завершён.** Owner-global Appearance Profile хранит четыре открытых выбора без системных дефолтов; static portrait adapter отделён от account avatar и честно объявляет отсутствие dynamic pose/expression.
-- **N12.2 / 00.00.56 — завершён.** Trusted Body Renderer Registry отделяет state от renderer; neutral/static adapters установлены, unknown adapters fail closed, dynamic extension остаётся not_installed.
-- **N6 Desktop Runtime остаётся отложен по решению владельца проекта. Следующий визуальный шаг — N12.3 Real Dynamic Renderer Integration только после появления реального trusted renderer + совместимого asset; он не должен придумывать owner appearance choices.**
+- **N12.2 / 00.00.56 — завершён.** Trusted Body Renderer Registry отделяет state от renderer; neutral/static adapters установлены, unknown adapters fail closed.
+- **N12.3 / 00.00.57 — завершён.** Real Dynamic Renderer Integration устанавливает built-in `trusted_vector_rig`: deterministic DOM/CSS motion потребляет только pose/expression/gesture/state, respects reduced motion и не придумывает owner appearance choices. Portable launcher одновременно исправлен для Uvicorn `_Tee.isatty` compatibility.
+- **N6 Desktop Runtime остаётся отложен по решению владельца проекта. Следующий шаг после N12.3 — либо подключение финального character asset к trusted dynamic adapter, либо переход к N6 Desktop Runtime; operational state contract менять не требуется.**
 
 ## Поэтапный план
 
@@ -166,7 +167,8 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - static portrait adapter не заявляет dynamic pose/expression;
 - renderer выбирается через закрытый trusted registry; arbitrary asset-authored JavaScript запрещён;
 - unknown adapter fail-closed использует neutral shell;
-- финальный dynamic asset/rig подключается отдельным trusted adapter и не меняет operational state contract.
+- built-in `trusted_vector_rig` установлен как первый dynamic adapter и не меняет operational state contract;
+- финальный character asset может быть подключён позже отдельным trusted adapter без model-authored code и без изменения source-of-truth.
 
 ## Gate после каждого этапа
 

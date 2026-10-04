@@ -2569,3 +2569,181 @@
     grid-column: auto;
   }
 }
+
+
+/* N12.3 — Trusted Vector Rig. Motion is driven only by real body contract state. */
+.nexus-body-vector-rig {
+  overflow: visible;
+}
+.nexus-rig-root,
+.nexus-rig-torso,
+.nexus-rig-head,
+.nexus-rig-face,
+.nexus-rig-ear,
+.nexus-rig-eye,
+.nexus-rig-mouth,
+.nexus-rig-arm {
+  position: absolute;
+  box-sizing: border-box;
+}
+.nexus-rig-root {
+  inset: 1px 3px 2px;
+  transform-origin: 50% 85%;
+  transition: transform 180ms ease;
+}
+.nexus-rig-torso {
+  left: 12px;
+  bottom: 1px;
+  width: 14px;
+  height: 17px;
+  border: 1.5px solid currentColor;
+  border-radius: 45% 45% 34% 34%;
+  background: #fff;
+  transform-origin: 50% 90%;
+  transition: transform 180ms ease;
+}
+.nexus-rig-head {
+  left: 8px;
+  top: 5px;
+  width: 22px;
+  height: 23px;
+  border: 1.5px solid currentColor;
+  border-radius: 48% 48% 52% 52%;
+  background: #fff;
+  transform-origin: 50% 80%;
+  transition: transform 180ms ease;
+}
+.nexus-rig-ear {
+  top: -5px;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-right: 0;
+  border-bottom: 0;
+  background: #fff;
+  transition: transform 180ms ease;
+}
+.nexus-rig-ear.left {
+  left: 1px;
+  transform: rotate(34deg);
+}
+.nexus-rig-ear.right {
+  right: 1px;
+  transform: scaleX(-1) rotate(34deg);
+}
+.nexus-rig-face {
+  inset: 0;
+}
+.nexus-rig-eye {
+  top: 10px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  transition: width 150ms ease, height 150ms ease, transform 150ms ease;
+}
+.nexus-rig-eye.left { left: 5px; }
+.nexus-rig-eye.right { right: 5px; }
+.nexus-rig-mouth {
+  left: 50%;
+  bottom: 5px;
+  width: 6px;
+  height: 2px;
+  transform: translateX(-50%);
+  border-bottom: 1.5px solid currentColor;
+  border-radius: 0 0 50% 50%;
+  transition: width 150ms ease, height 150ms ease, border 150ms ease;
+}
+.nexus-rig-arm {
+  top: 4px;
+  width: 4px;
+  height: 13px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  background: #fff;
+  transform-origin: 50% 2px;
+  transition: transform 180ms ease;
+}
+.nexus-rig-arm.left { left: -5px; transform: rotate(12deg); }
+.nexus-rig-arm.right { right: -5px; transform: rotate(-12deg); }
+
+.nexus-body-vector-rig[data-pose="focus"] .nexus-rig-root,
+.nexus-body-vector-rig[data-pose="inspect"] .nexus-rig-root {
+  transform: translateY(1px) rotate(-1deg);
+}
+.nexus-body-vector-rig[data-pose="listen"] .nexus-rig-head {
+  transform: rotate(5deg) translateX(1px);
+}
+.nexus-body-vector-rig[data-pose="speak"] .nexus-rig-head {
+  transform: translateY(-1px);
+}
+.nexus-body-vector-rig[data-pose="alert"] .nexus-rig-root {
+  transform: translateY(-2px);
+}
+.nexus-body-vector-rig[data-pose="restrained"] .nexus-rig-root {
+  transform: scale(.96);
+}
+
+.nexus-body-vector-rig[data-expression="focused"] .nexus-rig-eye {
+  height: 2px;
+  border-radius: 2px;
+}
+.nexus-body-vector-rig[data-expression="attentive"] .nexus-rig-eye {
+  width: 4px;
+  height: 4px;
+}
+.nexus-body-vector-rig[data-expression="alert"] .nexus-rig-eye {
+  width: 5px;
+  height: 2px;
+  border-radius: 2px;
+}
+.nexus-body-vector-rig[data-gesture="verify"] .nexus-rig-arm.right,
+.nexus-body-vector-rig[data-gesture="attention"] .nexus-rig-arm.right {
+  transform: rotate(-52deg) translateY(-2px);
+}
+.nexus-body-vector-rig[data-gesture="listen"] .nexus-rig-arm.left {
+  transform: rotate(42deg) translateY(-2px);
+}
+.nexus-body-vector-rig[data-gesture="thinking"] .nexus-rig-arm.left {
+  transform: rotate(55deg) translate(2px,-2px);
+}
+.nexus-body-vector-rig[data-gesture="working"] .nexus-rig-torso,
+.nexus-body-vector-rig[data-gesture="transcribe"] .nexus-rig-torso {
+  animation: nexus-rig-active 700ms ease-in-out infinite alternate;
+}
+.nexus-body-vector-rig[data-gesture="speak"] .nexus-rig-mouth {
+  width: 5px;
+  height: 5px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  animation: nexus-rig-speak 260ms ease-in-out infinite alternate;
+}
+.nexus-body-vector-rig[data-gesture="recover"] .nexus-rig-root {
+  animation: nexus-rig-recover 520ms ease-in-out infinite alternate;
+}
+
+@keyframes nexus-rig-active {
+  from { transform: translateY(0); }
+  to { transform: translateY(-1.5px); }
+}
+@keyframes nexus-rig-speak {
+  from { transform: translateX(-50%) scaleY(.65); }
+  to { transform: translateX(-50%) scaleY(1.08); }
+}
+@keyframes nexus-rig-recover {
+  from { transform: translateX(-1px); }
+  to { transform: translateX(1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-rig-root,
+  .nexus-rig-torso,
+  .nexus-rig-head,
+  .nexus-rig-ear,
+  .nexus-rig-eye,
+  .nexus-rig-mouth,
+  .nexus-rig-arm {
+    transition: none !important;
+    animation: none !important;
+  }
+}
