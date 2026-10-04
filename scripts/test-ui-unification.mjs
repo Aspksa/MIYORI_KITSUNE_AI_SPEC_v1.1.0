@@ -13,10 +13,10 @@ assert.ok(
 );
 
 assert.ok(
-  !html.includes('id="menuSettings"') &&
+  html.includes('id="menuSettings"') &&
     html.includes('id="nexusNavSystem"') &&
-    html.includes("<strong>Настройки</strong><small>Система · клиенты · обновления</small>"),
-  "settings must have one visible navigation entry",
+    html.includes('data-nexus-view="system" type="button" hidden aria-hidden="true" tabindex="-1"'),
+  "settings must be visible only inside Дополнительно",
 );
 
 assert.ok(
