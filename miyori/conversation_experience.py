@@ -675,6 +675,7 @@ def topic_recent_messages(
     topic_id: int,
     limit: int = 30,
 ) -> list[dict[str, str]]:
+    init_conversation_experience_db()
     validate_topic(project_id, conversation_id, topic_id)
     with connect() as db:
         rows = db.execute(
@@ -698,6 +699,7 @@ def pinned_chat_context(
     conversation_id: int,
     limit: int = 4,
 ) -> list[dict]:
+    init_conversation_experience_db()
     if not get_conversation(conversation_id, project_id):
         raise LookupError("Разговор не найден.")
     with connect() as db:
