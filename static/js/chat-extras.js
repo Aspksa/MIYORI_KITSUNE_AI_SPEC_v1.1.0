@@ -280,6 +280,34 @@
     historyQuery = searchInput.value;
     void loadConversations();
   });
+  const savedAnswersButton = $("savedAnswersButton");
+  let showingSaved = false;
+  savedAnswersButton?.addEventListener("click", async () => {
+    if (!state.projectId) return;
+    showingSaved = !showingSaved;
+    savedAnswersButton.textContent = showingSaved ? "Все разговоры" : "Сохранённые ответы";
+    if (!showingSaved) {
+      await loadConversations();
+      return;
+    }
+    try {
+      const data = await api("/api/projects/" + state.projectId + "/bookmarks");
+      const list = $("conversationList");
+      list.replaceChildren();
+      if (!data.bookmarks?.length) {
+        list.appendChild(make("p", "conversation-empty", "Сохранённых ответов пока нет"));
+      }
+      for (const item of data.bookmarks || []) {
+        const button = make("button", "saved-answer-row", item.conversation_title + " · " + item.preview);
+        button.type = "button";
+        button.onclick = () => openConversation(item.conversation_id, item.id);
+        list.appendChild(button);
+      }
+    } catch (error) {
+      showError(error.message);
+    }
+  });
+
   const list = $("conversationList");
   list?.addEventListener("click", async event => {
     const pin = event.target.closest("[data-conversation-pin]");
