@@ -243,6 +243,29 @@ def voice_note_path(project_id: int, note_id: int) -> tuple[Path, str] | None:
         return None
     return path, str(row["mime_type"])
 
+def delete_voice_note(project_id: int, note_id: int) -> bool:
+    init_conversation_experience_db()
+    with connect() as db:
+        row = db.execute(
+            "SELECT stored_path FROM chat_voice_notes WHERE id=? AND project_id=?",
+            (note_id, project_id),
+        ).fetchone()
+        if not row:
+            return False
+        path = (Path(settings.data_dir) / str(row["stored_path"])).resolve()
+        root = Path(settings.data_dir).resolve()
+        db.execute(
+            "DELETE FROM chat_voice_notes WHERE id=? AND project_id=?",
+            (note_id, project_id),
+        )
+    if root in path.parents:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return True
+
+
 
 def create_topic(project_id: int, conversation_id: int, name: str) -> dict:
     init_conversation_experience_db()
