@@ -407,7 +407,8 @@ def init_db() -> None:
                 arguments_json TEXT NOT NULL,
                 preflight_json TEXT NOT NULL DEFAULT '{}',
                 status TEXT NOT NULL CHECK(status IN (
-                    'planned','running','recovery_required','executed','failed','cancelled'
+                    'planned','running','verifying','recovery_required',
+                    'executed','failed','cancelled'
                 )),
                 result_json TEXT,
                 error_json TEXT,
