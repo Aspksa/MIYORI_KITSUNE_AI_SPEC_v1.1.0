@@ -5,11 +5,13 @@ const renderer = readFileSync("frontend/nexus/body_renderer.ts", "utf8");
 const body = readFileSync("frontend/nexus/body.ts", "utf8");
 const client = readFileSync("frontend/nexus/client.ts", "utf8");
 const contracts = readFileSync("frontend/nexus/contracts.ts", "utf8");
+const css = readFileSync("static/css/nexus.css", "utf8");
 
 assert.ok(
-  contracts.includes('BODY_RENDERER_SCHEMA_VERSION = "1.0.0"') &&
+  contracts.includes('BODY_RENDERER_SCHEMA_VERSION = "1.1.0"') &&
     contracts.includes('"neutral_shell"') &&
-    contracts.includes('"static_portrait"'),
+    contracts.includes('"static_portrait"') &&
+    contracts.includes('"trusted_vector_rig"'),
   "trusted renderer registry types are missing",
 );
 
@@ -17,12 +19,15 @@ assert.ok(
   client.includes("trusted_registry_only !== true") &&
     client.includes("arbitrary_renderer_module_allowed !== false") &&
     client.includes("asset_authored_javascript_allowed !== false") &&
-    client.includes('unknown_adapter_fallback !== "neutral_shell"'),
-  "Digital Body client must fail closed on untrusted renderer contracts",
+    client.includes('unknown_adapter_fallback !== "neutral_shell"') &&
+    client.includes('adapter_id !== "trusted_vector_rig"'),
+  "Digital Body client must validate the installed trusted dynamic renderer",
 );
 
 assert.ok(
   renderer.includes("renderTrustedBodyVisual") &&
+    renderer.includes("renderTrustedVectorRig") &&
+    renderer.includes('case "trusted_vector_rig"') &&
     renderer.includes('case "static_portrait"') &&
     renderer.includes('case "neutral_shell"') &&
     renderer.includes("renderNeutralShell"),
@@ -38,8 +43,16 @@ assert.ok(
 assert.ok(
   body.includes('import { renderTrustedBodyVisual } from "./body_renderer.js"') &&
     body.includes("renderTrustedBodyVisual(body, presentation, effectiveState)") &&
+    body.includes("Динамическое тело активно") &&
     !body.includes("function buildPortrait("),
-  "Digital Body must delegate rendering to the trusted adapter registry",
+  "Digital Body must delegate rendering to the trusted dynamic adapter registry",
+);
+
+assert.ok(
+  css.includes(".nexus-body-vector-rig") &&
+    css.includes('data-gesture="speak"') &&
+    css.includes("@media (prefers-reduced-motion: reduce)"),
+  "trusted vector rig motion CSS is missing or does not respect reduced motion",
 );
 
 assert.ok(
@@ -50,7 +63,7 @@ assert.ok(
     !renderer.includes("Math.random") &&
     !renderer.includes("setInterval") &&
     !renderer.includes("setTimeout"),
-  "renderer registry must not execute asset code or synthesize liveness",
+  "renderer registry must not execute asset code or synthesize timer-driven liveness",
 );
 
-console.log("NEXUS Body Renderer Registry contract OK.");
+console.log("NEXUS Real Dynamic Renderer contract OK.");
