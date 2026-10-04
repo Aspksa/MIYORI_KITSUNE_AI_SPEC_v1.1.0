@@ -57,6 +57,7 @@ from miyori.conversation_experience import (
     create_folder,
     create_topic,
     create_voice_note,
+    delete_voice_note,
     due_schedules,
     filter_conversation_ids,
     folder_snapshot,
@@ -1723,6 +1724,11 @@ def chat_voice_note_download(project_id: int, note_id: int):
         raise HTTPException(status_code=404, detail="Голосовая заметка не найдена.")
     path, mime = resolved
     return FileResponse(path, media_type=mime, filename=path.name)
+
+
+@app.delete("/api/projects/{project_id}/voice-notes/{note_id}")
+def chat_voice_note_delete(project_id: int, note_id: int) -> dict:
+    return {"deleted": delete_voice_note(project_id, note_id)}
 
 
 @app.get("/api/projects/{project_id}/memory")
