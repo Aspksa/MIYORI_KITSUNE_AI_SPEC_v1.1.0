@@ -49,6 +49,7 @@ export function installNexusVoice() {
     let lastConfidence = null;
     let lastAssistantText = "";
     let submittedFromVoice = false;
+    let speaking = false;
     let stopped = false;
     const setState = (next, options = {}) => {
         panel.dataset.state = next;
@@ -92,6 +93,7 @@ export function installNexusVoice() {
             return;
         if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
             window.speechSynthesis.cancel();
+            speaking = false;
             if (interrupted)
                 setState("interrupted");
         }
@@ -211,10 +213,16 @@ export function installNexusVoice() {
         }
     };
     button.addEventListener("click", () => {
-        if (listening)
-            stopRecognition(true);
-        else
+        if (panel.dataset.state === "speaking") {
+            cancelSpeech(true);
             void startListening();
+        }
+        else if (listening) {
+            stopRecognition(true);
+        }
+        else {
+            void startListening();
+        }
     });
     send.addEventListener("click", () => {
         const text = finalTranscript.trim();
@@ -231,9 +239,18 @@ export function installNexusVoice() {
         cancelSpeech(false);
         const utterance = new SpeechSynthesisUtterance(lastAssistantText);
         utterance.lang = document.documentElement.lang || "ru-RU";
-        utterance.addEventListener("start", () => setState("speaking"));
-        utterance.addEventListener("end", () => setState("idle"));
-        utterance.addEventListener("error", () => setState("error", { error: "Не удалось озвучить ответ." }));
+        utterance.addEventListener("start", () => {
+            speaking = true;
+            setState("speaking");
+        });
+        utterance.addEventListener("end", () => {
+            speaking = false;
+            setState("idle");
+        });
+        utterance.addEventListener("error", () => {
+            speaking = false;
+            setState("error", { error: "Не удалось озвучить ответ." });
+        });
         window.speechSynthesis.speak(utterance);
     });
     stop.addEventListener("click", () => {
