@@ -56,6 +56,8 @@ class NexusContractTests(unittest.TestCase):
         self.assertIn("active_workflows", snapshot["counts"])
         self.assertIn("recovering_workflows", snapshot["counts"])
         self.assertIn("knowledge_attention", snapshot["counts"])
+        self.assertIn("agent_workspaces", snapshot["counts"])
+        self.assertIn("active_agent_workspaces", snapshot["counts"])
         self.assertEqual(snapshot["counts"]["active_workflows"], 0)
         self.assertTrue(snapshot["suggestions"])
 

@@ -6,6 +6,7 @@ from .context_router import ContextRoute
 from .db import (
     create_agent_workflow,
     create_workflow_step,
+    decide_permission_request,
     finish_agent_run,
     get_agent_trace,
     get_agent_workflow,
@@ -23,6 +24,7 @@ from .db import (
 )
 from .planner import (
     MAX_AGENT_STEPS,
+    PlannerDecision,
     fallback_decision,
     parse_planner_payload,
     planner_prompt,
@@ -187,7 +189,17 @@ async def _continue_workflow(workflow: dict) -> AgentResult:
         for step in steps
         if step.get("kind") == "tool" and step.get("tool_name")
     }
-    tool_catalog = list_tools()
+    tool_permissions = workflow.get("route", {}).get("_tool_permissions")
+    allowed_permissions = (
+        {str(value) for value in tool_permissions}
+        if isinstance(tool_permissions, list) and tool_permissions
+        else None
+    )
+    tool_catalog = [
+        item
+        for item in list_tools()
+        if allowed_permissions is None or str(item.get("permission")) in allowed_permissions
+    ]
     allowed_tools = {item["name"] for item in tool_catalog}
     planner_mode = str(workflow.get("planner_mode") or "model")
     planner_available = planner_mode != "fallback"
@@ -249,6 +261,12 @@ async def _continue_workflow(workflow: dict) -> AgentResult:
                 decision = fallback_decision(message, route, planner_history)
         else:
             decision = fallback_decision(message, route, planner_history)
+
+        if decision.action == "tool" and (decision.tool_name or "") not in allowed_tools:
+            decision = PlannerDecision(
+                action="finish",
+                reason="Capability boundary не разрешает выбранный инструмент в этом workflow.",
+            )
 
         if decision.action == "finish":
             step = create_workflow_step(
@@ -540,26 +558,37 @@ async def run_agent(
     conversation_context: list[dict[str, str]] | None = None,
     *,
     request_key: str,
+    max_steps: int | None = None,
+    tool_permissions: tuple[str, ...] | None = None,
 ) -> AgentResult:
     existing = get_agent_workflow_by_request_key(project_id, request_key)
     if existing:
         return _result_from_workflow(existing)
 
+    step_budget = max(1, min(int(max_steps or MAX_AGENT_STEPS), MAX_AGENT_STEPS))
     run_id = start_agent_run(
         project_id,
         conversation_id,
         message,
-        MAX_AGENT_STEPS,
+        step_budget,
     )
+    route_payload = route.to_dict()
+    if tool_permissions:
+        normalized_permissions = sorted({str(value) for value in tool_permissions})
+        invalid_permissions = set(normalized_permissions) - {"read", "write"}
+        if invalid_permissions:
+            raise ValueError("Недопустимое ограничение tool permissions.")
+        route_payload["_tool_permissions"] = normalized_permissions
+
     workflow = create_agent_workflow(
         project_id=project_id,
         conversation_id=conversation_id,
         agent_run_id=run_id,
         request_key=request_key,
         goal=message,
-        route=route.to_dict(),
+        route=route_payload,
         conversation_context=conversation_context or [],
-        max_steps=MAX_AGENT_STEPS,
+        max_steps=step_budget,
     )
     record_workflow_event(
         int(workflow["id"]),
@@ -758,3 +787,61 @@ async def resume_agent_workflow(
 
     workflow = get_agent_workflow(workflow_id, project_id) or workflow
     return await _continue_workflow(workflow)
+
+
+async def cancel_agent_workflow(
+    project_id: int,
+    workflow_id: int,
+) -> dict:
+    workflow = get_agent_workflow(workflow_id, project_id)
+    if not workflow:
+        raise ValueError("Workflow не найден в текущем проекте.")
+    if workflow["status"] == "recovering":
+        raise RuntimeError("Сначала завершите проверку восстановления workflow.")
+    if workflow["status"] in {"completed", "cancelled"}:
+        return workflow
+
+    permission_id = workflow.get("pending_permission_id")
+    if permission_id:
+        permission = get_permission_request(project_id, int(permission_id))
+        if permission and permission["status"] == "pending":
+            decide_permission_request(project_id, int(permission_id), False)
+        if permission and permission.get("workflow_step_id"):
+            step = get_workflow_step(int(permission["workflow_step_id"]))
+            if step and step["status"] == "waiting_permission":
+                update_workflow_step(
+                    int(step["id"]),
+                    status="cancelled",
+                    result={"workflow_cancelled": True},
+                    mark_finished=True,
+                )
+
+    update_agent_workflow(
+        workflow_id,
+        status="cancelled",
+        pending_permission_id=None,
+        result={"outcome": "cancelled_by_user"},
+        error=None,
+        finished=True,
+    )
+    set_agent_run_status(
+        int(workflow["agent_run_id"]),
+        "cancelled",
+        finished=True,
+    )
+    record_workflow_event(
+        workflow_id,
+        "workflow.cancelled",
+        {"actor": "user"},
+    )
+    record_audit_event(
+        project_id,
+        "user",
+        "workflow.cancelled",
+        "Пользователь остановил workflow.",
+        conversation_id=workflow.get("conversation_id"),
+        workflow_id=workflow_id,
+        entity_type="workflow",
+        entity_id=workflow_id,
+    )
+    return get_agent_workflow(workflow_id, project_id) or workflow

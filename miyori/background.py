@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+from .agent_workspace import run_agent_workspace_cycle
 from .db import list_memory_facts
 from .epistemic import epistemic_snapshot, list_claims, verify_claim
 from .development import run_project_self_check
@@ -87,7 +88,12 @@ def epistemic_review_handler(project_id: int, payload: dict) -> dict:
     }
 
 
+def agent_workspace_handler(project_id: int, payload: dict) -> dict:
+    return run_agent_workspace_cycle(project_id, payload)
+
+
 def register_background_handlers() -> None:
+    register_task_handler("agent_workspace", agent_workspace_handler)
     register_task_handler("self_check", self_check_handler)
     register_task_handler("memory_consolidation", memory_consolidation_handler)
     register_task_handler("epistemic_review", epistemic_review_handler)

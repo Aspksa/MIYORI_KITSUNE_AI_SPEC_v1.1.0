@@ -358,7 +358,10 @@ async function renderNexusActionsWorkspace() {
             '<h3>Agents & Actions</h3>' +
             '<p>Одна карточка соответствует одному реальному workflow, tool operation или background task. ' +
             'Permission внутри workflow не считается отдельным действием.</p></div>' +
-          '<button id="nexusActionsRefresh" class="secondary-sheet-button" type="button">Обновить</button>' +
+          '<div class="nexus-actions-head-controls">' +
+            '<button id="nexusAgentWorkspaceOpen" class="primary-sheet-button" type="button">Agent Workspace</button>' +
+            '<button id="nexusActionsRefresh" class="secondary-sheet-button" type="button">Обновить</button>' +
+          '</div>' +
         '</div>' +
         '<div class="nexus-action-metrics">' +
           metric("Требуют внимания", counts.attention, "permission · recovery · error",
@@ -383,6 +386,7 @@ async function renderNexusActionsWorkspace() {
       '</section>';
 
     el("nexusActionsRefresh").onclick = renderNexusActionsWorkspace;
+    el("nexusAgentWorkspaceOpen").onclick = renderNexusAgentWorkspace;
 
     const refreshActionState = async () => {
       await Promise.all([
@@ -476,6 +480,177 @@ async function renderNexusActionsWorkspace() {
         }
       };
     });
+  } catch (error) {
+    workspaceBody.innerHTML = workspaceResult(error.message, "error");
+  }
+}
+
+
+function nexusAgentWorkspaceStatus(value) {
+  return ({
+    planned: "Запланировано",
+    running: "Работает",
+    waiting_permission: "Ждёт разрешения",
+    recovery: "Recovery",
+    completed: "Завершено",
+    failed: "Ошибка",
+    cancelled: "Отменено",
+    blocked: "Ждёт зависимостей",
+    ready: "Готов к запуску"
+  }[value] || value || "—");
+}
+
+function nexusAgentNodeMarkup(node) {
+  const deps = Array.isArray(node.dependencies) ? node.dependencies : [];
+  const result = node.result || {};
+  const workflowStatus = result.workflow_status || "";
+  return '<article class="agent-workspace-node status-' + escapeHtml(node.status || "blocked") + '">' +
+    '<header><div><span>' + escapeHtml(node.role || "Agent") + '</span>' +
+      '<strong>' + escapeHtml(node.title || node.node_key || "Node") + '</strong></div>' +
+      '<b>' + escapeHtml(nexusAgentWorkspaceStatus(node.status)) + '</b></header>' +
+    '<p>' + escapeHtml(node.instruction || "") + '</p>' +
+    '<div class="agent-workspace-node-meta">' +
+      '<span>budget ' + Number(node.step_budget || 0) + '</span>' +
+      '<span>' + (node.capability === "standard" ? "standard · write через разрешение" : "read-only") + '</span>' +
+      (deps.length ? '<span>после: ' + deps.map(escapeHtml).join(", ") + '</span>' : '<span>независимый старт</span>') +
+      (node.workflow_id ? '<span>workflow #' + Number(node.workflow_id) + '</span>' : '') +
+      (workflowStatus ? '<span>' + escapeHtml(workflowStatus) + '</span>' : '') +
+    '</div>' +
+    (node.error ? '<details><summary>Ошибка</summary><pre>' + nexusActionJson(node.error) + '</pre></details>' : '') +
+    (node.result ? '<details><summary>Handoff / result</summary><pre>' + nexusActionJson(node.result) + '</pre></details>' : '') +
+  '</article>';
+}
+
+function nexusAgentWorkspaceMarkup(workspace) {
+  const nodes = Array.isArray(workspace.nodes) ? workspace.nodes : [];
+  const active = ["planned", "running", "waiting_permission", "recovery"].includes(workspace.status);
+  return '<article class="agent-workspace-card">' +
+    '<header class="agent-workspace-card-head">' +
+      '<div><span class="section-caption">Workspace #' + Number(workspace.id) + '</span>' +
+        '<h4>' + escapeHtml(workspace.goal || "Agent Workspace") + '</h4>' +
+        '<small>' + Number(workspace.max_parallel || 1) + ' параллельно · ' +
+          Number(workspace.total_step_budget || 0) + ' шагов budget</small></div>' +
+      '<span class="knowledge-status tone-' +
+        (workspace.status === "failed" ? "error" :
+         workspace.status === "waiting_permission" || workspace.status === "recovery" ? "warning" :
+         workspace.status === "completed" ? "success" :
+         workspace.status === "running" ? "working" : "neutral") + '">' +
+        escapeHtml(nexusAgentWorkspaceStatus(workspace.status)) + '</span>' +
+    '</header>' +
+    '<div class="agent-workspace-node-grid">' + nodes.map(nexusAgentNodeMarkup).join("") + '</div>' +
+    (active ? '<div class="agent-workspace-controls">' +
+      '<button type="button" class="primary-sheet-button" data-agent-workspace-run="' + Number(workspace.id) + '">' +
+        (workspace.status === "planned" ? "Запустить" : "Продолжить") + '</button>' +
+      '<button type="button" class="secondary-sheet-button" data-agent-workspace-cancel="' + Number(workspace.id) + '">Остановить</button>' +
+    '</div>' : '') +
+  '</article>';
+}
+
+async function renderNexusAgentWorkspace() {
+  showWorkspaceShell(
+    "actions",
+    "NEXUS · Agent Workspace",
+    "Agent Workspace",
+    "Делегирование, dependency graph, budgets, parallel-ready узлы и handoff поверх существующего Workflow Engine."
+  );
+
+  workspaceBody.innerHTML =
+    '<section class="agent-workspace-page">' +
+      '<header class="agent-workspace-intro">' +
+        '<div><span class="section-caption">N8 · orchestration</span><h3>Команда агентов</h3>' +
+          '<p>Независимые узлы могут работать параллельно. Любой write-tool всё равно проходит через Actions permissions.</p></div>' +
+        '<button id="agentWorkspaceBack" class="secondary-sheet-button" type="button">← Действия</button>' +
+      '</header>' +
+      '<form id="agentWorkspaceCreate" class="agent-workspace-create">' +
+        '<label for="agentWorkspaceGoal">Цель</label>' +
+        '<div><textarea id="agentWorkspaceGoal" rows="3" maxlength="6000" placeholder="Например: проверь договор, найди риски и подготовь безопасный план действий" required></textarea>' +
+        '<button class="primary-sheet-button" type="submit">Создать workspace</button></div>' +
+        '<small>По умолчанию: два read-only агента параллельно → Координатор standard после handoff; write всегда через permission.</small>' +
+      '</form>' +
+      '<div id="agentWorkspaceStatus" class="knowledge-quiet-status" role="status" aria-live="polite"></div>' +
+      '<div id="agentWorkspaceList" class="agent-workspace-list"><div class="workspace-loading">Загружаю workspace…</div></div>' +
+    '</section>';
+
+  const load = async () => {
+    const list = el("agentWorkspaceList");
+    const data = await api("/api/projects/" + state.projectId + "/agent-workspaces?limit=30");
+    const summaries = Array.isArray(data.workspaces) ? data.workspaces : [];
+    const full = [];
+    for (const item of summaries) {
+      try {
+        const detail = await api("/api/projects/" + state.projectId + "/agent-workspaces/" + item.id);
+        full.push(detail.workspace);
+      } catch (_) {
+        full.push(item);
+      }
+    }
+    list.innerHTML = full.length
+      ? full.map(nexusAgentWorkspaceMarkup).join("")
+      : '<div class="knowledge-empty"><strong>Agent Workspace пока нет</strong><span>Создайте цель — структура появится отдельно от чата.</span></div>';
+
+    list.querySelectorAll("[data-agent-workspace-run]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/agent-workspaces/" +
+              button.dataset.agentWorkspaceRun + "/run",
+            {method: "POST"}
+          );
+          el("agentWorkspaceStatus").textContent = "Workspace передан coordinator worker.";
+          await Promise.all([loadTasks(), loadNexus()]);
+          await load();
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+    list.querySelectorAll("[data-agent-workspace-cancel]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/agent-workspaces/" +
+              button.dataset.agentWorkspaceCancel + "/cancel",
+            {method: "POST"}
+          );
+          await Promise.all([loadTasks(), loadNexus()]);
+          await load();
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+  };
+
+  el("agentWorkspaceBack").onclick = renderNexusActionsWorkspace;
+  el("agentWorkspaceCreate").onsubmit = async event => {
+    event.preventDefault();
+    const goal = el("agentWorkspaceGoal").value.trim();
+    if (!goal) return;
+    const submit = event.submitter;
+    if (submit) submit.disabled = true;
+    try {
+      const created = await api("/api/projects/" + state.projectId + "/agent-workspaces", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({goal, max_parallel: 2})
+      });
+      el("agentWorkspaceGoal").value = "";
+      el("agentWorkspaceStatus").textContent =
+        "Workspace #" + created.workspace.id + " создан. Проверьте роли и запустите его.";
+      await load();
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  };
+
+  try {
+    await load();
   } catch (error) {
     workspaceBody.innerHTML = workspaceResult(error.message, "error");
   }

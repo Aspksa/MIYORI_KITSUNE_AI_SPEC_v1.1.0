@@ -78,6 +78,9 @@ jobs:
       - name: NEXUS Voice contract
         run: npm run test:nexus-voice
 
+      - name: NEXUS Agent Workspace contract
+        run: npm run test:agent-workspace
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

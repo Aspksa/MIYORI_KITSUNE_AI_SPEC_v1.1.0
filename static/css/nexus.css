@@ -1956,3 +1956,199 @@
   .nexus-voice-panel { grid-template-columns: 1fr; }
   .nexus-voice-actions { justify-content: flex-start; }
 }
+
+
+/* N8 — Agent Workspace. Compact DAG/workflow surface; no decorative agent avatars. */
+.nexus-actions-head-controls,
+.agent-workspace-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.agent-workspace-page {
+  display: grid;
+  gap: 12px;
+  width: min(1120px,100%);
+}
+.agent-workspace-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid #e5dfeb;
+  border-radius: 15px;
+  background: #fff;
+}
+.agent-workspace-intro h3 {
+  margin: 4px 0 0;
+  color: #493f52;
+  font-size: 17px;
+}
+.agent-workspace-intro p {
+  max-width: 760px;
+  margin: 6px 0 0;
+  color: #817788;
+  font-size: 9px;
+  line-height: 1.55;
+}
+.agent-workspace-create {
+  display: grid;
+  gap: 7px;
+  padding: 13px 15px;
+  border: 1px solid #e7e1ec;
+  border-radius: 13px;
+  background: #fff;
+}
+.agent-workspace-create > label {
+  color: #6f6478;
+  font-size: 9px;
+  font-weight: 800;
+}
+.agent-workspace-create > div {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+.agent-workspace-create textarea {
+  min-width: 0;
+  padding: 10px 11px;
+  resize: vertical;
+  border: 1px solid #ddd6e4;
+  border-radius: 9px;
+  background: #fbfafc;
+  color: #504657;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.agent-workspace-create small {
+  color: #98909f;
+  font-size: 8px;
+}
+.agent-workspace-list {
+  display: grid;
+  gap: 10px;
+}
+.agent-workspace-card {
+  padding: 14px;
+  border: 1px solid #e6e0eb;
+  border-radius: 14px;
+  background: #fff;
+}
+.agent-workspace-card-head {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+.agent-workspace-card-head h4 {
+  margin: 4px 0 0;
+  color: #4a4052;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.agent-workspace-card-head small {
+  display: block;
+  margin-top: 4px;
+  color: #92899a;
+  font-size: 8px;
+}
+.agent-workspace-node-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.agent-workspace-node {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #ece6f1;
+  border-top: 3px solid #b9afc1;
+  border-radius: 10px;
+  background: #fcfbfd;
+}
+.agent-workspace-node.status-running,
+.agent-workspace-node.status-ready { border-top-color: #8170a8; }
+.agent-workspace-node.status-waiting_permission,
+.agent-workspace-node.status-recovery { border-top-color: #c19a59; }
+.agent-workspace-node.status-completed { border-top-color: #6fa07e; }
+.agent-workspace-node.status-failed { border-top-color: #bf7070; }
+.agent-workspace-node.status-cancelled { border-top-color: #aaa1b1; }
+.agent-workspace-node > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 7px;
+}
+.agent-workspace-node > header span,
+.agent-workspace-node > header strong {
+  display: block;
+}
+.agent-workspace-node > header span {
+  color: #968c9d;
+  font-size: 7px;
+  font-weight: 800;
+}
+.agent-workspace-node > header strong {
+  margin-top: 2px;
+  color: #594e61;
+  font-size: 9px;
+}
+.agent-workspace-node > header b {
+  color: #817586;
+  font-size: 7px;
+  white-space: nowrap;
+}
+.agent-workspace-node > p {
+  margin: 7px 0 0;
+  color: #817788;
+  font-size: 8px;
+  line-height: 1.5;
+}
+.agent-workspace-node-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.agent-workspace-node-meta span {
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: #f0ecf3;
+  color: #7c7183;
+  font-size: 7px;
+}
+.agent-workspace-node details {
+  margin-top: 7px;
+  border-top: 1px solid #ece6f0;
+}
+.agent-workspace-node summary {
+  padding-top: 7px;
+  color: #766a7e;
+  font-size: 7px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.agent-workspace-node pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 8px;
+  border-radius: 7px;
+  background: #f7f4f9;
+  color: #665b6d;
+  font: 7px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.agent-workspace-controls { margin-top: 12px; }
+@media (max-width: 900px) {
+  .agent-workspace-node-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .agent-workspace-intro,
+  .agent-workspace-card-head { grid-template-columns: 1fr; display: grid; }
+  .agent-workspace-create > div { grid-template-columns: 1fr; }
+}

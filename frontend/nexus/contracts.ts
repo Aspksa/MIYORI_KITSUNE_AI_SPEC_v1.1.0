@@ -6,6 +6,7 @@ export const NEXUS_SURFACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_PRESENCE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -347,6 +348,74 @@ export interface NexusPresence {
     knowledge_attention_changes_primary_presence: false;
   };
   generated_at: string;
+}
+
+export type NexusAgentWorkspaceStatus =
+  | "planned"
+  | "running"
+  | "waiting_permission"
+  | "recovery"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type NexusAgentWorkspaceNodeStatus =
+  | "blocked"
+  | "ready"
+  | "running"
+  | "waiting_permission"
+  | "recovery"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface NexusAgentWorkspaceNode {
+  id: number;
+  workspace_id: number;
+  node_key: string;
+  role: string;
+  title: string;
+  instruction: string;
+  capability: "read_only" | "standard";
+  dependencies: string[];
+  step_budget: number;
+  status: NexusAgentWorkspaceNodeStatus;
+  workflow_id: number | null;
+  result: unknown;
+  error: unknown;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface NexusAgentWorkspaceSummary {
+  id: number;
+  project_id: number;
+  goal: string;
+  status: NexusAgentWorkspaceStatus;
+  max_parallel: number;
+  total_step_budget: number;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface NexusAgentWorkspace {
+  schema_version: typeof NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION;
+  id: number;
+  project_id: number;
+  goal: string;
+  status: NexusAgentWorkspaceStatus;
+  max_parallel: number;
+  total_step_budget: number;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  nodes: NexusAgentWorkspaceNode[];
+  counts: Record<NexusAgentWorkspaceNodeStatus, number>;
 }
 
 export type NexusVoiceState =

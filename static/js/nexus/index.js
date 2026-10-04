@@ -4,7 +4,7 @@ import { installNexusSurfaceHost } from "./surfaces.js";
 import { installNexusPresence } from "./presence.js";
 import { installNexusProactive } from "./proactive.js";
 import { installNexusVoice } from "./voice.js";
-const NEXUS_FRONTEND_VERSION = "0.9.0";
+const NEXUS_FRONTEND_VERSION = "1.0.0";
 function boot() {
     document.documentElement.dataset.nexus = "ready";
     installDialogAccessibility();

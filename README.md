@@ -2,8 +2,26 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.51.**  
+**Внутренняя версия приложения: 00.00.52.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.52
+
+`00.00.52` — **NEXUS Agent Workspace · delegation, DAG, budgets и handoff**.
+
+N8 добавляет отдельную оркестрационную поверхность поверх существующего Workflow Engine:
+
+- Agent Workspace хранит цель, узлы, роли, зависимости, per-node step budget и общий budget;
+- dependency graph валидируется как DAG: циклы, неизвестные зависимости и превышение budget отклоняются до запуска;
+- независимые ready-узлы запускаются параллельно до server-side `max_parallel`, а зависимые узлы — только после завершения prerequisites;
+- каждый узел вызывает существующий `run_agent` с собственным `max_steps`, а не отдельный tool engine;
+- write-tools продолжают использовать существующие permission / preflight / verify / recovery контуры;
+- waiting permission и recovery останавливают дальнейший dependency chain вместо обхода подтверждения;
+- результаты завершённых узлов передаются downstream узлам как explicit handoff;
+- cancel переиспользует общий workflow cancellation primitive и не дублирует permission semantics;
+- дефолтная команда: Исследователь + Ревьюер рисков параллельно → Координатор после их handoff;
+- Agent Workspace находится внутри Actions как отдельный экран и не превращает Chat в control room;
+- UI показывает роли, dependencies, budgets, реальные workflow IDs/status/result, без аватаров «толпы агентов» и декоративных анимаций.
 
 ## Состояние релиза 00.00.51
 
