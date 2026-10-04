@@ -1692,7 +1692,8 @@
   font-size: 7px;
   line-height: 1.4;
 }
-.nexus-presence-host[data-mode="working"] .nexus-presence-mark {
+.nexus-presence-host[data-mode="working"] .nexus-presence-mark,
+.nexus-presence-host[data-mode="verifying"] .nexus-presence-mark {
   background: #806cad;
 }
 .nexus-presence-host[data-mode="waiting"] .nexus-presence-mark {
