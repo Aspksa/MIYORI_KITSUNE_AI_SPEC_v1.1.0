@@ -86,6 +86,7 @@ function messageFromRecord(item) {
     id: item.id,
     bookmarked: Boolean(item.bookmarked),
     diagnostics: item.metadata?.diagnostics,
+    comparison_offer: item.metadata?.comparison_offer,
     attachments: (item.metadata?.attachments || []).map(id => ({id})),
     suppressEvent: true,
     suppressScroll: true
@@ -361,7 +362,8 @@ form.addEventListener("submit", async (event) => {
     state.conversationId = data.conversation_id;
     if (data.user_message_id) userRow.dataset.messageId = String(data.user_message_id);
     addMessage("assistant", data.answer, data.sources || [], {
-      id:data.assistant_message_id, diagnostics:data.diagnostics
+      id:data.assistant_message_id, diagnostics:data.diagnostics,
+      comparison_offer:data.comparison_offer
     });
     attachmentStore?.clear();
     state.pendingRequest = null;
