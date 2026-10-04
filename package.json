@@ -14,6 +14,7 @@
     "build:nexus": "tsc -p tsconfig.nexus.json",
     "check:nexus-a11y": "node scripts/check-nexus-a11y.mjs",
     "test:nexus-state": "node scripts/test-nexus-state.mjs",
-    "test:nexus-shell": "node scripts/test-nexus-shell.mjs"
+    "test:nexus-shell": "node scripts/test-nexus-shell.mjs",
+    "test:nexus-knowledge": "node scripts/test-nexus-knowledge.mjs"
   }
 }
