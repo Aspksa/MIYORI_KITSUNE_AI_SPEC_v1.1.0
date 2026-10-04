@@ -8,10 +8,11 @@ const contracts = readFileSync("frontend/nexus/contracts.ts", "utf8");
 const css = readFileSync("static/css/nexus.css", "utf8");
 
 assert.ok(
-  contracts.includes('BODY_RENDERER_SCHEMA_VERSION = "1.1.0"') &&
+  contracts.includes('BODY_RENDERER_SCHEMA_VERSION = "1.2.0"') &&
     contracts.includes('"neutral_shell"') &&
     contracts.includes('"static_portrait"') &&
-    contracts.includes('"trusted_vector_rig"'),
+    contracts.includes('"trusted_vector_rig"') &&
+    contracts.includes('"trusted_character_rig"'),
   "trusted renderer registry types are missing",
 );
 
@@ -20,13 +21,16 @@ assert.ok(
     client.includes("arbitrary_renderer_module_allowed !== false") &&
     client.includes("asset_authored_javascript_allowed !== false") &&
     client.includes('unknown_adapter_fallback !== "neutral_shell"') &&
-    client.includes('adapter_id !== "trusted_vector_rig"'),
+    client.includes('adapter_id !== "trusted_character_rig"') &&
+    client.includes('appearance_source !== "owner_profile_only"'),
   "Digital Body client must validate the installed trusted dynamic renderer",
 );
 
 assert.ok(
   renderer.includes("renderTrustedBodyVisual") &&
     renderer.includes("renderTrustedVectorRig") &&
+    renderer.includes("renderTrustedCharacterRig") &&
+    renderer.includes('case "trusted_character_rig"') &&
     renderer.includes('case "trusted_vector_rig"') &&
     renderer.includes('case "static_portrait"') &&
     renderer.includes('case "neutral_shell"') &&
@@ -50,6 +54,7 @@ assert.ok(
 
 assert.ok(
   css.includes(".nexus-body-vector-rig") &&
+    css.includes(".nexus-body-character-rig") &&
     css.includes('data-gesture="speak"') &&
     css.includes("@media (prefers-reduced-motion: reduce)"),
   "trusted vector rig motion CSS is missing or does not respect reduced motion",
@@ -66,4 +71,4 @@ assert.ok(
   "renderer registry must not execute asset code or synthesize timer-driven liveness",
 );
 
-console.log("NEXUS Real Dynamic Renderer contract OK.");
+console.log("NEXUS Miyori Character Rig contract OK.");
