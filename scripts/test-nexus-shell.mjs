@@ -72,7 +72,7 @@ assert.ok(
   shell.includes('document.documentElement.dataset.nexusView || "chat"'),
   "shell must preserve a startup view already selected by legacy startup preferences",
 );
-const keyframes = [...css.matchAll(/@keyframes\\s+([a-zA-Z0-9_-]+)/g)]
+const keyframes = [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)]
   .map((match) => match[1])
   .sort();
 assert.deepEqual(
