@@ -2274,6 +2274,7 @@ async def _build_agent_response(
         "model_usage":actual_usage,
         "retrieval_ms":retrieval_ms,
         "document_review":document_review,
+        "document_review_query":text[:5000] if document_review else None,
     }
 
     assistant_message_id = add_message(
