@@ -2121,6 +2121,48 @@ def document_intelligence_get(project_id: int, document_id: int) -> dict:
     return {"intelligence": profile}
 
 
+@app.get("/api/projects/{project_id}/documents/{document_id}/vision")
+def document_vision_get(project_id: int, document_id: int) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        return document_vision_status(project_id, document_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/documents/{document_id}/vision")
+def document_vision_start(
+    project_id: int,
+    document_id: int,
+    request: DocumentVisionRequest,
+) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        current = document_vision_status(project_id, document_id)
+        if current.get("state", {}).get("status") in {"queued", "running"}:
+            return {"vision": current, "task": None, "already_running": True}
+        task = create_task(
+            project_id,
+            "document_vision",
+            {
+                "document_id": document_id,
+                "force": bool(request.force),
+                "max_items": int(request.max_items),
+                "include_text_pages": bool(request.include_text_pages),
+            },
+        )
+        queued = mark_document_vision_queued(project_id, document_id)
+        wake_worker()
+        return {
+            "vision": queued,
+            "task": task,
+            "already_running": False,
+        }
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
 @app.get("/api/projects/{project_id}/documents/{document_id}/outline")
 def document_outline(project_id: int, document_id: int) -> dict:
     profile = get_document_intelligence(project_id, document_id)
