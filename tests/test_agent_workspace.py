@@ -11,7 +11,13 @@ from miyori import agent_workspace as aw
 from miyori.config import settings
 from miyori.agent import run_agent
 from miyori.context_router import route_context
-from miyori.db import create_project, get_agent_workflow, init_db, list_permission_requests
+from miyori.db import (
+    create_project,
+    get_agent_workflow,
+    init_db,
+    list_permission_requests,
+    update_agent_workflow,
+)
 
 
 class AgentWorkspaceTests(unittest.TestCase):
@@ -217,18 +223,26 @@ class AgentWorkspaceTests(unittest.TestCase):
     def test_cancel_does_not_lie_when_child_recovery_blocks_cancel(self) -> None:
         workspace = aw.create_agent_workspace(self.project_id, "Recovery cancel")
         node = workspace["nodes"][0]
+        child = __import__("asyncio").run(
+            run_agent(
+                self.project_id,
+                None,
+                "Покажи статус проекта.",
+                route_context("Покажи статус проекта."),
+                [],
+                request_key="workspace:recovery-child:test",
+                max_steps=2,
+                tool_permissions=("read",),
+            )
+        )
+        update_agent_workflow(child.workflow_id, status="recovering")
         aw._update_node(
             int(node["id"]),
             status="running",
-            workflow_id=777,
+            workflow_id=child.workflow_id,
             mark_started=True,
         )
-        with patch.object(
-            aw,
-            "cancel_agent_workflow",
-            side_effect=RuntimeError("recovery first"),
-        ):
-            final = aw.cancel_agent_workspace(self.project_id, int(workspace["id"]))
+        final = aw.cancel_agent_workspace(self.project_id, int(workspace["id"]))
 
         self.assertEqual(final["status"], "recovery")
         by_id = {int(item["id"]): item for item in final["nodes"]}
