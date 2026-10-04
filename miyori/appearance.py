@@ -75,6 +75,16 @@ def _appearance_choice_labels() -> list[str]:
     return values
 
 
+def _valid_image_signature(data: bytes, mime_type: str) -> bool:
+    if mime_type == "image/png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if mime_type == "image/jpeg":
+        return len(data) >= 3 and data[:3] == b"\xff\xd8\xff"
+    if mime_type == "image/webp":
+        return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
 def _portrait_dir() -> Path:
     path = settings.data_dir / "appearance"
     path.mkdir(parents=True, exist_ok=True)
@@ -207,6 +217,8 @@ def save_portrait_asset(data: bytes, mime_type: str) -> dict:
         raise ValueError("Портрет должен быть PNG, JPEG или WEBP.")
     if not data:
         raise ValueError("Файл портрета пуст.")
+    if not _valid_image_signature(data, mime_type):
+        raise ValueError("Содержимое файла не соответствует заявленному формату изображения.")
     if len(data) > PORTRAIT_MAX_BYTES:
         raise ValueError("Портрет слишком большой. Максимум 5 МБ.")
 
