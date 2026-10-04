@@ -14,6 +14,7 @@ import {
   type NexusSurfacePage,
   type NexusPresence,
   type NexusProactivePage,
+  type NexusProactiveSignal,
   type NexusEventPage,
   type NexusSnapshot,
 } from "./contracts.js";
@@ -212,16 +213,20 @@ export async function fetchNexusPresence(
   return payload as NexusPresence;
 }
 
-function validateProactivePage(payload: Partial<NexusProactivePage>): NexusProactivePage {
+function validateProactivePage(
+  payload: Partial<NexusProactivePage>,
+): NexusProactivePage {
   if (
     payload.schema_version !== NEXUS_PROACTIVE_SCHEMA_VERSION ||
     !Array.isArray(payload.signals) ||
-    payload.policy?.chat_interruption_allowed !== false ||
+    !Array.isArray(payload.display?.chat_shelf_ids) ||
     payload.policy?.auto_execute_allowed !== false ||
-    payload.policy?.write_tools_allowed !== false ||
-    payload.policy?.creates_chat_messages !== false ||
-    payload.policy?.persistent_dismiss_snooze !== true ||
-    payload.policy?.derived_from_authoritative_state !== true
+    payload.policy?.write_action_allowed !== false ||
+    payload.policy?.chat_message_injection_allowed !== false ||
+    payload.policy?.interrupt_user_allowed !== false ||
+    payload.policy?.os_notification_allowed !== false ||
+    payload.policy?.operational_blockers_owned_by_presence !== true ||
+    payload.policy?.decisions_change_signal_visibility_only !== true
   ) {
     throw new Error("NEXUS proactive API нарушил attention safety contract.");
   }
@@ -244,17 +249,35 @@ export async function fetchNexusProactive(
   );
 }
 
-export async function dismissNexusProactive(
+async function decideNexusProactive(
   projectId: number,
-  signalId: string,
+  signal: Pick<NexusProactiveSignal, "signal_key" | "fingerprint">,
+  decision: "dismissed" | "snoozed",
+  snoozeMinutes?: number,
 ): Promise<NexusProactivePage> {
   validateProjectId(projectId);
+  const body: Record<string, unknown> = {
+    signal_key: signal.signal_key,
+    fingerprint: signal.fingerprint,
+    decision,
+  };
+  if (decision === "snoozed") {
+    body.snooze_minutes = snoozeMinutes ?? 60;
+  }
+
   const response = await fetch(
-    `/api/projects/${projectId}/nexus/proactive/${encodeURIComponent(signalId)}/dismiss`,
-    { method: "POST", headers: { Accept: "application/json" } },
+    `/api/projects/${projectId}/nexus/proactive/decision`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
   );
   if (!response.ok) {
-    throw new Error(`NEXUS proactive dismiss: HTTP ${response.status}`);
+    throw new Error(`NEXUS proactive decision: HTTP ${response.status}`);
   }
   const payload = (await response.json()) as {
     proactive?: Partial<NexusProactivePage>;
@@ -262,28 +285,17 @@ export async function dismissNexusProactive(
   return validateProactivePage(payload.proactive ?? {});
 }
 
+export async function dismissNexusProactive(
+  projectId: number,
+  signal: Pick<NexusProactiveSignal, "signal_key" | "fingerprint">,
+): Promise<NexusProactivePage> {
+  return decideNexusProactive(projectId, signal, "dismissed");
+}
+
 export async function snoozeNexusProactive(
   projectId: number,
-  signalId: string,
+  signal: Pick<NexusProactiveSignal, "signal_key" | "fingerprint">,
   minutes = 60,
 ): Promise<NexusProactivePage> {
-  validateProjectId(projectId);
-  const response = await fetch(
-    `/api/projects/${projectId}/nexus/proactive/${encodeURIComponent(signalId)}/snooze`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ minutes }),
-    },
-  );
-  if (!response.ok) {
-    throw new Error(`NEXUS proactive snooze: HTTP ${response.status}`);
-  }
-  const payload = (await response.json()) as {
-    proactive?: Partial<NexusProactivePage>;
-  };
-  return validateProactivePage(payload.proactive ?? {});
+  return decideNexusProactive(projectId, signal, "snoozed", minutes);
 }
