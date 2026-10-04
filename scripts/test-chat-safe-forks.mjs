@@ -34,7 +34,10 @@ assert.ok(
   api.includes('use_tools=False') &&
   api.includes('safe_read_only_fork') &&
   api.includes('None if request.read_only') &&
-  api.includes('(existing_message.get("metadata") or {}).get("read_only"'),
+  (
+    api.includes('(existing_message.get("metadata") or {}).get("read_only"') ||
+    api.includes('bool(stored_meta.get("read_only", False)) != request.read_only')
+  ),
   "Server must enforce read-only regeneration independent of browser state.",
 );
 console.log("Fork action safety and idempotent recovery contract OK.");
