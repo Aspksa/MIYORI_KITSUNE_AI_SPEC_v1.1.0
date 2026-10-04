@@ -310,9 +310,9 @@ def build_nexus_snapshot(project_id: int) -> dict:
         _module(
             "generative_ui",
             "Generative UI",
-            "disabled",
-            last_result="Определён typed surface contract; модель не получает право генерировать HTML.",
-            limitation="Компонентный renderer будет подключён после стабилизации NEXUS state/event слоя.",
+            "ready",
+            last_result="Trusted surface registry активен; произвольный HTML/JS запрещён.",
+            limitation="Surface renderer принимает только versioned specs и известные компоненты.",
             updated_at=generated_at,
         ),
     ]
@@ -354,5 +354,14 @@ def build_nexus_snapshot(project_id: int) -> dict:
                 "source",
                 "collection",
             ],
+            "allowed_surface_components": [
+                "status_summary",
+                "action_card",
+                "progress_card",
+                "knowledge_attention",
+                "result_collection",
+            ],
+            "unknown_components_rejected": True,
+            "script_allowed": False,
         },
     }
