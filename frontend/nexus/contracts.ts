@@ -680,12 +680,15 @@ export interface NexusDigitalBody {
     sentiment_to_expression_allowed: false;
     model_authored_motion_allowed: false;
     state_transition_motion_allowed: true;
+    contract_driven_active_motion_allowed: true;
     reduced_motion_must_be_respected: true;
   };
   render_policy: {
     neutral_shell_until_owner_appearance_choice: true;
     owner_global_appearance_profile: true;
     static_portrait_is_non_dynamic: true;
+    trusted_vector_rig_installed: true;
+    dynamic_renderer_may_invent_appearance: false;
     invent_open_appearance_choices_allowed: false;
     tail_count_may_be_invented: false;
     hair_color_may_be_invented: false;
