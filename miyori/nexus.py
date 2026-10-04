@@ -16,6 +16,7 @@ from .agent_workspace import list_agent_workspaces
 from .document_intelligence import document_intelligence_status
 from .epistemic import epistemic_snapshot
 from .nexus_home import build_nexus_home
+from .nexus_body import build_nexus_body
 from .tasks import worker_status
 
 NEXUS_SCHEMA_VERSION = "1.0.0"
@@ -93,6 +94,7 @@ def build_nexus_snapshot(project_id: int) -> dict:
     document_status = document_intelligence_status(project_id)
     epistemic = epistemic_snapshot(project_id)
     home = build_nexus_home(project_id)
+    body = build_nexus_body(project_id)
     worker = worker_status()
 
     verified_memory = [item for item in memory if item.get("status") == "verified"]
@@ -340,6 +342,20 @@ def build_nexus_snapshot(project_id: int) -> dict:
                 "Connectivity подтверждается только authenticated heartbeat; network scanning отключён."
                 if home.get("enabled")
                 else "Переключитесь на домашний проект для Home capability."
+            ),
+            updated_at=generated_at,
+        ),
+        _module(
+            "digital_body",
+            "Digital Body",
+            "ready",
+            last_result=(
+                f"Body state: {body.get('state')} · pose: "
+                f"{(body.get('presentation') or {}).get('pose')}"
+            ),
+            limitation=(
+                "Runtime state-driven; финальный портрет не фиксируется, пока владелец не выберет "
+                "цвет волос, цвет глаз, точное число хвостов и основной наряд."
             ),
             updated_at=generated_at,
         ),
