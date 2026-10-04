@@ -19,7 +19,7 @@
     verifying:"Проверяется",
   };
   let generation=0;
-  let pending=null;
+  let currentProject=null;
   function visible(projectId,items){
     const details=$("chatContinuationDetails");
     const host=$("chatActivity");
@@ -69,6 +69,11 @@
     const pid=Number(state.projectId||0);
     if(!pid)return;
     const token=++generation;
+    if(currentProject!==pid){
+      // Clear old-project task names synchronously, even on network failure.
+      currentProject=pid;
+      visible(pid,[]);
+    }
     try{
       const response=await api(
         "/api/projects/"+pid+"/nexus/actions?limit=80"
