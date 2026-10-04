@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.64"
+PROJECT_VERSION = "00.00.65"
 
 MODULES = {
     "miyori_ai": {
@@ -11,9 +11,9 @@ MODULES = {
     },
     "workflow_engine": {
         "name": "Workflow Engine",
-        "version": "1.2.0",
+        "version": "1.2.1",
         "status": "active",
-        "description": "Persistent workflow state, permission continuation, explicit verifying state, tool operations, crash recovery, idempotency и audit trail.",
+        "description": "Persistent Workflow Engine и компактный вывод подтверждённых незавершённых задач при возвращении в чат без автоматических повторов.",
     },
     "account": {
         "name": "Личный кабинет",
@@ -156,6 +156,23 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.65",
+        "title": "Agent Continuation · Quiet Recovery and Task State",
+        "summary": "Существующий NEXUS Action Center теперь компактно показывает незавершённую работу проекта в чате после перезапуска: ожидающие разрешения задачи, восстановление, ошибки, запущенные процессы. Нет дополнительных окон, таймеров имитации или автоповтора инструментов.",
+        "modules": [{
+            "key": "workflow_engine",
+            "version": "1.2.1",
+            "changes": [
+                "Состояние проекта читается из persistent NEXUS Actions, а не дублирующей базы.",
+                "После запуска и смены проекта отображаются только реальные ожидающие внимания и работающие задачи.",
+                "Один закрытый раздел «Незавершённая работа» внутри существующей полосы событий, скрыт при отсутствии задач.",
+                "Продолжение задач, разрешения и восстановление доступны только через существующие разрешающие элементы раздела Действия.",
+                "Нет выполнения инструментов или автоматического восстановления из клиентского компонента.",
+                "Frontend DOM-тест проверяет отображение реальных задач, изоляцию проектов и отсутствие побочных действий."
+            ],
+        }],
+    },
     {
         "version": "00.00.64",
         "title": "Document Reasoning · Grounded Multi-Document Comparison",
