@@ -122,8 +122,9 @@ function renderTrustedCharacterRig(
     tails.dataset.ownerTailCount = String(tailCount);
     for (let index = 0; index < capped; index += 1) {
       const tail = rigPart("miyori-character-tail");
-      tail.style.setProperty("--tail-index", String(index));
-      tail.style.setProperty("--tail-count", String(capped));
+      const center = (capped - 1) / 2;
+      const angle = (index - center) * 11;
+      tail.style.setProperty("--tail-angle", `${angle}deg`);
       tails.appendChild(tail);
     }
   } else {
