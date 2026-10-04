@@ -9,6 +9,7 @@ CHAT_PROGRESS_STAGES = {
     "generating",
     "verifying",
     "completed",
+    "cancelled",
     "error",
 }
 
