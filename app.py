@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from time import perf_counter
 from miyori.chat_intelligence import plan_chat_query,enhance_context_route
 from miyori.chat_history_recall import relevant_history,wants_history
+from miyori.answer_check import check_numeric_support
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
@@ -2276,6 +2277,12 @@ async def _build_agent_response(
         quality_guidance=query_plan.public_summary(),
     )
 
+    numeric_check = check_numeric_support(
+        answer,
+        rag_items=rag_payload.get("items",[]),
+        document_fragments=attachment_context,
+        verified_claims=epistemic,
+    )
     unreadable_files = [
         source.get("title") for source in attachment_sources
         if source.get("readable") is False
@@ -2305,6 +2312,7 @@ async def _build_agent_response(
         },
         "model_usage":actual_usage,
         "retrieval_ms":retrieval_ms,
+        "numeric_check":numeric_check,
         "historical_chat":{
             "requested":wants_history(text),
             "matches":len(history_matches),
