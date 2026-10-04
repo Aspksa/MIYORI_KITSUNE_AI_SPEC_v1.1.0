@@ -267,6 +267,20 @@ def create_topic(project_id: int, conversation_id: int, name: str) -> dict:
     return dict(row)
 
 
+def validate_topic(project_id: int, conversation_id: int, topic_id: int | None) -> int | None:
+    if topic_id is None:
+        return None
+    init_conversation_experience_db()
+    with connect() as db:
+        row = db.execute(
+            "SELECT id FROM chat_topics WHERE id=? AND project_id=? AND conversation_id=?",
+            (int(topic_id), project_id, conversation_id),
+        ).fetchone()
+    if not row:
+        raise ValueError("Тема не принадлежит текущему разговору.")
+    return int(row["id"])
+
+
 def assign_topic(project_id: int, conversation_id: int, message_id: int, topic_id: int | None) -> None:
     if topic_id is None:
         return
