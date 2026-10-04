@@ -19,6 +19,10 @@ from time import perf_counter
 from miyori.chat_intelligence import plan_chat_query,enhance_context_route
 from miyori.chat_history_recall import relevant_history,wants_history
 from miyori.answer_check import check_numeric_support
+from miyori.chat_feedback import (
+    init_chat_feedback_db,record_chat_feedback,
+    relevant_owner_corrections,feedback_totals,
+)
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
@@ -286,6 +290,7 @@ async def lifespan(app: FastAPI):
     init_db()
     init_conversation_ui_db()
     init_chat_metrics_db()
+    init_chat_feedback_db()
     init_document_intelligence_db()
     init_document_questions_db()
     init_document_comparisons_db()
@@ -337,6 +342,11 @@ class ChatRequest(BaseModel):
     request_id: str | None = Field(default=None, min_length=8, max_length=128)
     attachment_ids: list[int] = Field(default_factory=list, max_length=5)
     read_only: bool = False
+
+
+class MessageFeedbackRequest(BaseModel):
+    verdict: str = Field(max_length=20)
+    correction: str = Field(default="",max_length=2000)
 
 
 class ConversationUiPatch(BaseModel):
@@ -1333,6 +1343,30 @@ def chat_bookmarks(project_id: int) -> dict:
     return {"bookmarks": list_bookmarked_messages(project_id)}
 
 
+@app.post("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/feedback")
+def conversation_feedback_create(
+    project_id: int, conversation_id: int,message_id: int,
+    request: MessageFeedbackRequest,
+) -> dict:
+    try:
+        saved=record_chat_feedback(
+            project_id,conversation_id,message_id,
+            request.verdict,request.correction,
+        )
+        return {"feedback":saved}
+    except LookupError as exc:
+        raise HTTPException(status_code=404,detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/chat/feedback-summary")
+def conversation_feedback_summary(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404,detail="Проект не найден.")
+    return feedback_totals(project_id)
+
+
 @app.get("/api/projects/{project_id}/conversations/{conversation_id}/search")
 def conversation_search(project_id: int, conversation_id: int, q: str = "") -> dict:
     try:
@@ -2261,6 +2295,16 @@ async def _build_agent_response(
             sources.append(attachment)
             source_ids.add(attachment["document_id"])
 
+    user_corrections=relevant_owner_corrections(project_id,text)
+    for correction in user_corrections:
+        sources.append({
+            "source_type":"owner_feedback",
+            "title":"Уточнение владельца (непроверено)",
+            "conversation_id":correction["conversation_id"],
+            "message_id":correction["message_id"],
+            "unverified":True,
+        })
+
     actual_usage: dict = {}
     answer = await chat(
         context,
@@ -2268,6 +2312,7 @@ async def _build_agent_response(
         document_context=attachment_context or None,
         history_context=(history_matches or [{"status":"not_found"}])
                         if wants_history(text) else None,
+        feedback_context=user_corrections or None,
         brain_plan=brain.plan,
         tool_context=agent.tool_context,
         epistemic_context=epistemic,
@@ -2313,6 +2358,7 @@ async def _build_agent_response(
         "model_usage":actual_usage,
         "retrieval_ms":retrieval_ms,
         "numeric_check":numeric_check,
+        "owner_feedback_count":len(user_corrections),
         "historical_chat":{
             "requested":wants_history(text),
             "matches":len(history_matches),
