@@ -355,6 +355,19 @@
       await forkMessage(row, false);
     } else if (action === "correct") {
       showCorrectionEditor(row);
+    } else if (action === "tasks") {
+      const goal = String(row._miyoriTaskGoal || "").trim();
+      if (!goal || typeof openAgentWorkspaceFromChat !== "function") return;
+      button.disabled = true;
+      try {
+        await openAgentWorkspaceFromChat(goal);
+      } finally {
+        button.disabled = false;
+      }
+    } else if (action === "actions") {
+      if (typeof renderNexusActionsWorkspace === "function") {
+        await renderNexusActionsWorkspace();
+      }
     }
   });
 
@@ -470,10 +483,44 @@
 
   // Actual, persisted NEXUS events only. No invented progress or idle animation.
   let activityTimer = null;
+  let progressTimer = null;
   let activeProject = null;
+  let activeRequestId = null;
   let activityCursor = null;
   let activityGeneration = 0;
   let requestSince = null;
+  let lastProgressStage = "";
+
+  const progressLabels = {
+    accepted: "Запрос принят",
+    agent: "Проверяю план и действия",
+    retrieving: "Ищу источники и контекст",
+    generating: "Формирую ответ",
+    verifying: "Проверяю источники",
+    completed: "Ответ готов",
+    error: "Ошибка обработки"
+  };
+
+  async function checkRequestProgress(generation = activityGeneration) {
+    if (!state.busy || generation !== activityGeneration ||
+        !activeProject || !activeRequestId) return;
+    try {
+      const data = await api(
+        "/api/projects/" + activeProject + "/chat/progress/" +
+        encodeURIComponent(activeRequestId)
+      );
+      if (generation !== activityGeneration || !state.busy) return;
+      const progress = data.progress;
+      if (!progress?.stage || progress.stage === lastProgressStage) return;
+      lastProgressStage = progress.stage;
+      $("chatActivity").dataset.stage = progress.stage;
+      $("chatActivitySummary").textContent =
+        progressLabels[progress.stage] || progress.detail || progress.stage;
+      window.dispatchEvent(new CustomEvent("miyori:chat-progress", {
+        detail: progress
+      }));
+    } catch (_) {}
+  }
   async function checkEvents(initial = false, generation = activityGeneration) {
     if (!state.busy || generation !== activityGeneration || !activeProject) return;
     try {
@@ -504,17 +551,27 @@
   }
 
   window.miyoriChatActivity = {
-    begin() {
+    begin(requestId) {
       if (activityTimer) clearInterval(activityTimer);
+      if (progressTimer) clearInterval(progressTimer);
       activityGeneration++;
       const generation = activityGeneration;
       activeProject = Number(state.projectId);
+      activeRequestId = String(requestId || "");
+      lastProgressStage = "";
       activityCursor = null;
       requestSince = new Date().toISOString().slice(0,19);
       $("chatActivity").hidden = false;
-      $("chatActivitySummary").textContent = "Ожидаю подтверждённых событий";
+      $("chatActivity").dataset.stage = "accepted";
+      $("chatActivitySummary").textContent = progressLabels.accepted;
       $("chatActivityEvents").replaceChildren();
       $("chatActivityDetails").open = false;
+      void checkRequestProgress(generation);
+      progressTimer = setInterval(() => {
+        if (document.visibilityState === "visible") {
+          void checkRequestProgress(generation);
+        }
+      }, 900);
       // Record cursor before poll begins. No prior event is reported as new.
       void checkEvents(true, generation).finally(() => {
         if (generation === activityGeneration) {
@@ -527,7 +584,10 @@
     complete() {
       void window.miyoriChatContinuation?.refresh();
       if (activityTimer) clearInterval(activityTimer);
+      if (progressTimer) clearInterval(progressTimer);
       activityTimer = null;
+      progressTimer = null;
+      activeRequestId = null;
       activityGeneration++;
       if (!$("chatActivityEvents").childElementCount) {
         $("chatActivitySummary").textContent = "Новых событий в журнале нет";

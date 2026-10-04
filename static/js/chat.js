@@ -87,6 +87,11 @@ function messageFromRecord(item) {
     bookmarked: Boolean(item.bookmarked),
     diagnostics: item.metadata?.diagnostics,
     comparison_offer: item.metadata?.comparison_offer,
+    task_goal: item.metadata?.task_goal,
+    workflow: item.metadata?.workflow_id ? {
+      id: item.metadata.workflow_id,
+      status: item.metadata.workflow_status || ""
+    } : null,
     attachments: (item.metadata?.attachments || []).map(id => ({id})),
     suppressEvent: true,
     suppressScroll: true
@@ -315,13 +320,13 @@ form.addEventListener("submit", async (event) => {
   if (uploadStatus) uploadStatus.textContent = "";
   const userRow = addMessage("user", text, [], {
     attachments: attachedFiles,
+    animate: true,
   });
   input.value = "";
   window.miyoriDrafts?.save();
   input.style.height = "auto";
   setBusy(true);
   state.submissionPending = false;
-  window.miyoriChatActivity?.begin();
 
   const pending = state.pendingRequest;
   const reuse = pending &&
@@ -339,6 +344,7 @@ form.addEventListener("submit", async (event) => {
     text, readOnly, attachment_ids:[...attachment_ids],ui_context,
   };
   state.lastRequestId = requestId;
+  window.miyoriChatActivity?.begin(requestId);
 
   try {
     const response = await fetch("/api/chat", {
@@ -368,7 +374,10 @@ form.addEventListener("submit", async (event) => {
     if (data.user_message_id) userRow.dataset.messageId = String(data.user_message_id);
     addMessage("assistant", data.answer, data.sources || [], {
       id:data.assistant_message_id, diagnostics:data.diagnostics,
-      comparison_offer:data.comparison_offer
+      comparison_offer:data.comparison_offer,
+      task_goal:data.task_goal,
+      workflow:data.workflow,
+      animate:true
     });
     attachmentStore?.clear();
     state.pendingRequest = null;

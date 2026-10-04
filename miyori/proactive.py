@@ -113,9 +113,6 @@ def _raw_candidates(project_id: int) -> list[dict]:
 
     for item in actions:
         state = str(item.get("state") or "")
-        if state not in {"waiting_permission", "recovery", "error"}:
-            continue
-
         action_id = str(item.get("id") or "")
         title = str(item.get("title") or "Действие")
         summary = str(item.get("summary") or "").strip()
@@ -124,49 +121,87 @@ def _raw_candidates(project_id: int) -> list[dict]:
         workflow_id = item.get("workflow_id")
         error = item.get("error")
 
-        if state == "waiting_permission":
-            severity = "normal"
-            priority = 10
-            heading = "Нужно ваше решение"
-            fallback = "Подготовлено действие, которое не продолжится без разрешения."
-        elif state == "recovery":
-            severity = "high"
-            priority = 4
-            heading = "Нужно восстановить действие"
-            fallback = "Workflow остановлен в безопасном recovery-состоянии."
-        else:
-            severity = "high"
-            priority = 5
-            heading = "Действие завершилось ошибкой"
-            fallback = "Ошибка сохранена в Actions; автоматический повтор не выполняется."
+        if state in {"waiting_permission", "recovery", "error"}:
+            if state == "waiting_permission":
+                severity = "normal"
+                priority = 10
+                heading = "Нужно ваше решение"
+                fallback = "Подготовлено действие, которое не продолжится без разрешения."
+            elif state == "recovery":
+                severity = "high"
+                priority = 4
+                heading = "Нужно восстановить действие"
+                fallback = "Workflow остановлен в безопасном recovery-состоянии."
+            else:
+                severity = "high"
+                priority = 5
+                heading = "Действие завершилось ошибкой"
+                fallback = "Ошибка сохранена в Actions; автоматический повтор не выполняется."
 
-        candidates.append(
-            _signal(
-                signal_key=f"action:{action_id}:{state}",
-                fingerprint_payload={
-                    "state": state,
-                    "operation_id": operation_id,
-                    "permission_id": permission_id,
-                    "workflow_id": workflow_id,
-                    "error": error,
-                },
-                kind="operational",
-                severity=severity,
-                priority=priority,
-                title=f"{heading}: {title}",
-                detail=summary or fallback,
-                destination="actions",
-                channel_owner="presence",
-                source={
-                    "type": "action",
-                    "id": action_id,
-                    "state": state,
-                    "operation_id": operation_id,
-                    "permission_id": permission_id,
-                    "workflow_id": workflow_id,
-                },
+            candidates.append(
+                _signal(
+                    signal_key=f"action:{action_id}:{state}",
+                    fingerprint_payload={
+                        "state": state,
+                        "operation_id": operation_id,
+                        "permission_id": permission_id,
+                        "workflow_id": workflow_id,
+                        "error": error,
+                    },
+                    kind="operational",
+                    severity=severity,
+                    priority=priority,
+                    title=f"{heading}: {title}",
+                    detail=summary or fallback,
+                    destination="actions",
+                    channel_owner="presence",
+                    source={
+                        "type": "action",
+                        "id": action_id,
+                        "state": state,
+                        "operation_id": operation_id,
+                        "permission_id": permission_id,
+                        "workflow_id": workflow_id,
+                    },
+                )
             )
-        )
+            continue
+
+        # "Stale" is evidence-based elapsed time, not an invented deadline.
+        if state in {"planned", "running", "verifying"}:
+            updated = _parse_time(item.get("updated_at") or item.get("created_at"))
+            if updated is not None:
+                age_hours = max(0, int((_now_dt() - updated).total_seconds() // 3600))
+                if age_hours >= 6:
+                    candidates.append(
+                        _signal(
+                            signal_key=f"action:{action_id}:stale",
+                            fingerprint_payload={
+                                "state": state,
+                                "updated_at": updated.isoformat(),
+                                "workflow_id": workflow_id,
+                                "operation_id": operation_id,
+                            },
+                            kind="unfinished_work",
+                            severity="low",
+                            priority=42,
+                            title="Есть незавершённая работа без новых событий",
+                            detail=(
+                                f"{title}: состояние «{state}» не менялось "
+                                f"не менее {age_hours} ч."
+                            ),
+                            destination="actions",
+                            channel_owner="attention_shelf",
+                            source={
+                                "type": "action",
+                                "id": action_id,
+                                "state": state,
+                                "updated_at": updated.isoformat(),
+                                "age_hours": age_hours,
+                                "workflow_id": workflow_id,
+                            },
+                        )
+                    )
 
     knowledge = build_nexus_knowledge_center(project_id, limit=1)
     attention = dict((knowledge.get("counts") or {}).get("attention") or {})
@@ -205,6 +240,55 @@ def _raw_candidates(project_id: int) -> list[dict]:
                         key: int(attention.get(key) or 0)
                         for key, _ in labels
                     },
+                },
+            )
+        )
+
+    discrepancy_parts = {
+        "memory_disputed": int(attention.get("memory_disputed") or 0),
+        "memory_conflicts": int(attention.get("memory_conflicts") or 0),
+        "claim_disputed": int(attention.get("claim_disputed") or 0),
+        "claim_open_contradictions": int(attention.get("claim_open_contradictions") or 0),
+    }
+    discrepancy_total = sum(discrepancy_parts.values())
+    if discrepancy_total > 0:
+        candidates.append(
+            _signal(
+                signal_key="knowledge:discrepancy",
+                fingerprint_payload=discrepancy_parts,
+                kind="knowledge_discrepancy",
+                severity="normal",
+                priority=22,
+                title="Миёри заметила расхождение в знаниях",
+                detail=(
+                    "Есть подтверждённые системой спорные или противоречащие "
+                    f"друг другу записи: {discrepancy_total}."
+                ),
+                destination="knowledge",
+                channel_owner="attention_shelf",
+                source={"type": "knowledge", "attention": discrepancy_parts},
+            )
+        )
+
+    documents_limited = int(attention.get("documents_limited") or 0)
+    if documents_limited > 0:
+        candidates.append(
+            _signal(
+                signal_key="knowledge:document_coverage",
+                fingerprint_payload={"documents_limited": documents_limited},
+                kind="document_coverage_gap",
+                severity="normal",
+                priority=28,
+                title="Часть документов прочитана не полностью",
+                detail=(
+                    "Ограниченное извлечение текста отмечено у документов: "
+                    f"{documents_limited}. Это не считается полным чтением оригинала."
+                ),
+                destination="knowledge",
+                channel_owner="attention_shelf",
+                source={
+                    "type": "knowledge",
+                    "documents_limited": documents_limited,
                 },
             )
         )

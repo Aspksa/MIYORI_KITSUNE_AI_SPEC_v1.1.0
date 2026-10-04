@@ -77,6 +77,7 @@ function setBusy(value) {
   sendButton.disabled = value;
   input.disabled = value;
   projectSelect.disabled = value;
+  if (messages) messages.setAttribute("aria-busy", value ? "true" : "false");
   sendButton.title = value ? "Миёри отвечает…" : "Отправить сообщение";
   sendButton.setAttribute("aria-label", value ? "Миёри отвечает…" : "Отправить сообщение");
   setPulse(value ? "thinking" : "ready");
@@ -113,13 +114,26 @@ function renderMessageMarkdown(container, value) {
   }
 }
 
+function chatNearBottom() {
+  if (!messages) return true;
+  return messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 96;
+}
+
+messages?.addEventListener("scroll", () => {
+  if (chatNearBottom()) delete messages.dataset.unreadReply;
+}, {passive:true});
+
 function addMessage(role, text, sources = [], options = {}) {
+  const followLatest = !options.suppressScroll &&
+    (role === "user" || chatNearBottom());
   if (role === "user") messages.querySelector(".welcome-message")?.remove();
   const article = document.createElement("article");
   article.className = "message " + role;
   if (options.id != null) article.dataset.messageId = String(options.id);
   article._miyoriText = String(text ?? "");
   article._miyoriAttachments = Array.isArray(options.attachments) ? options.attachments : [];
+  article._miyoriTaskGoal = String(options.task_goal || "").trim();
+  article._miyoriWorkflow = options.workflow || null;
 
   const avatar = document.createElement("div");
   avatar.className = "avatar";
@@ -270,6 +284,38 @@ function addMessage(role, text, sources = [], options = {}) {
         }
       });
       content.append(totalsButton,totalsOutput);
+      const qualityButton=document.createElement("button");
+      qualityButton.type="button";
+      qualityButton.className="chat-quality-details-button";
+      qualityButton.textContent="Качество чата за 30 дней";
+      const qualityOutput=document.createElement("p");
+      qualityOutput.className="chat-quality-monthly";
+      qualityButton.addEventListener("click",async()=>{
+        const project=Number(state.projectId);
+        if(!project || qualityButton.disabled)return;
+        qualityButton.disabled=true;
+        try {
+          const report=await api(
+            "/api/projects/"+project+"/chat/quality?days=30"
+          );
+          if(Number(state.projectId)!==project)return;
+          const feedback=report.feedback||{};
+          qualityOutput.textContent=
+            "Ответов: "+Number(report.assistant_responses||0)+
+            " · с источниками: "+Number(report.responses_with_sources||0)+
+            " · исправлений: "+Number(feedback.corrected||0)+
+            " · чисел без найденного фрагмента: "+
+              Number(report.numeric_claims_missing_source||0)+
+            (report.average_latency_ms==null?"":" · средняя latency: "+
+              Number(report.average_latency_ms)+" мс")+
+            ". Это измерения, не процент точности.";
+        } catch(error) {
+          qualityOutput.textContent="Метрики качества недоступны: "+
+            String(error.message||error);
+          qualityButton.disabled=false;
+        }
+      });
+      content.append(qualityButton,qualityOutput);
       const offer=options.comparison_offer;
       if(Array.isArray(offer?.document_ids) &&
          offer.document_ids.length>=2 &&
@@ -380,6 +426,15 @@ function addMessage(role, text, sources = [], options = {}) {
     : [["copy", "Копировать"], ["retry", "Повторить"],
        ["save", options.bookmarked ? "Сохранено" : "Сохранить"],
        ["correct", "Исправить"]];
+  if (role === "assistant" && article._miyoriTaskGoal) {
+    commands.push(["tasks", "В задачи"]);
+  }
+  if (role === "assistant" && Number(article._miyoriWorkflow?.id) > 0 &&
+      ["waiting_permission", "recovering", "running"].includes(
+        String(article._miyoriWorkflow?.status || "")
+      )) {
+    commands.push(["actions", "Действия"]);
+  }
   commands.forEach(([action, label]) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -391,7 +446,29 @@ function addMessage(role, text, sources = [], options = {}) {
   bubble.appendChild(controls);
   article.append(avatar, bubble);
   messages.appendChild(article);
-  if (!options.suppressScroll) messages.scrollTop = messages.scrollHeight;
+
+  if (options.animate) {
+    article.classList.add("message-arriving");
+    if (role === "assistant") {
+      [...body.children].slice(0, 12).forEach((node, index) => {
+        node.style.setProperty(
+          "--chat-reveal-delay",
+          Math.min(index * 28, 196) + "ms"
+        );
+      });
+    }
+    window.setTimeout(() => article.classList.remove("message-arriving"), 520);
+  }
+
+  if (!options.suppressScroll && followLatest) {
+    messages.scrollTop = messages.scrollHeight;
+    delete messages.dataset.unreadReply;
+  } else if (!options.suppressScroll && role === "assistant") {
+    messages.dataset.unreadReply = "true";
+    const summary = el("chatActivitySummary");
+    if (summary) summary.textContent = "Новый ответ ниже";
+  }
+
   if (role === "assistant" && !options.suppressEvent) {
     window.dispatchEvent(
       new CustomEvent("miyori:assistant-message", {

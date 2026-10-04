@@ -120,6 +120,7 @@ def relevant_owner_corrections(
     return result
 
 
+
 def feedback_totals(project_id: int) -> dict:
     init_chat_feedback_db()
     with connect() as db:

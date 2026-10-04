@@ -24,4 +24,12 @@ assert.ok(!voice.includes("setInterval") && !voice.includes("Math.random"), "Voi
 assert.ok(!built.includes(".innerHTML"), "Voice renderer must not inject transcript through innerHTML");
 assert.ok(css.includes("/* N5 — Voice Core.") && [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)].every((match) => ["miyori-character-recover", "nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].includes(match[1])), "Voice UI must remain state-driven and animation-free");
 
+assert.ok(
+  voice.includes("Прервать ответ и говорить") &&
+    voice.includes('panel.dataset.state === "speaking"') &&
+    voice.includes("cancelSpeech(true)") &&
+    built.includes("Прервать ответ и говорить"),
+  "Voice must support explicit barge-in without pretending to hear continuously",
+);
+
 console.log("NEXUS Voice contract OK.");

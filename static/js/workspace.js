@@ -46,6 +46,47 @@ const workspaceTitle = el("workspaceTitle");
 const workspaceSubtitle = el("workspaceSubtitle");
 const workspaceEyebrow = el("workspaceEyebrow");
 
+function chatViewStorageKey() {
+  const projectId = Number(state.projectId);
+  if (!Number.isInteger(projectId) || projectId <= 0) return "";
+  const conversationId = Number(state.conversationId);
+  return "miyori.chat.view." + projectId + "." +
+    (Number.isInteger(conversationId) && conversationId > 0 ? conversationId : "new");
+}
+
+function saveChatViewState() {
+  if (!messages || document.documentElement.dataset.nexusView !== "chat") return;
+  const key = chatViewStorageKey();
+  if (!key) return;
+  const atBottom =
+    messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 64;
+  try {
+    sessionStorage.setItem(key, JSON.stringify({
+      scrollTop: messages.scrollTop,
+      atBottom,
+    }));
+  } catch (_) {}
+}
+
+function restoreChatViewState() {
+  if (!messages) return;
+  const key = chatViewStorageKey();
+  let saved = null;
+  try {
+    saved = key ? JSON.parse(sessionStorage.getItem(key) || "null") : null;
+  } catch (_) {}
+  requestAnimationFrame(() => {
+    if (saved?.atBottom) {
+      messages.scrollTop = messages.scrollHeight;
+      return;
+    }
+    const target = Number(saved?.scrollTop);
+    messages.scrollTop = Number.isFinite(target)
+      ? Math.max(0, Math.min(target, messages.scrollHeight))
+      : messages.scrollHeight;
+  });
+}
+
 const workspaceMenu = {
   ai: menuMiyoriAI,
   mobile: menuMobileApp,
@@ -73,13 +114,14 @@ function showChatWorkspace() {
   if (chatHeader) chatHeader.hidden = false;
   if (messages) messages.hidden = false;
   if (chatComposer) chatComposer.hidden = false;
-  if (messages) messages.scrollTop = messages.scrollHeight;
+  restoreChatViewState();
   setWorkspaceMenuActive(null);
   announceNexusView("chat");
   input.focus();
 }
 
 function showWorkspaceShell(name, eyebrow, title, subtitle) {
+  saveChatViewState();
   // Minimal last-viewed-screen hint, not document content or authorization.
   window.miyoriScreenContext={module:String(name || "chat")};
   if (chatHeader) chatHeader.hidden = true;
@@ -559,6 +601,16 @@ function nexusAgentWorkspaceMarkup(workspace) {
       '<button type="button" class="secondary-sheet-button" data-agent-workspace-cancel="' + Number(workspace.id) + '">Остановить</button>' +
     '</div>' : '') +
   '</article>';
+}
+
+async function openAgentWorkspaceFromChat(goal) {
+  const text = String(goal || "").trim();
+  await renderNexusAgentWorkspace();
+  const field = el("agentWorkspaceGoal");
+  if (!field || !text) return;
+  field.value = text;
+  field.dispatchEvent(new Event("input", {bubbles:true}));
+  field.focus();
 }
 
 async function renderNexusAgentWorkspace() {

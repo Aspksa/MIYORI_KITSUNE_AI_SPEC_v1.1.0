@@ -103,6 +103,7 @@ export function installNexusVoice(): () => void {
   let lastConfidence: number | null = null;
   let lastAssistantText = "";
   let submittedFromVoice = false;
+  let speaking = false;
   let stopped = false;
 
   const setState = (
@@ -116,7 +117,9 @@ export function installNexusVoice(): () => void {
     button.title =
       next === "listening"
         ? "Остановить прослушивание"
-        : "Голосовой ввод";
+        : next === "speaking"
+          ? "Прервать ответ и говорить"
+          : "Голосовой ввод";
     if (options.transcript !== undefined) {
       transcript.textContent = options.transcript || "Скажите фразу…";
     }
@@ -148,6 +151,7 @@ export function installNexusVoice(): () => void {
     if (!hasTts) return;
     if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
       window.speechSynthesis.cancel();
+      speaking = false;
       if (interrupted) setState("interrupted");
     }
   };
@@ -262,8 +266,14 @@ export function installNexusVoice(): () => void {
   };
 
   button.addEventListener("click", () => {
-    if (listening) stopRecognition(true);
-    else void startListening();
+    if (panel.dataset.state === "speaking") {
+      cancelSpeech(true);
+      void startListening();
+    } else if (listening) {
+      stopRecognition(true);
+    } else {
+      void startListening();
+    }
   });
 
   send.addEventListener("click", () => {
@@ -280,11 +290,18 @@ export function installNexusVoice(): () => void {
     cancelSpeech(false);
     const utterance = new SpeechSynthesisUtterance(lastAssistantText);
     utterance.lang = document.documentElement.lang || "ru-RU";
-    utterance.addEventListener("start", () => setState("speaking"));
-    utterance.addEventListener("end", () => setState("idle"));
-    utterance.addEventListener("error", () =>
-      setState("error", { error: "Не удалось озвучить ответ." }),
-    );
+    utterance.addEventListener("start", () => {
+      speaking = true;
+      setState("speaking");
+    });
+    utterance.addEventListener("end", () => {
+      speaking = false;
+      setState("idle");
+    });
+    utterance.addEventListener("error", () => {
+      speaking = false;
+      setState("error", { error: "Не удалось озвучить ответ." });
+    });
     window.speechSynthesis.speak(utterance);
   });
 
