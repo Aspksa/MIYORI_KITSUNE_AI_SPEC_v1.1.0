@@ -105,6 +105,7 @@ function renderOlderControl() {
 async function openConversation(id, targetId = null) {
   if (!state.projectId) return;
   const token = ++conversationOpenToken;
+  const projectAtStart = Number(state.projectId);
   conversationOpenController?.abort();
   const controller = new AbortController();
   conversationOpenController = controller;
@@ -119,7 +120,7 @@ async function openConversation(id, targetId = null) {
     showError(error.message);
     return;
   }
-  if (controller.signal.aborted || token !== conversationOpenToken) return;
+  if (controller.signal.aborted || token !== conversationOpenToken || projectAtStart !== Number(state.projectId)) return;
   window.miyoriDrafts?.save();
   window.miyoriChatAttachments?.clear();
   state.conversationId = id;
@@ -401,6 +402,8 @@ form.addEventListener("submit", async (event) => {
 });
 
 projectSelect.addEventListener("change", async () => {
+  ++conversationOpenToken;
+  conversationOpenController?.abort();
   window.miyoriDrafts?.save();
   window.miyoriChatAttachments?.clear();
   state.projectId = Number(projectSelect.value);
