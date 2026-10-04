@@ -1647,3 +1647,100 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* N9 — Living Presence. Visible only for real non-idle activity. */
+.nexus-presence-host {
+  width: min(920px, calc(100% - 28px));
+  margin: 8px auto 0;
+}
+.nexus-presence-host[hidden] {
+  display: none;
+}
+.nexus-presence-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0,1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid #e8e2ed;
+  border-radius: 11px;
+  background: #fbfafc;
+}
+.nexus-presence-mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9b91a3;
+}
+.nexus-presence-copy,
+.nexus-presence-row > span:nth-child(2) {
+  min-width: 0;
+}
+.nexus-presence-row strong,
+.nexus-presence-row small {
+  display: block;
+}
+.nexus-presence-row strong {
+  color: #574c60;
+  font-size: 9px;
+}
+.nexus-presence-row small {
+  margin-top: 2px;
+  color: #918797;
+  font-size: 7px;
+  line-height: 1.4;
+}
+.nexus-presence-host[data-mode="working"] .nexus-presence-mark {
+  background: #806cad;
+}
+.nexus-presence-host[data-mode="waiting"] .nexus-presence-mark {
+  background: #c49a54;
+}
+.nexus-presence-host[data-mode="attention"] .nexus-presence-mark,
+.nexus-presence-host[data-mode="recovery"] .nexus-presence-mark {
+  background: #bd6b6b;
+}
+.nexus-presence-host[data-mode="degraded"] .nexus-presence-mark {
+  background: #a68a63;
+}
+.nexus-presence-action {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid #d9d0e2;
+  border-radius: 8px;
+  background: #fff;
+  color: #655970;
+  font: inherit;
+  font-size: 8px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.nexus-presence-detail {
+  margin-top: 5px;
+  padding: 0 10px 7px 27px;
+  color: #817789;
+  font-size: 7px;
+}
+.nexus-presence-detail summary {
+  cursor: pointer;
+  font-weight: 750;
+}
+.nexus-presence-detail p {
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+@media (max-width: 620px) {
+  .nexus-presence-host {
+    width: calc(100% - 16px);
+    margin-top: 6px;
+  }
+  .nexus-presence-row {
+    grid-template-columns: 8px minmax(0,1fr);
+  }
+  .nexus-presence-action {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
