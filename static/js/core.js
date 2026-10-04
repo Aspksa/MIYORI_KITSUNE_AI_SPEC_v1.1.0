@@ -113,10 +113,13 @@ function renderMessageMarkdown(container, value) {
   }
 }
 
-function addMessage(role, text, sources = []) {
+function addMessage(role, text, sources = [], options = {}) {
   if (role === "user") messages.querySelector(".welcome-message")?.remove();
   const article = document.createElement("article");
   article.className = "message " + role;
+  if (options.id != null) article.dataset.messageId = String(options.id);
+  article._miyoriText = String(text ?? "");
+  article._miyoriAttachments = Array.isArray(options.attachments) ? options.attachments : [];
 
   const avatar = document.createElement("div");
   avatar.className = "avatar";
@@ -163,6 +166,42 @@ function addMessage(role, text, sources = []) {
     bubble.appendChild(sourceBox);
   }
 
+  if (role === "assistant") {
+    body.querySelectorAll("pre").forEach(pre => {
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "code-copy";
+      copy.dataset.chatAction = "copy-code";
+      copy.textContent = "Копировать код";
+      pre.classList.add("code-container");
+      pre.appendChild(copy);
+    });
+  }
+  if (Array.isArray(options.attachments) && options.attachments.length && role === "user") {
+    const attachments = document.createElement("div");
+    attachments.className = "message-attachment-labels";
+    options.attachments.forEach(item => {
+      const chip = document.createElement("span");
+      chip.textContent = "📄 " + String(item.filename || item.title || ("Документ #" + (item.id || item)));
+      attachments.appendChild(chip);
+    });
+    bubble.appendChild(attachments);
+  }
+  const controls = document.createElement("div");
+  controls.className = "message-tools";
+  controls.setAttribute("aria-label", "Действия с сообщением");
+  const commands = role === "user"
+    ? [["copy", "Копировать"], ["edit", "Изменить"]]
+    : [["copy", "Копировать"], ["retry", "Повторить"], ["save", options.bookmarked ? "Сохранено" : "Сохранить"]];
+  commands.forEach(([action, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.chatAction = action;
+    button.textContent = label;
+    if (action === "save") button.setAttribute("aria-pressed", options.bookmarked ? "true" : "false");
+    controls.appendChild(button);
+  });
+  bubble.appendChild(controls);
   article.append(avatar, bubble);
   messages.appendChild(article);
   messages.scrollTop = messages.scrollHeight;
@@ -173,6 +212,7 @@ function addMessage(role, text, sources = []) {
       })
     );
   }
+  return article;
 }
 
 function showWelcome() {
