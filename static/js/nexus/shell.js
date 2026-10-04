@@ -64,6 +64,8 @@ function renderSnapshot(snapshot) {
     setText("nexusRailState", label);
     setText("nexusRailDetail", detail);
     setStateDot("nexusRailStateDot", state);
+    setText("systemDocumentCount", String(Number(snapshot.counts.documents ?? 0)));
+    setText("systemMemoryCount", String(Number(snapshot.counts.verified_memory ?? 0)));
     setText("nexusHeaderState", label);
     setText("nexusHeaderDetail", detail);
     setStateDot("nexusHeaderStateDot", state);
@@ -89,6 +91,8 @@ function renderConnectionError(message) {
     setText("nexusRailState", "Нет связи");
     setText("nexusRailDetail", message);
     setStateDot("nexusRailStateDot", "error");
+    setText("systemDocumentCount", "—");
+    setText("systemMemoryCount", "—");
     setText("nexusHeaderState", "Нет связи");
     setText("nexusHeaderDetail", message);
     setStateDot("nexusHeaderStateDot", "error");

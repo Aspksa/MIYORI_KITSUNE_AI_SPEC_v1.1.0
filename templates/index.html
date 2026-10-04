@@ -5,18 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2f7">
   <title>Miyori Kitsune AI</title>
-  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/unified.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/chat-polish.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/chat-extras.css?v=00.00.66">
-  <link rel="stylesheet" href="/static/css/chat-insights.css?v=00.00.66">
+  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/unified.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/chat-polish.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/chat-extras.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/chat-insights.css?v=00.00.67">
+  <link rel="stylesheet" href="/static/css/menu-system.css?v=00.00.67">
 </head>
 <body>
   <div class="app-shell">
@@ -25,11 +26,17 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.66</span>
+            <span class="version-pill" id="versionText">00.00.67</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
       </div>
+
+      <button id="openSystemStatus" class="system-status-launcher" type="button">
+        <span class="system-status-launcher-icon">●</span>
+        <span><strong>Состояние системы</strong><small>ИИ · память · RAG · Cloud.ru</small></span>
+        <span class="side-menu-chevron">›</span>
+      </button>
 
       <nav id="nexusPrimaryNav" class="nexus-primary-nav" aria-label="Основные разделы MIYORI NEXUS">
         <button id="nexusNavChat" class="nexus-nav-button active" data-nexus-view="chat" type="button" aria-current="page">
@@ -59,19 +66,8 @@
         </button>
       </nav>
 
-      <div id="nexusRailStatus" class="nexus-rail-status" role="status" aria-live="polite">
-        <span id="nexusRailStateDot" class="nexus-state-dot" data-state="not_connected" aria-hidden="true"></span>
-        <span><strong id="nexusRailState">Подключение</strong><small id="nexusRailDetail">Получаю состояние проекта…</small></span>
-      </div>
-
-      <button id="openSystemStatus" class="system-status-launcher" type="button">
-        <span class="system-status-launcher-icon">●</span>
-        <span><strong>Состояние системы</strong><small>ИИ · память · RAG · Cloud.ru</small></span>
-        <span class="side-menu-chevron">›</span>
-      </button>
-
-      <details class="nexus-secondary-details">
-        <summary>Дополнительно</summary>
+      <section class="nexus-secondary-details" aria-labelledby="additionalMenuTitle">
+        <h2 id="additionalMenuTitle" class="nexus-secondary-heading">Дополнительно</h2>
         <nav class="main-side-menu" aria-label="Основное меню">
           <button class="side-menu-item ai-home-item" id="menuMiyoriAI" type="button">
             <span class="side-menu-icon ai-menu-icon">AI</span>
@@ -119,7 +115,7 @@
             <span class="side-menu-chevron">›</span>
           </button>
         </nav>
-      </details>
+      </section>
 
       <div class="workspace-details" hidden aria-hidden="true" role="region" aria-label="История переписки">
         <section class="project-card compact-project">
@@ -431,6 +427,16 @@
         <button id="closeSystemStatus" class="sheet-close" type="button" aria-label="Закрыть">×</button>
       </header>
       <div class="settings-sheet-body">
+        <div class="system-overview">
+          <div id="nexusRailStatus" class="nexus-rail-status" role="status" aria-live="polite">
+                  <span id="nexusRailStateDot" class="nexus-state-dot" data-state="not_connected" aria-hidden="true"></span>
+                  <span><strong id="nexusRailState">Подключение</strong><small id="nexusRailDetail">Получаю состояние проекта…</small></span>
+                </div>
+          <div class="system-overview-metrics" aria-label="Фактические данные текущего проекта">
+            <div><span>Документы</span><strong id="systemDocumentCount">—</strong></div>
+            <div><span title="Проверенные факты памяти текущего проекта">Память</span><strong id="systemMemoryCount">—</strong></div>
+          </div>
+        </div>
         <div class="system-status-list system-status-modal-list">
           <div class="system-status-row">
             <span class="system-status-icon">◉</span>
@@ -474,16 +480,16 @@
 
   <script src="/static/vendor/marked.umd.js?v=8.0.0"></script>
   <script src="/static/vendor/purify.min.js?v=3.2.6"></script>
-  <script src="/static/js/core.js?v=00.00.66"></script>
-  <script src="/static/js/data.js?v=00.00.66"></script>
-  <script src="/static/js/chat.js?v=00.00.66"></script>
-  <script src="/static/js/workspace.js?v=00.00.66"></script>
-  <script src="/static/js/drive.js?v=00.00.66"></script>
-  <script src="/static/js/projects.js?v=00.00.66"></script>
-  <script src="/static/js/settings.js?v=00.00.66"></script>
-  <script src="/static/js/chat-continuation.js?v=00.00.66"></script>
-  <script src="/static/js/boot.js?v=00.00.66"></script>
-  <script src="/static/js/chat-extras.js?v=00.00.66"></script>
-  <script type="module" src="/static/js/nexus/index.js?v=00.00.66"></script>
+  <script src="/static/js/core.js?v=00.00.67"></script>
+  <script src="/static/js/data.js?v=00.00.67"></script>
+  <script src="/static/js/chat.js?v=00.00.67"></script>
+  <script src="/static/js/workspace.js?v=00.00.67"></script>
+  <script src="/static/js/drive.js?v=00.00.67"></script>
+  <script src="/static/js/projects.js?v=00.00.67"></script>
+  <script src="/static/js/settings.js?v=00.00.67"></script>
+  <script src="/static/js/chat-continuation.js?v=00.00.67"></script>
+  <script src="/static/js/boot.js?v=00.00.67"></script>
+  <script src="/static/js/chat-extras.js?v=00.00.67"></script>
+  <script type="module" src="/static/js/nexus/index.js?v=00.00.67"></script>
 </body>
 </html>

@@ -1,0 +1,128 @@
+/* 00.00.67 — direct, non-collapsing Additional menu and first-position System status. */
+.nexus-secondary-details {
+  display:block;
+  margin-top:14px!important;
+  border-top:1px solid var(--ui-border)!important;
+  border-bottom:0!important;
+  padding:11px 0 0!important;
+}
+.nexus-secondary-heading {
+  margin:0 0 9px!important;
+  padding:0 12px!important;
+  color:var(--ui-muted)!important;
+  font-size:11px!important;
+  font-weight:750!important;
+  letter-spacing:.055em;
+  text-transform:none;
+}
+.nexus-secondary-details .main-side-menu {
+  display:flex!important;
+  flex-direction:column;
+  gap:3px;
+  margin:0!important;
+  padding:2px 0 12px!important;
+}
+.nexus-secondary-details .side-menu-item {
+  min-height:42px!important;
+  padding:8px 10px!important;
+  border-radius:11px!important;
+}
+.nexus-secondary-details .side-menu-copy strong{
+  font-size:12px!important;
+  font-weight:690!important;
+}
+.nexus-secondary-details .side-menu-copy small{
+  font-size:10px!important;
+  line-height:1.4;
+}
+.left-rail > .system-status-launcher {
+  order:0;
+  min-height:55px!important;
+  margin:3px 1px 14px!important;
+  padding:10px 12px!important;
+  border:1px solid var(--ui-border)!important;
+  border-radius:14px!important;
+  background:var(--ui-surface-soft)!important;
+  color:var(--ui-text)!important;
+}
+.left-rail > .system-status-launcher:hover {
+  border-color:var(--ui-border-strong)!important;
+  background:var(--ui-accent-soft)!important;
+}
+.system-overview {
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:12px 14px 16px;
+  margin:0 0 12px;
+  border:1px solid var(--ui-border);
+  border-radius:16px;
+  background:var(--ui-surface-soft);
+}
+.system-overview .nexus-rail-status {
+  display:flex!important;
+  align-items:center;
+  gap:10px;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.system-overview .nexus-rail-status strong {
+  color:var(--ui-text)!important;
+  font-size:15px!important;
+  font-weight:740;
+}
+.system-overview .nexus-rail-status small {
+  margin-top:3px;
+  color:var(--ui-muted)!important;
+  font-size:11px!important;
+  white-space:normal;
+  line-height:1.5;
+}
+.system-overview-metrics {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+.system-overview-metrics > div {
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  padding:12px 14px;
+  border:1px solid var(--ui-border);
+  border-radius:12px;
+  background:var(--ui-surface)!important;
+}
+.system-overview-metrics span {
+  font-size:11px;
+  color:var(--ui-muted);
+}
+.system-overview-metrics strong {
+  font-size:22px;
+  font-weight:760;
+  font-variant-numeric:tabular-nums;
+  color:var(--ui-text);
+}
+html[data-theme="dark"] .system-overview {
+  border-color:var(--ui-border)!important;
+  background:var(--ui-surface-soft)!important;
+}
+@media(max-width:700px) {
+  .system-overview {padding:10px}
+  .system-overview-metrics > div{padding:10px}
+}
+
+/* Historical chat citations reuse the existing sources row, never an extra panel. */
+.message-source-chip.message-history-source {
+  cursor:pointer;
+  font:inherit;
+  text-align:left;
+}
+.message-source-chip.message-history-source:hover,
+.message-source-chip.message-history-source:focus-visible {
+  outline:2px solid var(--ui-accent);
+  outline-offset:2px;
+  background:var(--ui-accent-soft);
+}
