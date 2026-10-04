@@ -2,8 +2,28 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.48.**  
+**Внутренняя версия приложения: 00.00.49.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.49
+
+`00.00.49` — **NEXUS Living Presence · жизнь только из реального состояния**.
+
+N9 добавляет спокойный presence layer, который не симулирует «характер» случайными эффектами:
+
+- `/api/projects/{id}/nexus/presence` формирует versioned authoritative presence contract;
+- режимы ограничены `ready / working / waiting / attention / recovery / degraded`;
+- приоритет recovery/waiting/error определяется реальным Actions state;
+- knowledge attention и failed tasks участвуют как реальные причины состояния;
+- last event берётся из существующего NEXUS Event Fabric;
+- frontend получает реальный локальный `miyori:interaction-state` только на время фактически отправленного chat-request;
+- idle/ready не занимает экран: presence host скрыт;
+- нет `Math.random`, timer-driven «дыхания», `setInterval` или keyframe-анимации;
+- высокий attention может раскрыть последнее подтверждённое событие;
+- contextual button ведёт в Actions, Knowledge или System в зависимости от фактической причины;
+- Presence capability опубликован в NEXUS snapshot с запретом random liveness.
+
+Такой контракт готов к будущим Voice/Desktop/Avatar: визуальное или голосовое поведение сможет подписываться на те же состояния, не изобретая собственную «эмоцию».
 
 ## Состояние релиза 00.00.48
 
