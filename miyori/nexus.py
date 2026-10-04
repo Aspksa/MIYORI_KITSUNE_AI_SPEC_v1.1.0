@@ -280,6 +280,14 @@ def build_nexus_snapshot(project_id: int) -> dict:
             updated_at=generated_at,
         ),
         _module(
+            "presence",
+            "Living Presence",
+            "ready",
+            last_result="Presence выводится только из реальных runtime/event/interaction состояний.",
+            limitation="Случайная анимация и симуляция активности запрещены контрактом.",
+            updated_at=generated_at,
+        ),
+        _module(
             "home",
             "Home",
             "ready" if project.get("kind") == "home" else "disabled",
@@ -363,5 +371,7 @@ def build_nexus_snapshot(project_id: int) -> dict:
             ],
             "unknown_components_rejected": True,
             "script_allowed": False,
+            "presence_source": "authoritative_runtime_events",
+            "random_liveness_allowed": False,
         },
     }
