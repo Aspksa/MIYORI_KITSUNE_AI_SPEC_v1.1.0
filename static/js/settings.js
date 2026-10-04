@@ -15,7 +15,7 @@ function applyInterfaceSettings(general) {
 }
 
 async function renderSettingsWorkspace() {
-  showWorkspaceShell("settings", "Система", "Настройки", "Общие параметры, система, автоматизация и диагностика.");
+  showWorkspaceShell("settings", "", "Настройки", "");
   try {
     const data = await api("/api/settings");
     const cfg = data.settings || {};
