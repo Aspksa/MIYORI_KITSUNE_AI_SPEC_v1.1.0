@@ -103,7 +103,15 @@ from miyori.db import (
     verified_memory_context,
     find_document_folder,
 )
-from miyori.agent import run_agent, resume_agent_workflow
+from miyori.agent import cancel_agent_workflow, run_agent, resume_agent_workflow
+from miyori.agent_workspace import (
+    cancel_agent_workspace,
+    create_agent_workspace,
+    enqueue_agent_workspace,
+    get_agent_workspace,
+    init_agent_workspace_db,
+    list_agent_workspaces,
+)
 from miyori.background import register_background_handlers
 from miyori.brain import build_context
 from miyori.context_router import ContextRoute, route_context
@@ -238,6 +246,7 @@ async def lifespan(app: FastAPI):
     init_db()
     init_document_intelligence_db()
     init_document_questions_db()
+    init_agent_workspace_db()
     recovery_marked = mark_interrupted_runtime_for_recovery()
     recovery_checked = reconcile_recoverable_operations(allow_retry=False)
     init_epistemic_db()
@@ -306,6 +315,21 @@ class TaskCreateRequest(BaseModel):
         pattern="^(self_check|memory_consolidation|epistemic_review|document_intelligence|document_question)$"
     )
     payload: dict = Field(default_factory=dict)
+
+
+class AgentWorkspaceNodeRequest(BaseModel):
+    key: str = Field(min_length=1, max_length=64)
+    role: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=1, max_length=160)
+    instruction: str = Field(min_length=1, max_length=6000)
+    depends_on: list[str] = Field(default_factory=list, max_length=8)
+    step_budget: int = Field(default=3, ge=1, le=5)
+
+
+class AgentWorkspaceCreateRequest(BaseModel):
+    goal: str = Field(min_length=1, max_length=6000)
+    max_parallel: int = Field(default=2, ge=1, le=3)
+    nodes: list[AgentWorkspaceNodeRequest] | None = Field(default=None, max_length=8)
 
 
 class DocumentAnalysisRequest(BaseModel):
@@ -2132,6 +2156,60 @@ async def permission_decision(
     }
 
 
+@app.get("/api/projects/{project_id}/agent-workspaces")
+def agent_workspaces_list(project_id: int, limit: int = 30) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"workspaces": list_agent_workspaces(project_id, limit=limit)}
+
+
+@app.post("/api/projects/{project_id}/agent-workspaces")
+def agent_workspace_create(
+    project_id: int,
+    request: AgentWorkspaceCreateRequest,
+) -> dict:
+    try:
+        workspace = create_agent_workspace(
+            project_id,
+            request.goal,
+            [item.model_dump() for item in request.nodes] if request.nodes else None,
+            max_parallel=request.max_parallel,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"workspace": workspace}
+
+
+@app.get("/api/projects/{project_id}/agent-workspaces/{workspace_id}")
+def agent_workspace_get(project_id: int, workspace_id: int) -> dict:
+    workspace = get_agent_workspace(project_id, workspace_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Agent Workspace не найден.")
+    return {"workspace": workspace}
+
+
+@app.post("/api/projects/{project_id}/agent-workspaces/{workspace_id}/run")
+def agent_workspace_run(project_id: int, workspace_id: int) -> dict:
+    try:
+        task = enqueue_agent_workspace(project_id, workspace_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    wake_worker()
+    return {
+        "task": task,
+        "workspace": get_agent_workspace(project_id, workspace_id),
+    }
+
+
+@app.post("/api/projects/{project_id}/agent-workspaces/{workspace_id}/cancel")
+def agent_workspace_cancel(project_id: int, workspace_id: int) -> dict:
+    try:
+        workspace = cancel_agent_workspace(project_id, workspace_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"workspace": workspace}
+
+
 @app.get("/api/projects/{project_id}/workflows")
 def workflows_list(project_id: int, status: str | None = None) -> dict:
     if not get_project(project_id):
@@ -2158,64 +2236,14 @@ def workflow_get(project_id: int, workflow_id: int) -> dict:
 
 
 @app.post("/api/projects/{project_id}/workflows/{workflow_id}/cancel")
-def workflow_cancel(project_id: int, workflow_id: int) -> dict:
-    workflow = get_agent_workflow(workflow_id, project_id)
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow не найден.")
-    if workflow["status"] == "recovering":
-        raise HTTPException(
-            status_code=409,
-            detail="Сначала завершите проверку восстановления workflow.",
-        )
-    if workflow["status"] in {"completed", "cancelled"}:
-        return {"workflow": workflow}
-
-    permission_id = workflow.get("pending_permission_id")
-    if permission_id:
-        permission = get_permission_request(project_id, int(permission_id))
-        if permission and permission["status"] == "pending":
-            decide_permission_request(project_id, int(permission_id), False)
-        if permission and permission.get("workflow_step_id"):
-            step = get_workflow_step(int(permission["workflow_step_id"]))
-            if step and step["status"] == "waiting_permission":
-                update_workflow_step(
-                    int(step["id"]),
-                    status="cancelled",
-                    result={"workflow_cancelled": True},
-                    mark_finished=True,
-                )
-
-    update_agent_workflow(
-        workflow_id,
-        status="cancelled",
-        pending_permission_id=None,
-        result={"outcome": "cancelled_by_user"},
-        error=None,
-        finished=True,
-    )
-    set_agent_run_status(
-        int(workflow["agent_run_id"]),
-        "cancelled",
-        finished=True,
-    )
-    record_workflow_event(
-        workflow_id,
-        "workflow.cancelled",
-        {"actor": "user"},
-    )
-    record_audit_event(
-        project_id,
-        "user",
-        "workflow.cancelled",
-        "Пользователь остановил workflow.",
-        conversation_id=workflow.get("conversation_id"),
-        workflow_id=workflow_id,
-        entity_type="workflow",
-        entity_id=workflow_id,
-    )
-    return {
-        "workflow": get_agent_workflow(workflow_id, project_id),
-    }
+async def workflow_cancel(project_id: int, workflow_id: int) -> dict:
+    try:
+        workflow = await cancel_agent_workflow(project_id, workflow_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"workflow": workflow}
 
 
 @app.post("/api/projects/{project_id}/workflows/{workflow_id}/resume")
