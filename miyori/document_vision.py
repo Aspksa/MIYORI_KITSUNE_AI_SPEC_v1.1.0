@@ -680,7 +680,20 @@ async def run_document_vision(
             "Не найдено страниц или изображений, которым нужен OCR/визуальный анализ."
         )
 
-    ocr_model, vision_model = await _resolve_models()
+    _set_state(
+        project_id, document_id, "running",
+        requested=len(items), processed=0, failed=0,
+        error=None,
+    )
+    try:
+        ocr_model, vision_model = await _resolve_models()
+    except Exception as exc:
+        _set_state(
+            project_id, document_id, "failed",
+            requested=len(items), processed=0, failed=0,
+            error=str(exc)[:1600],
+        )
+        raise
     _set_state(
         project_id, document_id, "running",
         requested=len(items), processed=0, failed=0,
@@ -753,6 +766,9 @@ async def run_document_vision(
     intelligence = build_local_document_intelligence(
         project_id, document_id, combined
     )
+    # Refresh the same project RAG index after searchable chunks change.
+    from .rag import init_rag
+    init_rag()
     _set_state(
         project_id, document_id,
         "complete" if failed == 0 else "partial",
