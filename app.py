@@ -2409,6 +2409,7 @@ async def _build_agent_response(
                 {"document_ids": list(attachment_ids), "question": text}
                 if attachment_ids and len(attachment_ids) >= 2 else None
             ),
+            "task_goal": text,
         },
         client_request_id=response_key,
     )
@@ -2434,6 +2435,7 @@ async def _build_agent_response(
             {"document_ids": list(attachment_ids), "question": text}
             if attachment_ids and len(attachment_ids) >= 2 else None
         ),
+        "task_goal": text,
         "attachments": attachment_sources,
         "workflow": {
             "id": agent.workflow_id,
