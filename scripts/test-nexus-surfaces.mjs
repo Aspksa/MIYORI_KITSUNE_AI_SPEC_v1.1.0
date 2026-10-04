@@ -44,7 +44,7 @@ assert.ok(
 );
 assert.ok(
   css.includes("/* N7 — trusted Generative UI.") &&
-    [...css.matchAll(/@keyframes\\s+([a-zA-Z0-9_-]+)/g)].every((match) => ["nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].includes(match[1])),
+    [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)].every((match) => ["nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].includes(match[1])),
   "Generative UI styling must remain quiet and animation-free",
 );
 
