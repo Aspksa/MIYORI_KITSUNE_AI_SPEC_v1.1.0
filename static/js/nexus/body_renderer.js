@@ -48,8 +48,38 @@ function renderStaticPortrait(body, presentation, effectiveState) {
     appendStateMark(portrait);
     return portrait;
 }
+function rigPart(className) {
+    const part = document.createElement("span");
+    part.className = className;
+    return part;
+}
+function renderTrustedVectorRig(presentation, effectiveState) {
+    const portrait = basePortrait(presentation, effectiveState);
+    portrait.classList.add("nexus-body-vector-rig");
+    const rig = rigPart("nexus-rig-root");
+    const torso = rigPart("nexus-rig-torso");
+    const head = rigPart("nexus-rig-head");
+    const leftEar = rigPart("nexus-rig-ear left");
+    const rightEar = rigPart("nexus-rig-ear right");
+    const face = rigPart("nexus-rig-face");
+    const leftEye = rigPart("nexus-rig-eye left");
+    const rightEye = rigPart("nexus-rig-eye right");
+    const mouth = rigPart("nexus-rig-mouth");
+    const leftArm = rigPart("nexus-rig-arm left");
+    const rightArm = rigPart("nexus-rig-arm right");
+    face.append(leftEye, rightEye, mouth);
+    head.append(leftEar, rightEar, face);
+    torso.append(leftArm, rightArm);
+    rig.append(torso, head);
+    portrait.appendChild(rig);
+    appendStateMark(portrait);
+    return portrait;
+}
 export function renderTrustedBodyVisual(body, presentation, effectiveState) {
-    switch (body.renderer.selected_adapter) {
+    const selectedAdapter = String(body.renderer.selected_adapter);
+    switch (selectedAdapter) {
+        case "trusted_vector_rig":
+            return renderTrustedVectorRig(presentation, effectiveState);
         case "static_portrait":
             return renderStaticPortrait(body, presentation, effectiveState);
         case "neutral_shell":
