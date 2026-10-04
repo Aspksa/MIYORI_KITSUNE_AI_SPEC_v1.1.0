@@ -19,6 +19,8 @@ from miyori.db import (
     update_tool_operation,
     update_workflow_step,
 )
+from miyori.document_intelligence import init_document_intelligence_db
+from miyori.epistemic import init_epistemic_db
 from miyori.nexus import build_nexus_snapshot
 from miyori.nexus_actions import build_nexus_action_center
 from miyori.tools import execute_approved_request, execute_tool
@@ -34,6 +36,8 @@ class NexusActionsContractTests(unittest.TestCase):
         object.__setattr__(settings, "database_path", root / "data" / "miyori.sqlite3")
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         init_db()
+        init_document_intelligence_db()
+        init_epistemic_db()
         self.project = create_project("NEXUS Actions", kind="work")
         self.project_id = int(self.project["id"])
 
