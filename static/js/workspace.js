@@ -603,6 +603,16 @@ function nexusAgentWorkspaceMarkup(workspace) {
   '</article>';
 }
 
+async function openAgentWorkspaceFromChat(goal) {
+  const text = String(goal || "").trim();
+  await renderNexusAgentWorkspace();
+  const field = el("agentWorkspaceGoal");
+  if (!field || !text) return;
+  field.value = text;
+  field.dispatchEvent(new Event("input", {bubbles:true}));
+  field.focus();
+}
+
 async function renderNexusAgentWorkspace() {
   showWorkspaceShell("actions", "", "Команда агентов", "");
 
