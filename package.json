@@ -38,6 +38,7 @@
     "test:answer-check": "node scripts/test-answer-check.mjs",
     "test:chat-feedback": "node scripts/test-chat-feedback.mjs",
     "test:chat-performance": "node scripts/test-chat-performance.mjs",
-    "test:document-links": "node scripts/test-document-links.mjs"
+    "test:document-links": "node scripts/test-document-links.mjs",
+    "test:screen-context": "node scripts/test-screen-context.mjs"
   }
 }
