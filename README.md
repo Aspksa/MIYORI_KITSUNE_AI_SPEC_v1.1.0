@@ -2,8 +2,26 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.52.**  
+**Внутренняя версия приложения: 00.00.53.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.53
+
+`00.00.53` — **NEXUS Home · authenticated device evidence и explicit binding**.
+
+N11 превращает старый Home CRUD в честный capability layer, не выдавая административные записи за реальный smart-home runtime:
+
+- versioned `/api/projects/{id}/nexus/home` отделяет inventory от runtime evidence;
+- поле `home_devices.status` сохранено для совместимости, но никогда не считается доказательством online;
+- устройство связывается явно; link/relink выдаёт heartbeat credential один раз, в базе хранится только SHA-256;
+- `online / offline / never_seen` вычисляются только из authenticated heartbeat и server-side TTL;
+- неизвестные устройства не auto-link, network scanning отключён;
+- capabilities заявляются linked device runtime и проходят allowlist;
+- revoke обнуляет активную identity и требует новой привязки;
+- parental profile можно связать только с explicitly linked device с `parental_policy`;
+- даже после binding сервер не заявляет OS-level enforcement: максимум `ready_for_device_agent`;
+- primary Home view показывает heartbeat evidence, freshness, capabilities и binding status;
+- интерфейс остаётся без fake activity, random liveness и декоративной анимации.
 
 ## Состояние релиза 00.00.52
 
