@@ -141,7 +141,7 @@
         </div>
         <section id="nexusBodyHost" class="nexus-body-host" role="status" aria-live="polite" aria-label="Digital Body Miyori" hidden></section>
         <div class="chat-header-tools">
-          <button id="chatHistoryButton" class="chat-top-button" type="button" aria-label="История переписки" title="История переписки">
+          <button id="chatHistoryButton" class="chat-top-button" type="button" aria-expanded="false" aria-label="История переписки" title="История переписки">
             <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
           </button>
           <button id="newChat" class="chat-new-button" type="button" title="Новый чат" aria-label="Новый чат">
@@ -213,7 +213,7 @@
                   <div class="module-icon">▤</div>
                   <div class="module-title"><span>Документы</span><small>Материалы проекта</small></div>
                   <label class="card-action upload-label" title="Добавить документ">+
-                    <input id="documentInput" type="file" accept=".txt,.md,.markdown,.json" hidden>
+                    <input id="documentInput" type="file" accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.markdown,.json" hidden>
                   </label>
                 </div>
                 <input id="documentSearch" class="search-field" type="search" placeholder="Поиск по документам…">
@@ -307,7 +307,7 @@
           <textarea id="messageInput" rows="2" maxlength="20000" placeholder="Спросите что-нибудь у Миёри…" aria-label="Сообщение Миёри" required></textarea>
           <div class="composer-toolbar">
             <div class="composer-tools">
-              <button id="composerAttach" class="composer-icon-button" type="button" title="Добавить документ" aria-label="Добавить документ">
+              <button id="composerAttach" class="composer-icon-button" type="button" title="Загрузить документ в знания проекта" aria-label="Загрузить документ в знания проекта">
                 <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.6 12.5 20.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>
               </button>
               <button id="voiceButton" class="voice-button composer-icon-button" type="button" title="Голосовой ввод" aria-label="Голосовой ввод" aria-pressed="false">
