@@ -7,6 +7,7 @@ from .db import list_memory_facts
 from .epistemic import epistemic_snapshot, list_claims, verify_claim
 from .development import run_project_self_check
 from .document_intelligence import deep_analyze_document
+from .document_vision import run_document_vision
 from .document_questions import run_exhaustive_document_question
 from .tasks import register_task_handler
 
@@ -50,6 +51,23 @@ def document_intelligence_handler(project_id: int, payload: dict) -> dict:
             document_id,
             task_id=int(task_id) if task_id is not None else None,
             force=bool(payload.get("force", False)),
+        )
+    )
+
+
+def document_vision_handler(project_id: int, payload: dict) -> dict:
+    document_id = int(payload.get("document_id") or 0)
+    if document_id <= 0:
+        raise ValueError("Для Vision/OCR нужен document_id.")
+    task_id = payload.get("_task_id")
+    return asyncio.run(
+        run_document_vision(
+            project_id,
+            document_id,
+            task_id=int(task_id) if task_id is not None else None,
+            force=bool(payload.get("force", False)),
+            max_items=int(payload.get("max_items") or 12),
+            include_text_pages=bool(payload.get("include_text_pages", False)),
         )
     )
 
@@ -98,4 +116,5 @@ def register_background_handlers() -> None:
     register_task_handler("memory_consolidation", memory_consolidation_handler)
     register_task_handler("epistemic_review", epistemic_review_handler)
     register_task_handler("document_intelligence", document_intelligence_handler)
+    register_task_handler("document_vision", document_vision_handler)
     register_task_handler("document_question", document_question_handler)
