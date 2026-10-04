@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from time import perf_counter
 from miyori.chat_intelligence import plan_chat_query,enhance_context_route
 from miyori.chat_history_recall import relevant_history,wants_history
+from miyori.answer_check import check_numeric_support
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
@@ -309,7 +310,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.67", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.68", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -576,7 +577,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.67",
+        "version": "00.00.68",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -874,7 +875,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.67",
+        "project_version": "00.00.68",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -2276,6 +2277,12 @@ async def _build_agent_response(
         quality_guidance=query_plan.public_summary(),
     )
 
+    numeric_check = check_numeric_support(
+        answer,
+        rag_items=rag_payload.get("items",[]),
+        document_fragments=attachment_context,
+        verified_claims=epistemic,
+    )
     unreadable_files = [
         source.get("title") for source in attachment_sources
         if source.get("readable") is False
@@ -2305,6 +2312,7 @@ async def _build_agent_response(
         },
         "model_usage":actual_usage,
         "retrieval_ms":retrieval_ms,
+        "numeric_check":numeric_check,
         "historical_chat":{
             "requested":wants_history(text),
             "matches":len(history_matches),
