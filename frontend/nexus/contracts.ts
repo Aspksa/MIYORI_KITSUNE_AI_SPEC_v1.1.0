@@ -172,6 +172,7 @@ export interface NexusKnowledgeMemory {
     origin_project_name: string | null;
   };
   actions: {
+    project_id: number;
     verify: boolean;
     dispute: boolean;
     supersede: boolean;
