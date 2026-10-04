@@ -36,7 +36,6 @@ def record_chat_feedback(
     project_id: int,conversation_id: int,message_id: int,
     verdict: str,correction: str = "",
 ) -> dict:
-    init_chat_feedback_db()
     value=str(correction or "").strip()
     if verdict not in _VALID:
         raise ValueError("Недопустимый тип обратной связи.")
@@ -44,6 +43,7 @@ def record_chat_feedback(
         raise ValueError("Введите исправление ответа.")
     if len(value)>2000:
         raise ValueError("Исправление не должно превышать 2000 символов.")
+    init_chat_feedback_db()
     with connect() as db:
         match=db.execute("""
             SELECT m.id,m.role FROM messages m

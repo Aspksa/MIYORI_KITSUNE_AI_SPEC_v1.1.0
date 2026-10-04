@@ -126,6 +126,9 @@ jobs:
       - name: Chat feedback form and scope
         run: npm run test:chat-feedback
 
+      - name: Chat startup and network performance safety
+        run: npm run test:chat-performance
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

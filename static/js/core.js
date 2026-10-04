@@ -759,14 +759,29 @@ function updateLivingIntent(card, phase, label = null, detail = null) {
   card.classList.toggle("error", phase === "error");
 }
 
+/* Only collapse simultaneous identical stateless reads. Never cache settled
+ * values and never share requests with an AbortSignal / mutation options. */
+const inflightApiReads = new Map();
 async function api(url, options = {}) {
-  const response = await fetch(url, options);
-  const data = await response.json();
-  if (!response.ok) {
-    const detail = data?.detail?.message || data?.detail || "Ошибка запроса.";
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
-  }
-  return data;
+  const method = String(options.method || "GET").toUpperCase();
+  const singleflight = method === "GET" && Object.keys(options).length === 0 &&
+    typeof url === "string" && url.startsWith("/api/");
+  if (singleflight && inflightApiReads.has(url))
+    return inflightApiReads.get(url);
+  const run = async () => {
+    const response = await fetch(url, options);
+    const data = await response.json();
+    if (!response.ok) {
+      const detail = data?.detail?.message || data?.detail || "Ошибка запроса.";
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    return data;
+  };
+  if (!singleflight) return run();
+  const promise = run();
+  inflightApiReads.set(url,promise);
+  try {return await promise;}
+  finally {if(inflightApiReads.get(url) === promise) inflightApiReads.delete(url);}
 }
 
 async function loadStatus() {

@@ -36,6 +36,7 @@
     "test:chat-reliability": "node scripts/test-chat-reliability.mjs",
     "test:menu-system": "node scripts/test-menu-system.mjs",
     "test:answer-check": "node scripts/test-answer-check.mjs",
-    "test:chat-feedback": "node scripts/test-chat-feedback.mjs"
+    "test:chat-feedback": "node scripts/test-chat-feedback.mjs",
+    "test:chat-performance": "node scripts/test-chat-performance.mjs"
   }
 }

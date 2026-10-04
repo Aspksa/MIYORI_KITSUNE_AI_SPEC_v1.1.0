@@ -114,9 +114,12 @@ async function applyStartupPreferences() {
 async function boot() {
   showWelcome();
   showChatWorkspace();
-  await loadStatus();
-  await loadModuleVersions();
-  try { await loadProjects(); } catch (error) { showError(error.message); }
+  // Independent bootstrap requests should not serially block the chat.
+  const startup=await Promise.allSettled([
+    loadStatus(),loadModuleVersions(),loadProjects()
+  ]);
+  if(startup[2].status==="rejected")
+    showError(startup[2].reason?.message || "Не удалось загрузить проекты.");
   await applyStartupPreferences();
   if (state.projectId) void window.miyoriChatContinuation?.refresh();
   input.focus();
