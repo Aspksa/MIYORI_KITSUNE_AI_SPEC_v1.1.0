@@ -18,7 +18,7 @@ _REG = re.compile(
     r"(?<![А-ЯЁ\w])([АВЕКМНОРСТУХ]\s*\d{3}\s*[АВЕКМНОРСТУХ]{2}\s*\d{2,3})(?![А-ЯЁ\w])",
     re.IGNORECASE,
 )
-_VIN = re.compile(r"(?<![A-Z0-9])([A-HJ-NPR-Z0-9]{17})(?![A-Z0-9])", re.IGNORECASE)
+_VIN = re.compile(\n    r"\\b(?:VIN|ВИН|номер\\s+кузова)\\s*(?:№|#|:)?\\s*([A-HJ-NPR-Z0-9]{17})(?![A-Z0-9])",\n    re.IGNORECASE,\n)
 _CONTRACT = re.compile(
     r"\b(?:договор(?:а|у|ом)?|контракт(?:а|у|ом)?)\s*"
     r"(?:[№#]|N(?:o|r)?\.?\s*)\s*([А-ЯЁA-Z0-9][А-ЯЁA-Z0-9/._-]{3,32})",
@@ -29,7 +29,7 @@ _INVOICE = re.compile(
     r"(?:[№#]|N(?:o|r)?\.?\s*)\s*([А-ЯЁA-Z0-9][А-ЯЁA-Z0-9/._-]{3,32})",
     re.IGNORECASE,
 )
-_MAX_NODES = 25000
+_MAX_NODES = 8000
 _MAX_DOCS = 500
 
 
