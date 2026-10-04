@@ -43,3 +43,22 @@
  .chat-continuation-row{display:block}
  .chat-continuation-row strong{display:block;margin-bottom:4px}
 }
+
+/* Cloud.ru totals are opened only by user choice inside existing insights. */
+.chat-usage-details-button{
+  grid-column:1/-1;width:max-content;margin:4px 0 0;
+  border:1px solid var(--ui-border);
+  border-radius:8px;padding:7px 10px;
+  color:var(--ui-accent);background:transparent;
+  font-family:inherit;font-size:12px;font-weight:600;
+  cursor:pointer;
+}
+.chat-usage-details-button:hover:not(:disabled){
+  background:var(--ui-accent-soft);
+}
+.chat-usage-details-button:disabled{opacity:.68;cursor:default}
+.chat-answer-insight-body .chat-usage-monthly{
+  grid-column:1/-1;font-size:11px!important;
+  color:var(--ui-text-2)!important;overflow-wrap:anywhere;
+}
+.chat-usage-monthly:empty{display:none}

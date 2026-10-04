@@ -414,10 +414,30 @@ form.addEventListener("submit", async (event) => {
       }
     }
 
-    await Promise.all([
-      loadConversations(), loadMemory(), loadDocuments(),
-      loadTools(), loadPermissions(), loadAudit(), loadTasks(), loadDevelopment(), loadNexus()
-    ]);
+    // The response is already persisted. Refresh only the material that
+    // genuinely changed; a dashboard refresh may never undo the chat send.
+    const operations=(data.agent?.actions||[]).some(
+      action=>Boolean(action.tool_name) && action.status!=="skipped"
+    );
+    const permissions=Boolean(data.agent?.pending_permissions?.length);
+    const memoryChanged=Boolean(data.memory?.captured) ||
+      Boolean(data.epistemic?.captured_claim_ids?.length);
+    const refresh=[loadConversations(),loadNexus()];
+    if(operations||permissions){
+      refresh.push(loadTools(),loadPermissions(),loadAudit(),loadTasks());
+    }
+    if(operations||memoryChanged){
+      refresh.push(loadMemory(),loadDevelopment());
+    }
+    if(operations||attachment_ids.length){
+      refresh.push(loadDocuments());
+    }
+    const refreshResults=await Promise.allSettled(refresh);
+    if(refreshResults.some(item=>item.status==="rejected")) {
+      const note=el("composerUploadStatus");
+      if(note) note.textContent=
+        "Ответ сохранён. Часть дополнительных статусов пока недоступна.";
+    }
   } catch (error) {
     showError(error.message || "Не удалось получить ответ.");
     // Keep the stable request ID for safe retry of a persisted workflow.

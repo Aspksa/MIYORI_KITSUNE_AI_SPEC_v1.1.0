@@ -205,6 +205,35 @@ function addMessage(role, text, sources = [], options = {}) {
         line("Токены Cloud.ru",usage.total_tokens);
       if (Number.isFinite(usage.estimated_cost_rub))
         line("Расчётная стоимость",usage.estimated_cost_rub+" ₽ (не счёт)");
+      const totalsButton=document.createElement("button");
+      totalsButton.type="button";
+      totalsButton.className="chat-usage-details-button";
+      totalsButton.textContent="Расход токенов за 30 дней";
+      const totalsOutput=document.createElement("p");
+      totalsOutput.className="chat-usage-monthly";
+      totalsButton.addEventListener("click",async()=>{
+        const project=Number(state.projectId);
+        if(!project || totalsButton.disabled)return;
+        totalsButton.disabled=true;
+        try {
+          const metrics=await api(
+            "/api/projects/"+project+"/chat/metrics?days=30"
+          );
+          if(Number(state.projectId)!==project)return;
+          totalsOutput.textContent=
+            "Запросов: "+Number(metrics.requests||0)+
+            " · с измерениями: "+Number(metrics.measured_requests||0)+
+            " · токены API: "+Number(metrics.total_tokens||0)+
+            (metrics.estimated_cost_rub==null?
+              " · стоимость неизвестна":
+              " · расчёт: "+Number(metrics.estimated_cost_rub)+" ₽ (не счёт)");
+        } catch(error) {
+          totalsOutput.textContent="Статистика недоступна: "+
+            String(error.message||error);
+          totalsButton.disabled=false;
+        }
+      });
+      content.append(totalsButton,totalsOutput);
       const offer=options.comparison_offer;
       if(Array.isArray(offer?.document_ids) &&
          offer.document_ids.length>=2 &&
@@ -269,6 +298,7 @@ function addMessage(role, text, sources = [], options = {}) {
               }
             );
             const id=data.comparison.id;
+            window.miyoriChatContinuation?.refresh();
             button.textContent="Обновить результаты проверки";
             await render(id);
             button.onclick=async()=>{
