@@ -120,7 +120,13 @@ class NexusProactiveContractTests(unittest.TestCase):
 
         self.assertEqual(signal["channel_owner"], "attention_shelf")
         self.assertEqual(page["budget"]["max_chat_shelf"], 1)
-        self.assertEqual(page["display"]["chat_shelf_ids"], [signal["id"]])
+        shelf_ids = page["display"]["chat_shelf_ids"]
+        self.assertEqual(len(shelf_ids), 1)
+        selected = next(item for item in page["signals"] if item["id"] == shelf_ids[0])
+        self.assertIn(
+            selected["kind"],
+            {"knowledge_discrepancy", "knowledge_integrity"},
+        )
 
     def test_low_initiative_keeps_advisory_signal_out_of_chat_shelf(self) -> None:
         self._set_initiative("low", suggest=True)
@@ -211,6 +217,31 @@ class NexusProactiveContractTests(unittest.TestCase):
                 for item in after["suppressed"]
             )
         )
+
+    def test_stale_active_work_is_advisory_not_a_fake_deadline(self) -> None:
+        from miyori.db import create_task
+
+        task = create_task(self.project_id, "self_check", {})
+        with connect() as conn:
+            conn.execute(
+                """
+                UPDATE tasks
+                SET created_at = datetime('now', '-8 hours')
+                WHERE id = ?
+                """,
+                (int(task["id"]),),
+            )
+
+        page = build_nexus_proactive(self.project_id)
+        stale = next(
+            item for item in page["signals"]
+            if item["kind"] == "unfinished_work"
+        )
+        self.assertEqual(stale["channel_owner"], "attention_shelf")
+        self.assertEqual(stale["source"]["state"], "planned")
+        self.assertGreaterEqual(stale["source"]["age_hours"], 6)
+        self.assertNotIn("deadline", stale["source"])
+        self.assertFalse(stale["safety"]["executes_action"])
 
     def test_policy_forbids_chat_injection_interruptions_and_os_notifications(self) -> None:
         page = build_nexus_proactive(self.project_id)
