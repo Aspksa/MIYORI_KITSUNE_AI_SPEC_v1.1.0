@@ -1,7 +1,7 @@
 import { fetchNexusPresence } from "./client.js";
 import type { NexusPresence, NexusSnapshot } from "./contracts.js";
 
-type LocalInteractionState = "idle" | "thinking";
+type LocalInteractionState = "idle" | "thinking" | "listening" | "transcribing" | "speaking" | "interrupted" | "voice_error";
 
 function currentView(): string {
   return String(document.documentElement.dataset.nexusView || "chat");
@@ -36,8 +36,12 @@ function renderPresence(
     return;
   }
 
-  if (interaction === "thinking") {
-    host.dataset.mode = "working";
+  if (["thinking", "listening", "transcribing", "speaking", "interrupted", "voice_error"].includes(interaction)) {
+    host.dataset.mode =
+      interaction === "voice_error" ? "attention" :
+      interaction === "interrupted" ? "waiting" :
+      interaction === "listening" || interaction === "transcribing" || interaction === "speaking"
+        ? "working" : "working";
     const row = document.createElement("div");
     row.className = "nexus-presence-row";
     const mark = document.createElement("span");
@@ -45,9 +49,19 @@ function renderPresence(
     mark.setAttribute("aria-hidden", "true");
     const copy = document.createElement("span");
     const title = document.createElement("strong");
-    title.textContent = "Думаю над сообщением";
+    title.textContent = ({
+      thinking: "Думаю над сообщением",
+      listening: "Слушаю",
+      transcribing: "Распознаю речь",
+      speaking: "Говорю",
+      interrupted: "Голос остановлен",
+      voice_error: "Проблема с голосом",
+    } as Record<string, string>)[interaction] || "Работаю";
     const detail = document.createElement("small");
-    detail.textContent = "Запрос отправлен; жду реальный ответ текущего provider/workflow.";
+    detail.textContent =
+      interaction === "thinking"
+        ? "Запрос отправлен; жду реальный ответ текущего provider/workflow."
+        : "Состояние пришло из реального Voice runtime.";
     copy.append(title, detail);
     row.append(mark, copy);
     host.appendChild(row);
@@ -179,6 +193,17 @@ export function installNexusPresence(): () => void {
     if (interaction === "idle") void refresh();
   };
 
+  const onVoice = (event: Event): void => {
+    if (!(event instanceof CustomEvent)) return;
+    const state = String(event.detail?.state || "idle");
+    interaction =
+      state === "error" ? "voice_error" :
+      state === "listening" || state === "transcribing" || state === "speaking" || state === "interrupted"
+        ? state as LocalInteractionState
+        : interaction === "thinking" ? "thinking" : "idle";
+    renderPresence(host, presence, interaction);
+  };
+
   const onView = (): void => {
     renderPresence(host, presence, interaction);
   };
@@ -186,6 +211,7 @@ export function installNexusPresence(): () => void {
   window.addEventListener("miyori:nexus-snapshot", onSnapshot);
   window.addEventListener("miyori:interaction-state", onInteraction);
   window.addEventListener("miyori:nexus-view", onView);
+  window.addEventListener("miyori:voice-state", onVoice);
 
   return () => {
     stopped = true;
@@ -193,5 +219,6 @@ export function installNexusPresence(): () => void {
     window.removeEventListener("miyori:nexus-snapshot", onSnapshot);
     window.removeEventListener("miyori:interaction-state", onInteraction);
     window.removeEventListener("miyori:nexus-view", onView);
+    window.removeEventListener("miyori:voice-state", onVoice);
   };
 }

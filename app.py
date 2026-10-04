@@ -176,6 +176,7 @@ from miyori.nexus_actions import build_nexus_action_center
 from miyori.nexus_knowledge import build_nexus_knowledge_center
 from miyori.nexus_surfaces import build_nexus_surfaces
 from miyori.nexus_presence import build_nexus_presence
+from miyori.nexus_voice import build_nexus_voice_contract
 from miyori.proactive import apply_proactive_decision, build_nexus_proactive
 from miyori.nexus_events import list_nexus_events
 from miyori.system_settings import (
@@ -255,7 +256,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.50", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.51", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -464,7 +465,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.50",
+        "version": "00.00.51",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -706,7 +707,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.50",
+        "project_version": "00.00.51",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1652,6 +1653,14 @@ def project_nexus_surfaces(
 def project_nexus_presence(project_id: int) -> dict:
     try:
         return build_nexus_presence(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/nexus/voice")
+def project_nexus_voice(project_id: int) -> dict:
+    try:
+        return build_nexus_voice_contract(project_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

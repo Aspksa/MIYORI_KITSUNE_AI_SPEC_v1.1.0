@@ -2,8 +2,29 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.50.**  
+**Внутренняя версия приложения: 00.00.51.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.51
+
+`00.00.51` — **NEXUS Voice Core · explicit permission, transcript/confidence и opt-in TTS**.
+
+N5 добавляет голос как capability поверх существующего Chat/Actions, а не как отдельный путь выполнения:
+
+- versioned `/api/projects/{id}/nexus/voice` фиксирует состояния и safety policy;
+- microphone permission запрашивается только по явному нажатию пользователя через browser/OS permission;
+- временная дорожка permission probe сразу закрывается; background recording запрещён;
+- Web Speech recognition используется только как optional browser transport и честно деградирует, если API недоступен;
+- interim transcript не отправляется и считается временным;
+- final transcript попадает в существующий composer и отправляется только отдельной кнопкой пользователя;
+- voice input проходит через обычный `chatForm`, поэтому не обходит permission/preflight/verification/recovery Actions;
+- transcript confidence показывается как advisory metric, а не как «истина»;
+- TTS использует локальный SpeechSynthesis только по явному нажатию «Озвучить ответ»;
+- speaking можно прервать, а запуск микрофона делает barge-in через отмену TTS;
+- Voice state публикуется в Living Presence как реальное listening/transcribing/thinking/speaking/interrupted/error состояние;
+- сервер не хранит аудио;
+- Desktop Runtime сможет заменить browser transport, не меняя Voice state/safety contract;
+- нет fake waveform, random liveness, keyframe-анимаций или автоматической озвучки.
 
 ## Состояние релиза 00.00.50
 

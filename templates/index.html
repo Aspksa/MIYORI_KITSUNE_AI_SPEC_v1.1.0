@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0d12">
   <title>Miyori Kitsune AI</title>
-  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.50">
-  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.50">
-  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.50">
-  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.50">
-  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.50">
-  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.50">
-  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.50">
-  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.50">
+  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.51">
+  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.51">
+  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.51">
+  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.51">
+  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.51">
+  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.51">
+  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.51">
+  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.51">
 </head>
 <body>
   <div class="app-shell">
@@ -22,7 +22,7 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.50</span>
+            <span class="version-pill" id="versionText">00.00.51</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
@@ -275,7 +275,20 @@
       <section id="messages" class="messages" aria-live="polite"></section>
 
       <footer class="composer-wrap" id="chatComposer">
+        <section id="voicePanel" class="nexus-voice-panel" aria-label="Голосовой интерфейс" hidden>
+          <div class="nexus-voice-copy">
+            <strong id="voiceStatus">Готова слушать</strong>
+            <span id="voiceTranscript">Скажите фразу…</span>
+            <small id="voiceConfidence"></small>
+          </div>
+          <div class="nexus-voice-actions">
+            <button id="voiceSpeak" type="button" class="voice-soft-button">Озвучить ответ</button>
+            <button id="voiceSend" type="button" class="voice-soft-button" disabled>Отправить текст</button>
+            <button id="voiceStop" type="button" class="voice-soft-button">Стоп</button>
+          </div>
+        </section>
         <form id="chatForm" class="composer">
+          <button id="voiceButton" class="voice-button" type="button" aria-label="Голосовой ввод" aria-pressed="false">◉</button>
           <div class="composer-field">
             <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Задать вопрос…" aria-label="Сообщение Миёри" required></textarea>
             <div class="composer-hint">Enter — отправить · Shift+Enter — новая строка</div>
@@ -411,14 +424,14 @@
     </section>
   </div>
 
-  <script src="/static/js/core.js?v=00.00.50"></script>
-  <script src="/static/js/data.js?v=00.00.50"></script>
-  <script src="/static/js/chat.js?v=00.00.50"></script>
-  <script src="/static/js/workspace.js?v=00.00.50"></script>
-  <script src="/static/js/drive.js?v=00.00.50"></script>
-  <script src="/static/js/projects.js?v=00.00.50"></script>
-  <script src="/static/js/settings.js?v=00.00.50"></script>
-  <script src="/static/js/boot.js?v=00.00.50"></script>
-  <script type="module" src="/static/js/nexus/index.js?v=00.00.50"></script>
+  <script src="/static/js/core.js?v=00.00.51"></script>
+  <script src="/static/js/data.js?v=00.00.51"></script>
+  <script src="/static/js/chat.js?v=00.00.51"></script>
+  <script src="/static/js/workspace.js?v=00.00.51"></script>
+  <script src="/static/js/drive.js?v=00.00.51"></script>
+  <script src="/static/js/projects.js?v=00.00.51"></script>
+  <script src="/static/js/settings.js?v=00.00.51"></script>
+  <script src="/static/js/boot.js?v=00.00.51"></script>
+  <script type="module" src="/static/js/nexus/index.js?v=00.00.51"></script>
 </body>
 </html>

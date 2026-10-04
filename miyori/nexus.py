@@ -310,9 +310,9 @@ def build_nexus_snapshot(project_id: int) -> dict:
         _module(
             "voice",
             "Voice",
-            "not_connected",
-            last_result="Voice runtime не подключён.",
-            limitation="Микрофон/STT/TTS будут подключаться отдельным capability-слоем.",
+            "ready",
+            last_result="Voice protocol активен: explicit microphone permission, transcript/confidence, TTS и interruption state.",
+            limitation="Browser SpeechRecognition доступен не во всех браузерах; Desktop сможет заменить transport без изменения контракта.",
             updated_at=generated_at,
         ),
         _module(

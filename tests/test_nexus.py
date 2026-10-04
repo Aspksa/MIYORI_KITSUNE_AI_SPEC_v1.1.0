@@ -84,7 +84,7 @@ class NexusContractTests(unittest.TestCase):
 
         self.assertEqual(modules["ai"]["state"], "not_connected")
         self.assertEqual(modules["home"]["state"], "disabled")
-        self.assertEqual(modules["voice"]["state"], "not_connected")
+        self.assertEqual(modules["voice"]["state"], "ready")
         self.assertEqual(modules["desktop"]["state"], "disabled")
         self.assertEqual(modules["generative_ui"]["state"], "ready")
         self.assertEqual(modules["presence"]["state"], "ready")

@@ -3,8 +3,9 @@ import { installNexusShell } from "./shell.js";
 import { installNexusSurfaceHost } from "./surfaces.js";
 import { installNexusPresence } from "./presence.js";
 import { installNexusProactive } from "./proactive.js";
+import { installNexusVoice } from "./voice.js";
 
-const NEXUS_FRONTEND_VERSION = "0.8.0";
+const NEXUS_FRONTEND_VERSION = "0.9.0";
 
 function boot(): void {
   document.documentElement.dataset.nexus = "ready";
@@ -14,6 +15,7 @@ function boot(): void {
   installNexusSurfaceHost();
   installNexusPresence();
   installNexusProactive();
+  installNexusVoice();
   window.dispatchEvent(
     new CustomEvent("miyori:nexus-ready", {
       detail: { version: NEXUS_FRONTEND_VERSION },

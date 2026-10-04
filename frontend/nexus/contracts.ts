@@ -5,6 +5,7 @@ export const NEXUS_KNOWLEDGE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_SURFACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_PRESENCE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -344,6 +345,48 @@ export interface NexusPresence {
     decorative_activity_allowed: false;
     chat_interruption_allowed: false;
     knowledge_attention_changes_primary_presence: false;
+  };
+  generated_at: string;
+}
+
+export type NexusVoiceState =
+  | "unavailable"
+  | "idle"
+  | "listening"
+  | "transcribing"
+  | "thinking"
+  | "speaking"
+  | "interrupted"
+  | "error";
+
+export interface NexusVoiceContract {
+  schema_version: typeof NEXUS_VOICE_SCHEMA_VERSION;
+  project: NexusProjectRef;
+  protocol: {
+    states: NexusVoiceState[];
+    default_state: "idle";
+    final_transcript_required_before_submit: true;
+    interim_transcript_is_ephemeral: true;
+    confidence_is_advisory: true;
+    barge_in_allowed: true;
+    cancel_allowed: true;
+  };
+  permissions: {
+    microphone_requires_explicit_user_gesture: true;
+    microphone_permission_must_be_browser_or_os_managed: true;
+    background_recording_allowed: false;
+  };
+  safety: {
+    voice_can_bypass_action_permissions: false;
+    voice_can_auto_approve_actions: false;
+    voice_can_auto_execute_write_tools: false;
+    final_transcript_uses_existing_chat_pipeline: true;
+  };
+  transport: {
+    browser_recognition: "optional";
+    browser_tts: "optional";
+    desktop_transport_replaceable: true;
+    server_audio_storage: false;
   };
   generated_at: string;
 }
