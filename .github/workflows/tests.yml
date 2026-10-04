@@ -117,6 +117,9 @@ jobs:
       - name: Chat reliability and measured usage
         run: npm run test:chat-reliability
 
+      - name: Fixed menu and System Status contract
+        run: npm run test:menu-system
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
