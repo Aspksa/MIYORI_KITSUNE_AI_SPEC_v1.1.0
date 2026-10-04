@@ -1386,6 +1386,63 @@ def project_employee_delete(project_id: int, employee_id: int) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/chat")
+async def send_message(request: ChatRequest) -> dict:
+    return await _process_chat_request(request)
+
+
+@app.post("/api/chat/stream")
+async def send_message_stream(request: ChatRequest):
+    """NDJSON: real Cloud.ru deltas followed by one persisted final response."""
+    queue = asyncio.Queue(maxsize=64)
+
+    async def emit_delta(text: str) -> None:
+        if text:
+            await queue.put({"type": "delta", "text": text})
+
+    async def produce() -> None:
+        try:
+            response = await _process_chat_request(request, stream_sink=emit_delta)
+            await queue.put({"type": "final", "response": response})
+        except asyncio.CancelledError:
+            set_chat_progress(
+                request.project_id, request.request_id, "cancelled",
+                "Генерация остановлена пользователем.",
+            )
+            raise
+        except HTTPException as exc:
+            await queue.put({
+                "type": "error", "status": exc.status_code, "detail": exc.detail
+            })
+        except Exception as exc:
+            await queue.put({
+                "type": "error", "status": 500, "detail": str(exc)
+            })
+        finally:
+            await queue.put({"type": "done"})
+
+    async def events():
+        task = asyncio.create_task(produce())
+        try:
+            while True:
+                event = await queue.get()
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+                if event.get("type") == "done":
+                    break
+        finally:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+    return StreamingResponse(
+        events(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
+
 @app.get("/api/projects/{project_id}/chat/metrics")
 def chat_metrics(project_id: int, days: int = 30) -> dict:
     if not get_project(project_id):
