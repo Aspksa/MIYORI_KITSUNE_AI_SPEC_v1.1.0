@@ -185,6 +185,14 @@ from miyori.nexus_knowledge import build_nexus_knowledge_center
 from miyori.nexus_surfaces import build_nexus_surfaces
 from miyori.nexus_presence import build_nexus_presence
 from miyori.nexus_voice import build_nexus_voice_contract
+from miyori.nexus_home import (
+    bind_parental_profile,
+    build_nexus_home,
+    init_nexus_home_db,
+    link_home_device,
+    record_home_heartbeat,
+    unlink_home_device,
+)
 from miyori.proactive import apply_proactive_decision, build_nexus_proactive
 from miyori.nexus_events import list_nexus_events
 from miyori.system_settings import (
@@ -247,6 +255,7 @@ async def lifespan(app: FastAPI):
     init_document_intelligence_db()
     init_document_questions_db()
     init_agent_workspace_db()
+    init_nexus_home_db()
     recovery_marked = mark_interrupted_runtime_for_recovery()
     recovery_checked = reconcile_recoverable_operations(allow_retry=False)
     init_epistemic_db()
@@ -265,7 +274,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.52", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.53", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -395,6 +404,20 @@ class HomeDeviceRequest(BaseModel):
     notes: str = Field(default="", max_length=1000)
 
 
+class NexusHomeLinkRequest(BaseModel):
+    capabilities: list[str] = Field(default_factory=list, max_length=10)
+
+
+class NexusHomeHeartbeatRequest(BaseModel):
+    credential: str = Field(min_length=16, max_length=256)
+    capabilities: list[str] | None = Field(default=None, max_length=10)
+    reported_state: dict = Field(default_factory=dict)
+
+
+class NexusHomeParentalBindRequest(BaseModel):
+    device_id: int = Field(gt=0)
+
+
 class ParentalProfileRequest(BaseModel):
     child_name: str = Field(min_length=1, max_length=160)
     device_name: str = Field(min_length=1, max_length=160)
@@ -490,7 +513,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.52",
+        "version": "00.00.53",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -732,7 +755,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.52",
+        "project_version": "00.00.53",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -833,6 +856,87 @@ def project_modules(project_id: int) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     return {"modules": list_project_modules(project_id)}
+
+
+@app.get("/api/projects/{project_id}/nexus/home")
+def project_nexus_home(project_id: int) -> dict:
+    try:
+        return build_nexus_home(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/nexus/home/devices/{device_id}/link")
+def project_nexus_home_device_link(
+    project_id: int,
+    device_id: int,
+    request: NexusHomeLinkRequest,
+    http_request: Request,
+) -> dict:
+    _require_local_admin(http_request)
+    try:
+        return link_home_device(
+            project_id,
+            device_id,
+            capabilities=request.capabilities,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/nexus/home/devices/{device_id}/unlink")
+def project_nexus_home_device_unlink(
+    project_id: int,
+    device_id: int,
+    http_request: Request,
+) -> dict:
+    _require_local_admin(http_request)
+    try:
+        return {"home": unlink_home_device(project_id, device_id)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/nexus/home/devices/{device_id}/heartbeat")
+def project_nexus_home_device_heartbeat(
+    project_id: int,
+    device_id: int,
+    request: NexusHomeHeartbeatRequest,
+) -> dict:
+    try:
+        return {
+            "home": record_home_heartbeat(
+                project_id,
+                device_id,
+                credential=request.credential,
+                capabilities=request.capabilities,
+                reported_state=request.reported_state,
+            )
+        }
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/nexus/home/parental/{profile_id}/bind")
+def project_nexus_home_parental_bind(
+    project_id: int,
+    profile_id: int,
+    request: NexusHomeParentalBindRequest,
+    http_request: Request,
+) -> dict:
+    _require_local_admin(http_request)
+    try:
+        return {
+            "home": bind_parental_profile(
+                project_id,
+                profile_id,
+                request.device_id,
+            )
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/home-devices")

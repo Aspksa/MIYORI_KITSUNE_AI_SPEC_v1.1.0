@@ -7,6 +7,7 @@ export const NEXUS_PRESENCE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_HOME_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -416,6 +417,92 @@ export interface NexusAgentWorkspace {
   finished_at: string | null;
   nodes: NexusAgentWorkspaceNode[];
   counts: Record<NexusAgentWorkspaceNodeStatus, number>;
+}
+
+export type NexusHomeConnectivityState =
+  | "unlinked"
+  | "revoked"
+  | "never_seen"
+  | "online"
+  | "offline";
+
+export interface NexusHomeDevice {
+  id: number;
+  name: string;
+  device_type: string;
+  address: string;
+  declared_status: string;
+  notes: string;
+  link_status: "unlinked" | "linked" | "revoked";
+  capabilities: string[];
+  connectivity: {
+    state: NexusHomeConnectivityState;
+    online: boolean;
+    freshness_seconds: number | null;
+    last_seen_at: string | null;
+    heartbeat_seq: number;
+  };
+  reported_state: Record<string, unknown>;
+  linked_at: string | null;
+  updated_at: string | null;
+  actions: {
+    can_link: boolean;
+    can_unlink: boolean;
+  };
+}
+
+export interface NexusHomeParentalProfile {
+  id: number;
+  project_id: number;
+  child_name: string;
+  device_name: string;
+  daily_limit_minutes: number;
+  bedtime_start: string;
+  bedtime_end: string;
+  blocked_categories: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  binding: {
+    device_id: number | null;
+    device_name: string | null;
+    explicitly_linked: boolean;
+    enforcement_state:
+      | "not_bound"
+      | "device_not_linked"
+      | "capability_missing"
+      | "device_offline"
+      | "ready_for_device_agent";
+    applied: false;
+    note: string;
+  };
+}
+
+export interface NexusHomeCenter {
+  schema_version: typeof NEXUS_HOME_SCHEMA_VERSION;
+  project: NexusProjectRef;
+  enabled: boolean;
+  devices: NexusHomeDevice[];
+  parental_profiles: NexusHomeParentalProfile[];
+  counts: {
+    devices: number;
+    linked: number;
+    online: number;
+    offline_or_unseen: number;
+    parental_profiles: number;
+    parental_attention: number;
+  };
+  policy: {
+    connectivity_source: "authenticated_heartbeat";
+    legacy_status_is_connectivity_source: false;
+    heartbeat_ttl_seconds: number;
+    network_scanning_enabled: false;
+    unknown_device_auto_link_allowed: false;
+    parental_rules_require_explicit_binding: true;
+    parental_rules_applied_by_server: false;
+    device_commands_enabled: false;
+  };
+  generated_at: string;
 }
 
 export type NexusVoiceState =

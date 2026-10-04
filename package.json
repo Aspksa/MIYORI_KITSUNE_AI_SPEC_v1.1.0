@@ -20,6 +20,7 @@
     "test:nexus-presence": "node scripts/test-nexus-presence.mjs",
     "test:nexus-proactive": "node scripts/test-nexus-proactive.mjs",
     "test:nexus-voice": "node scripts/test-nexus-voice.mjs",
-    "test:agent-workspace": "node scripts/test-agent-workspace.mjs"
+    "test:agent-workspace": "node scripts/test-agent-workspace.mjs",
+    "test:nexus-home": "node scripts/test-nexus-home.mjs"
   }
 }

@@ -1,4 +1,4 @@
-import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_VOICE_SCHEMA_VERSION, NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
+import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_VOICE_SCHEMA_VERSION, NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION, NEXUS_HOME_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
 function validateProjectId(projectId) {
     if (!Number.isInteger(projectId) || projectId <= 0) {
         throw new Error("Некорректный projectId для MIYORI NEXUS.");
@@ -280,4 +280,26 @@ export async function cancelNexusAgentWorkspace(projectId, workspaceId) {
     }
     const payload = (await response.json());
     return validateAgentWorkspace(payload.workspace);
+}
+export async function fetchNexusHome(projectId) {
+    validateProjectId(projectId);
+    const response = await fetch(`/api/projects/${projectId}/nexus/home`, {
+        headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+        throw new Error(`NEXUS Home API: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    if (payload.schema_version !== NEXUS_HOME_SCHEMA_VERSION ||
+        !Array.isArray(payload.devices) ||
+        !Array.isArray(payload.parental_profiles) ||
+        payload.policy?.connectivity_source !== "authenticated_heartbeat" ||
+        payload.policy?.legacy_status_is_connectivity_source !== false ||
+        payload.policy?.network_scanning_enabled !== false ||
+        payload.policy?.parental_rules_require_explicit_binding !== true ||
+        payload.policy?.parental_rules_applied_by_server !== false ||
+        payload.policy?.device_commands_enabled !== false) {
+        throw new Error("NEXUS Home API нарушил device evidence contract.");
+    }
+    return payload;
 }
