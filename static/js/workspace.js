@@ -657,6 +657,275 @@ async function renderNexusAgentWorkspace() {
 }
 
 
+
+function nexusHomeConnectivityLabel(value) {
+  return ({
+    unlinked: "Не привязано",
+    revoked: "Привязка отозвана",
+    never_seen: "Heartbeat ещё не получен",
+    online: "Online",
+    offline: "Offline"
+  }[value] || value || "—");
+}
+
+function nexusHomeTone(value) {
+  if (value === "online") return "success";
+  if (value === "offline" || value === "never_seen") return "warning";
+  if (value === "revoked") return "error";
+  return "neutral";
+}
+
+function nexusHomeDeviceMarkup(item) {
+  const connectivity = item.connectivity || {};
+  const capabilities = Array.isArray(item.capabilities) ? item.capabilities : [];
+  const freshness = connectivity.freshness_seconds;
+  const evidence = [
+    connectivity.last_seen_at ? "heartbeat " + nexusActionTime(connectivity.last_seen_at) : "heartbeat отсутствует",
+    freshness !== null && freshness !== undefined ? freshness + " сек. назад" : null,
+    connectivity.heartbeat_seq ? "seq " + Number(connectivity.heartbeat_seq) : null
+  ].filter(Boolean).join(" · ");
+
+  return '<article class="nexus-home-device">' +
+    '<header><div><span>' + escapeHtml(item.device_type || "device") + '</span>' +
+      '<strong>' + escapeHtml(item.name || "Устройство") + '</strong></div>' +
+      '<b class="knowledge-status tone-' + nexusHomeTone(connectivity.state) + '">' +
+        escapeHtml(nexusHomeConnectivityLabel(connectivity.state)) + '</b></header>' +
+    '<div class="nexus-home-device-meta">' +
+      '<span>link: ' + escapeHtml(item.link_status || "unlinked") + '</span>' +
+      '<span>legacy status: ' + escapeHtml(item.declared_status || "—") + '</span>' +
+      (item.address ? '<span>' + escapeHtml(item.address) + '</span>' : '') +
+    '</div>' +
+    '<p class="nexus-home-evidence">' + escapeHtml(evidence) + '</p>' +
+    '<div class="nexus-home-capabilities">' +
+      (capabilities.length
+        ? capabilities.map(value => '<span>' + escapeHtml(value) + '</span>').join("")
+        : '<span class="muted">capabilities ещё не подтверждены heartbeat</span>') +
+    '</div>' +
+    '<div class="nexus-home-controls">' +
+      (item.actions?.can_link
+        ? '<button type="button" class="primary-sheet-button" data-home-link="' + Number(item.id) + '">Привязать</button>'
+        : '') +
+      (item.actions?.can_unlink
+        ? '<button type="button" class="secondary-sheet-button" data-home-unlink="' + Number(item.id) + '">Отозвать привязку</button>'
+        : '') +
+    '</div>' +
+    '<details class="knowledge-disclosure"><summary>Runtime evidence</summary>' +
+      '<div class="knowledge-disclosure-body"><pre>' +
+        nexusActionJson({
+          connectivity: item.connectivity,
+          reported_state: item.reported_state,
+          linked_at: item.linked_at
+        }) +
+      '</pre></div></details>' +
+  '</article>';
+}
+
+function nexusHomeParentalMarkup(profile, eligibleDevices) {
+  const binding = profile.binding || {};
+  const labels = {
+    not_bound: "Не привязано",
+    device_not_linked: "Устройство не связано",
+    capability_missing: "Нет parental_policy capability",
+    device_offline: "Устройство offline",
+    ready_for_device_agent: "Готово для device-agent"
+  };
+  const options = eligibleDevices.map(device =>
+    '<option value="' + Number(device.id) + '">' + escapeHtml(device.name) + '</option>'
+  ).join("");
+
+  return '<article class="nexus-home-parental">' +
+    '<header><div><span>' + escapeHtml(profile.status || "draft") + '</span>' +
+      '<strong>' + escapeHtml(profile.child_name || "Профиль") + '</strong></div>' +
+      '<b>' + escapeHtml(labels[binding.enforcement_state] || binding.enforcement_state || "—") + '</b></header>' +
+    '<p>' + Number(profile.daily_limit_minutes || 0) + ' мин/день · ' +
+      escapeHtml(profile.bedtime_start || "—") + '–' + escapeHtml(profile.bedtime_end || "—") + '</p>' +
+    (binding.device_name
+      ? '<small>Связано с: ' + escapeHtml(binding.device_name) + '</small>'
+      : '<small>Правила не имеют device binding.</small>') +
+    '<p class="nexus-home-evidence">' + escapeHtml(binding.note || "") + '</p>' +
+    (eligibleDevices.length
+      ? '<div class="nexus-home-bind-row"><select data-home-profile-device="' + Number(profile.id) + '">' +
+          options + '</select><button type="button" class="secondary-sheet-button" data-home-bind-profile="' +
+          Number(profile.id) + '">Привязать профиль</button></div>'
+      : '<small class="nexus-home-muted">Нужен явно linked device с capability parental_policy.</small>') +
+  '</article>';
+}
+
+function showNexusHomeCredential(deviceName, credential) {
+  const host = el("nexusHomeCredential");
+  if (!host) return;
+  host.replaceChildren();
+  host.hidden = false;
+
+  const title = document.createElement("strong");
+  title.textContent = "Heartbeat credential · " + deviceName;
+  const note = document.createElement("p");
+  note.textContent = "Показывается один раз. Передайте его доверенному device-agent; Miyori хранит только SHA-256.";
+  const code = document.createElement("code");
+  code.textContent = credential;
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "secondary-sheet-button";
+  copy.textContent = "Копировать";
+  copy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(credential);
+      copy.textContent = "Скопировано";
+    } catch (_) {
+      copy.textContent = "Скопируйте вручную";
+    }
+  };
+  host.append(title, note, code, copy);
+}
+
+async function renderNexusHomeWorkspace() {
+  showWorkspaceShell(
+    "home",
+    "NEXUS · Home",
+    "Дом",
+    "Identity, authenticated heartbeat, connectivity evidence и безопасная привязка parental rules."
+  );
+
+  workspaceBody.innerHTML =
+    '<section class="nexus-home-page">' +
+      '<header class="nexus-home-intro"><div><span class="section-caption">N11 · trusted home state</span>' +
+        '<h3>Home Runtime</h3>' +
+        '<p>Online определяется только свежим authenticated heartbeat. Legacy status и адрес устройства не являются доказательством связи.</p></div>' +
+        '<button id="nexusHomeRefresh" class="secondary-sheet-button" type="button">Обновить</button>' +
+      '</header>' +
+      '<div id="nexusHomeCredential" class="nexus-home-credential" hidden></div>' +
+      '<div id="nexusHomeBody"><div class="workspace-loading">Загружаю Home…</div></div>' +
+    '</section>';
+
+  const load = async () => {
+    const page = await api("/api/projects/" + state.projectId + "/nexus/home");
+    const body = el("nexusHomeBody");
+    if (!page.enabled) {
+      body.innerHTML =
+        '<div class="knowledge-empty"><strong>Home отключён для рабочего проекта</strong>' +
+        '<span>Переключитесь на домашний проект. Устройства рабочего проекта не получают Home capability автоматически.</span>' +
+        '<button id="nexusHomeProjects" type="button" class="primary-sheet-button">Домашние проекты</button></div>';
+      el("nexusHomeProjects").onclick = () => renderProjectsWorkspace("home");
+      return;
+    }
+
+    const counts = page.counts || {};
+    const devices = Array.isArray(page.devices) ? page.devices : [];
+    const profiles = Array.isArray(page.parental_profiles) ? page.parental_profiles : [];
+    const eligibleDevices = devices.filter(item =>
+      item.link_status === "linked" &&
+      Array.isArray(item.capabilities) &&
+      item.capabilities.includes("parental_policy")
+    );
+
+    const metric = (label, value, note, tone = "neutral") =>
+      '<div class="nexus-action-metric tone-' + tone + '"><span>' + escapeHtml(label) +
+      '</span><strong>' + Number(value || 0) + '</strong><small>' + escapeHtml(note) + '</small></div>';
+
+    body.innerHTML =
+      '<div class="nexus-action-metrics nexus-home-metrics">' +
+        metric("Online", counts.online, "authenticated heartbeat", counts.online ? "success" : "neutral") +
+        metric("Linked", counts.linked, "explicit identity binding") +
+        metric("Offline / unseen", counts.offline_or_unseen, "по TTL evidence", counts.offline_or_unseen ? "warning" : "neutral") +
+        metric("Parental attention", counts.parental_attention, "не выдаём правила за applied", counts.parental_attention ? "warning" : "neutral") +
+      '</div>' +
+      '<section class="nexus-home-policy"><strong>Контракт Home</strong>' +
+        '<span>Heartbeat TTL: ' + Number(page.policy?.heartbeat_ttl_seconds || 0) + ' сек.</span>' +
+        '<span>Network scanning: отключён</span><span>Device commands: отключены</span></section>' +
+      '<section class="nexus-home-section"><header><div><strong>Устройства</strong>' +
+        '<small>Inventory отделён от runtime evidence.</small></div><span>' + devices.length + '</span></header>' +
+        '<div class="nexus-home-device-list">' +
+          (devices.length ? devices.map(nexusHomeDeviceMarkup).join("") :
+            '<div class="knowledge-empty"><strong>Устройств нет</strong><span>Добавьте устройство через существующий Home inventory API/раздел.</span></div>') +
+        '</div></section>' +
+      '<section class="nexus-home-section"><header><div><strong>Parental bindings</strong>' +
+        '<small>Binding не означает OS-level enforcement.</small></div><span>' + profiles.length + '</span></header>' +
+        '<div class="nexus-home-parental-list">' +
+          (profiles.length ? profiles.map(item => nexusHomeParentalMarkup(item, eligibleDevices)).join("") :
+            '<div class="knowledge-empty"><strong>Профилей нет</strong><span>Существующий parental-control CRUD сохранён.</span></div>') +
+        '</div></section>';
+
+    body.querySelectorAll("[data-home-link]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          const deviceId = Number(button.dataset.homeLink);
+          const result = await api(
+            "/api/projects/" + state.projectId + "/nexus/home/devices/" + deviceId + "/link",
+            {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({capabilities: []})
+            }
+          );
+          const device = devices.find(item => Number(item.id) === deviceId);
+          await load();
+          showNexusHomeCredential(device?.name || ("Device #" + deviceId), result.credential);
+          await loadNexus();
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+
+    body.querySelectorAll("[data-home-unlink]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/nexus/home/devices/" +
+              button.dataset.homeUnlink + "/unlink",
+            {method: "POST"}
+          );
+          await Promise.all([load(), loadNexus()]);
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+
+    body.querySelectorAll("[data-home-bind-profile]").forEach(button => {
+      button.onclick = async () => {
+        const profileId = Number(button.dataset.homeBindProfile);
+        const select = body.querySelector('[data-home-profile-device="' + profileId + '"]');
+        const deviceId = Number(select?.value || 0);
+        if (!deviceId) return;
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/nexus/home/parental/" + profileId + "/bind",
+            {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({device_id: deviceId})
+            }
+          );
+          await Promise.all([load(), loadNexus()]);
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+  };
+
+  el("nexusHomeRefresh").onclick = async () => {
+    try {
+      await Promise.all([load(), loadNexus()]);
+    } catch (error) {
+      showError(error.message);
+    }
+  };
+
+  try {
+    await load();
+  } catch (error) {
+    el("nexusHomeBody").innerHTML = workspaceResult(error.message, "error");
+  }
+}
+
 function nexusKnowledgePercent(value) {
   const numeric = Number(value || 0);
   return Math.max(0, Math.min(100, Math.round(numeric * 100)));
@@ -1673,5 +1942,5 @@ async function renderUpdateWorkspace(refresh = false) {
 if (nexusNavChat) nexusNavChat.onclick = showChatWorkspace;
 if (nexusNavActions) nexusNavActions.onclick = renderNexusActionsWorkspace;
 if (nexusNavKnowledge) nexusNavKnowledge.onclick = renderNexusKnowledgeWorkspace;
-if (nexusNavHome) nexusNavHome.onclick = () => renderProjectsWorkspace("home");
+if (nexusNavHome) nexusNavHome.onclick = renderNexusHomeWorkspace;
 if (nexusNavSystem) nexusNavSystem.onclick = () => renderSettingsWorkspace();
