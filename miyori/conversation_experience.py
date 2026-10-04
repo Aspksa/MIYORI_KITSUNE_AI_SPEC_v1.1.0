@@ -856,8 +856,9 @@ def due_schedules(project_id: int, limit: int = 20) -> list[dict]:
             """
             SELECT id,conversation_id,text,scheduled_for,repeat_mode,auto_send,status
             FROM chat_scheduled_messages
-            WHERE project_id=? AND status='scheduled' AND scheduled_for<=?
-            ORDER BY scheduled_for,id LIMIT ?
+            WHERE project_id=? AND status='scheduled'
+              AND julianday(scheduled_for)<=julianday(?)
+            ORDER BY julianday(scheduled_for),id LIMIT ?
             """,
             (project_id, now, max(1, min(50, limit))),
         ).fetchall()
