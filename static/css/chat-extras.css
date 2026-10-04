@@ -205,3 +205,18 @@
 @media(prefers-reduced-motion:reduce){
   .suggestion-chip,.message-tools button {transition:none!important}
 }
+
+.saved-answers-button{
+  cursor:pointer;background:transparent;border:0;
+  color:var(--ui-accent);font-size:11px;padding:5px 7px;
+  border-radius:7px;
+}
+.saved-answers-button:hover{background:var(--ui-accent-soft)}
+.saved-answer-row{
+  display:block;width:100%;margin:6px 0;padding:11px;
+  border:1px solid var(--ui-border);border-radius:9px;
+  background:var(--ui-surface-soft);color:var(--ui-text-2);
+  text-align:left;cursor:pointer;font-size:12px;line-height:1.5;
+  overflow-wrap:anywhere
+}
+.saved-answer-row:hover{border-color:var(--ui-accent)}
