@@ -5,3 +5,17 @@
 .chat-answer-insight-body {display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 16px;padding:7px 0 11px}
 .chat-answer-insight-body p {margin:0!important;font-size:11px!important;line-height:1.55!important;color:var(--ui-text-2)!important}
 .chat-answer-insight-body strong {font-size:11px!important;color:var(--ui-text)!important}
+
+.chat-compare-button {
+  display:block;margin:12px 0 6px;padding:9px 12px;
+  background:var(--ui-surface-soft);border:1px solid var(--ui-border);
+  border-radius:10px;color:var(--ui-accent);
+  cursor:pointer;font:600 12px/1.45 inherit;
+}
+.chat-compare-button:disabled{opacity:.6;cursor:wait}
+.chat-compare-results details {
+  margin:8px 0;padding:9px;
+  border:1px solid var(--ui-border);border-radius:9px;
+}
+.chat-compare-results summary {cursor:pointer;font-size:12px}
+.chat-compare-results p{margin:7px 0;color:var(--ui-text-2);font-size:12px;line-height:1.5}
