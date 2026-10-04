@@ -19,7 +19,9 @@ assert.ok(
 assert.ok(
   workspace.includes("Исследователь + Ревьюер рисков параллельно") &&
     workspace.includes("dependency graph") &&
-    workspace.includes("step_budget"),
+    workspace.includes("step_budget") &&
+    workspace.includes("read-only") &&
+    workspace.includes("write через разрешение"),
   "Agent Workspace must expose delegation, dependencies and budgets",
 );
 assert.ok(
@@ -35,7 +37,9 @@ assert.ok(
 );
 assert.ok(
   contracts.includes("NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION") &&
-    contracts.includes("NexusAgentWorkspaceNodeStatus"),
+    contracts.includes("NexusAgentWorkspaceNodeStatus") &&
+    contracts.includes('capability: "read_only" | "standard"') &&
+    contracts.includes("NexusAgentWorkspaceSummary"),
   "Agent Workspace typed contract is missing",
 );
 assert.ok(
