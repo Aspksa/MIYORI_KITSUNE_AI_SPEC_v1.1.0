@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.55"
+PROJECT_VERSION = "00.00.56"
 
 MODULES = {
     "miyori_ai": {
@@ -29,15 +29,15 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "status": "active",
-        "description": "NEXUS Digital Body 1.1 с owner-global Appearance Profile, статическим portrait adapter и реальными Presence/Voice runtime states.",
+        "description": "NEXUS Digital Body 1.2 с trusted renderer registry: neutral/static adapters, Appearance Profile и реальные Presence/Voice state channels.",
     },
     "digital_body": {
         "name": "Digital Body Miyori",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "status": "active",
-        "description": "Body-state runtime + explicit owner appearance choices; статический портрет не выдаётся за dynamic pose/expression rig.",
+        "description": "Body-state runtime через закрытый renderer registry; unknown/untrusted adapters fail closed в neutral shell.",
     },
     "appearance_profile": {
         "name": "Miyori Appearance Profile",
@@ -156,6 +156,33 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.56",
+        "title": "NEXUS Trusted Body Renderer Registry",
+        "summary": "N12.2 отделяет body-state contract от конкретного renderer: frontend использует закрытый registry установленных адаптеров, unknown renderer падает в neutral shell, а dynamic extension остаётся not_installed до появления реальной доверенной реализации.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "1.4.0",
+                "changes": [
+                    "Digital Body contract обновлён до 1.2 и содержит renderer contract.",
+                    "Renderer selection больше не зашит напрямую в body.ts.",
+                    "Presentation channels pose/expression/gesture остаются стабильным интерфейсом для будущего dynamic rig."
+                ],
+            },
+            {
+                "key": "digital_body",
+                "version": "1.2.0",
+                "changes": [
+                    "Добавлен trusted registry: neutral_shell и static_portrait.",
+                    "Unknown asset/adapter fail-closed возвращается к neutral_shell.",
+                    "Static portrait остаётся non-dynamic и не потребляет pose/expression/gesture как визуальную анимацию.",
+                    "Dynamic extension объявлен not_installed и не может исполнять asset-authored JavaScript.",
+                    "Модель не может выбирать renderer или переопределять operational state."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.55",
         "title": "NEXUS Appearance Profile · owner choices + static asset",

@@ -90,6 +90,9 @@ jobs:
       - name: NEXUS Appearance Profile contract
         run: npm run test:nexus-appearance
 
+      - name: NEXUS Body Renderer Registry contract
+        run: npm run test:nexus-body-renderer
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

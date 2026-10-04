@@ -4,6 +4,7 @@ import {
   updateMiyoriAppearance,
   uploadMiyoriPortrait,
 } from "./client.js";
+import { renderTrustedBodyVisual } from "./body_renderer.js";
 import type {
   MiyoriAppearanceSelection,
   NexusBodyLocalState,
@@ -66,52 +67,6 @@ function appendTextList(
   }
   group.appendChild(list);
   host.appendChild(group);
-}
-
-function buildPortrait(
-  body: NexusDigitalBody,
-  presentation: NexusBodyPresentation,
-  effectiveState: string,
-): HTMLElement {
-  const portrait = document.createElement("div");
-  portrait.className = "nexus-body-portrait";
-  portrait.dataset.pose = presentation.pose;
-  portrait.dataset.expression = presentation.expression;
-  portrait.dataset.gesture = presentation.gesture;
-  portrait.dataset.state = effectiveState;
-  portrait.setAttribute("aria-hidden", "true");
-
-  const asset = body.appearance.asset;
-  if (asset.kind === "static_portrait" && asset.url) {
-    portrait.classList.add("has-static-asset");
-    const image = document.createElement("img");
-    image.className = "nexus-body-static-portrait";
-    image.src = asset.url;
-    image.alt = "";
-    image.decoding = "async";
-    portrait.appendChild(image);
-  } else {
-    const leftEar = document.createElement("span");
-    leftEar.className = "nexus-body-ear left";
-    const rightEar = document.createElement("span");
-    rightEar.className = "nexus-body-ear right";
-
-    const face = document.createElement("span");
-    face.className = "nexus-body-face";
-    const leftEye = document.createElement("span");
-    leftEye.className = "nexus-body-eye left";
-    const rightEye = document.createElement("span");
-    rightEye.className = "nexus-body-eye right";
-    const mouth = document.createElement("span");
-    mouth.className = "nexus-body-mouth";
-    face.append(leftEye, rightEye, mouth);
-    portrait.append(leftEar, rightEar, face);
-  }
-
-  const stateMark = document.createElement("span");
-  stateMark.className = "nexus-body-state-mark";
-  portrait.appendChild(stateMark);
-  return portrait;
 }
 
 function appearanceStateText(body: NexusDigitalBody): string {
@@ -332,7 +287,7 @@ function renderBody(
 
   const shell = document.createElement("div");
   shell.className = "nexus-body-shell";
-  shell.appendChild(buildPortrait(body, presentation, effectiveState));
+  shell.appendChild(renderTrustedBodyVisual(body, presentation, effectiveState));
 
   const copy = document.createElement("div");
   copy.className = "nexus-body-copy";

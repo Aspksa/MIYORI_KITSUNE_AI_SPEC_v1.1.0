@@ -2,8 +2,27 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.55.**  
+**Внутренняя версия приложения: 00.00.56.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.56
+
+`00.00.56` — **NEXUS Trusted Body Renderer Registry**.
+
+N12.2 создаёт безопасную границу между Digital Body state и конкретной технологией отображения:
+
+- Digital Body contract обновлён до 1.2 и содержит versioned renderer contract;
+- renderer выбирается только из закрытого trusted registry;
+- сейчас реально установлены два адаптера: `neutral_shell` и `static_portrait`;
+- неизвестный/неподдерживаемый adapter всегда fail-closed возвращается к `neutral_shell`;
+- `body.ts` больше не решает сам, какой renderer доверенный — визуальный выбор вынесен в отдельный registry renderer;
+- `pose / expression / gesture` остаются стабильными presentation channels для будущего настоящего rig;
+- static portrait явно остаётся non-dynamic;
+- произвольный renderer module, asset-authored JavaScript, `eval` и model-selected renderer запрещены;
+- dynamic extension честно имеет состояние `not_installed`;
+- dynamic renderer не может переопределять operational state или придумывать открытые параметры внешности.
+
+Итог: архитектура готова принять реальный Live2D/Rive/другой доверенный adapter позже, но система не делает вид, что такой renderer уже установлен.
 
 ## Состояние релиза 00.00.55
 

@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from .appearance import get_appearance_profile
+from .body_renderer import build_body_renderer_contract
 from .nexus_presence import build_nexus_presence
 from .persona import load_persona_corpus
 
 
-NEXUS_BODY_SCHEMA_VERSION = "1.1.0"
+NEXUS_BODY_SCHEMA_VERSION = "1.2.0"
 NEXUS_BODY_STATES = (
     "ready",
     "working",
@@ -161,6 +162,7 @@ def build_nexus_body(project_id: int) -> dict:
     state = _body_state_from_presence(presence)
     presentation = dict(_BODY_PRESENTATION[state])
     appearance = _persona_appearance()
+    renderer = build_body_renderer_contract(appearance)
 
     return {
         "schema_version": NEXUS_BODY_SCHEMA_VERSION,
@@ -168,6 +170,7 @@ def build_nexus_body(project_id: int) -> dict:
         "state": state,
         "presentation": presentation,
         "appearance": appearance,
+        "renderer": renderer,
         "runtime": {
             "presence_mode": presence.get("mode"),
             "presence_attention": presence.get("attention"),
