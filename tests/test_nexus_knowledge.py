@@ -176,6 +176,12 @@ class NexusKnowledgeContractTests(unittest.TestCase):
         statements = {item["statement"] for item in center["memory"]}
         self.assertIn("Global preferred report format is PDF.", statements)
         self.assertNotIn("Other project internal code is OMEGA.", statements)
+        global_item = next(
+            item
+            for item in center["memory"]
+            if item["statement"] == "Global preferred report format is PDF."
+        )
+        self.assertEqual(global_item["actions"]["project_id"], int(other["id"]))
 
     def test_query_returns_grouped_results_without_blending_types(self) -> None:
         add_memory_fact(
