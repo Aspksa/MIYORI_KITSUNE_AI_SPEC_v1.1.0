@@ -29,15 +29,15 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "status": "active",
-        "description": "NEXUS Digital Body 1.2 с trusted renderer registry: neutral/static adapters, Appearance Profile и реальные Presence/Voice state channels.",
+        "description": "NEXUS Digital Body 1.3: trusted_vector_rig, Appearance Profile и реальные Presence/Voice state channels без выдуманной активности.",
     },
     "digital_body": {
         "name": "Digital Body Miyori",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "status": "active",
-        "description": "Body-state runtime через закрытый renderer registry; unknown/untrusted adapters fail closed в neutral shell.",
+        "description": "Body-state runtime через закрытый renderer registry; trusted_vector_rig двигается только по pose/expression/gesture/state, unknown adapters fail closed.",
     },
     "appearance_profile": {
         "name": "Miyori Appearance Profile",
@@ -143,7 +143,7 @@ MODULES = {
     },
     "launcher": {
         "name": "Portable Launcher",
-        "version": "1.0.0",
+        "version": "1.1.1",
         "status": "active",
         "description": "Надёжный Windows/ZIP запуск: Python preflight, Uvicorn entrypoint, readiness/browser, startup log и CI-проверка portable-архива.",
     },
