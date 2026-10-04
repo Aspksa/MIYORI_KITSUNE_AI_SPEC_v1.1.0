@@ -1395,9 +1395,11 @@ async def send_message(request: ChatRequest) -> dict:
 async def send_message_stream(request: ChatRequest):
     """NDJSON: real Cloud.ru deltas followed by one persisted final response."""
     queue = asyncio.Queue(maxsize=64)
+    partial_chunks: list[str] = []
 
     async def emit_delta(text: str) -> None:
         if text:
+            partial_chunks.append(text)
             await queue.put({"type": "delta", "text": text})
 
     async def produce() -> None:
@@ -1405,9 +1407,31 @@ async def send_message_stream(request: ChatRequest):
             response = await _process_chat_request(request, stream_sink=emit_delta)
             await queue.put({"type": "final", "response": response})
         except asyncio.CancelledError:
+            partial = "".join(partial_chunks).strip()
+            if partial and request.request_id:
+                user_message = get_message_by_client_request_id(
+                    request.project_id, request.request_id
+                )
+                partial_key = f"assistant:partial:{request.request_id}"
+                already_saved = get_message_by_client_request_id(
+                    request.project_id, partial_key
+                )
+                if user_message and not already_saved:
+                    add_message(
+                        int(user_message["conversation_id"]),
+                        "assistant",
+                        partial,
+                        metadata={
+                            "partial": True,
+                            "stopped_by_user": True,
+                            "request_id": request.request_id,
+                            "semantic_fact_verification": False,
+                        },
+                        client_request_id=partial_key,
+                    )
             set_chat_progress(
                 request.project_id, request.request_id, "cancelled",
-                "Генерация остановлена пользователем.",
+                "Генерация остановлена пользователем; полученная часть сохранена отдельно.",
             )
             raise
         except HTTPException as exc:
