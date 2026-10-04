@@ -204,8 +204,8 @@ function addMessage(role, text, sources = [], options = {}) {
   bubble.appendChild(controls);
   article.append(avatar, bubble);
   messages.appendChild(article);
-  messages.scrollTop = messages.scrollHeight;
-  if (role === "assistant") {
+  if (!options.suppressScroll) messages.scrollTop = messages.scrollHeight;
+  if (role === "assistant" && !options.suppressEvent) {
     window.dispatchEvent(
       new CustomEvent("miyori:assistant-message", {
         detail: {text: String(text || "")}
@@ -229,6 +229,25 @@ function showWelcome() {
   const suggestions = document.createElement("div");
   suggestions.id = "nexusSuggestions";
   suggestions.hidden = true;
+  const examples = [
+    ["Изучить документ", "Изучи прикреплённый документ и выдели главное."],
+    ["Проверить ошибки", "Проверь недавние материалы проекта на ошибки и противоречия."],
+    ["Мои задачи", "Покажи текущие задачи, ожидающие моего решения."],
+    ["Продолжить работу", "Помоги продолжить последнюю задачу с подтверждённого состояния."]
+  ];
+  for (const [label, prompt] of examples) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = label;
+    chip.onclick = () => {
+      input.value = prompt;
+      input.dispatchEvent(new Event("input", {bubbles:true}));
+      input.focus();
+    };
+    suggestions.appendChild(chip);
+  }
+  suggestions.hidden = false;
   bubble.append(title, subtitle, suggestions);
   article.appendChild(bubble);
   messages.appendChild(article);
@@ -245,9 +264,10 @@ async function loadNexus() {
 
   try {
     const data = await api("/api/projects/" + state.projectId + "/nexus");
-    suggestions.innerHTML = "";
-
-    for (const suggestion of data.suggestions) {
+    // Keep the four owner's quick prompts; server hints are additional,
+    // scoped suggestions and never replace the user's choices.
+    if (data.suggestions && data.suggestions.length) {
+      for (const suggestion of data.suggestions.slice(0, 2)) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "quiet-suggestion";
@@ -269,6 +289,7 @@ async function loadNexus() {
         input.focus();
       };
       suggestions.appendChild(button);
+      }
     }
 
     const c = data.counts;
