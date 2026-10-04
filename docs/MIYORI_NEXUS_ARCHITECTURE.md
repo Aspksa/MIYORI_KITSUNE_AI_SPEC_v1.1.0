@@ -70,6 +70,8 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **00.00.60 — Conversation Redesign.** ChatGPT-подобные принципы ввода без копирования продукта: многострочный composer, доступная история, безопасный Markdown (локальные Marked + DOMPurify), Digital Body как компактное состояние в заголовке; Appearance Profile и Settings доступны из Дополнительно. Действия получили пользовательские формулировки, source-of-truth, permissions и runtime состояния не менялись. Portable launcher одновременно исправлен для Uvicorn `_Tee.isatty` compatibility.
 - **N6 Desktop Runtime остаётся отложен.** После накопительного Chat Evolution `00.00.77` это главный крупный незавершённый shell-этап; Desktop должен подключаться к тем же API, request-progress, permission/recovery и NEXUS contracts без переноса бизнес-логики в клиент.
 
+- **00.00.77 — Chat Evolution завершён.** Evidence-based proactive attention, восстановление позиции чата, persistent request stages, handoff в существующий Agent Workspace, measured quality, Voice barge-in и reduced-motion-safe delivery animation.
+
 ## Поэтапный план
 
 ### N0 — NEXUS Foundation
