@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.56"
+PROJECT_VERSION = "00.00.57"
 
 MODULES = {
     "miyori_ai": {
@@ -156,6 +156,39 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.57",
+        "title": "NEXUS Real Dynamic Renderer Integration",
+        "summary": "N12.3 installs a real trusted vector rig and fixes Windows portable startup compatibility with Uvicorn logging. Motion is driven only by authoritative presentation channels; owner appearance choices remain untouched.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "1.5.0",
+                "changes": [
+                    "Digital Body contract upgraded to 1.3 and renderer contract to 1.1.",
+                    "trusted_vector_rig is installed in the closed registry and selected when no static portrait asset is present.",
+                    "Dynamic motion consumes only pose/expression/gesture/state and respects prefers-reduced-motion."
+                ],
+            },
+            {
+                "key": "digital_body",
+                "version": "1.3.0",
+                "changes": [
+                    "Added deterministic DOM/CSS vector rig with state-driven pose, expression and gesture motion.",
+                    "Unknown asset kinds still fail closed to neutral_shell.",
+                    "No asset-authored JavaScript, model-selected renderer, random liveness or owner-appearance invention is allowed."
+                ],
+            },
+            {
+                "key": "launcher",
+                "version": "1.1.1",
+                "changes": [
+                    "The _Tee startup stream now implements isatty/encoding/errors required by current Uvicorn logging.",
+                    "Fixes Windows startup crash: AttributeError: _Tee object has no attribute isatty."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.56",
         "title": "NEXUS Trusted Body Renderer Registry",
