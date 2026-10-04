@@ -281,6 +281,7 @@ function startNewChat() {
   agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
   agentBudget.textContent = "0/5";
   Promise.all([loadConversations(), loadTools(), loadNexus()]);
+  void window.miyoriChatContinuation?.refresh();
   input.focus();
 }
 
@@ -448,6 +449,7 @@ projectSelect.addEventListener("change", async () => {
     loadConversations(), loadMemory(), loadDocuments(),
     loadTools(), loadPermissions(), loadAudit(), loadTasks(), loadDevelopment(), loadNexus()
   ]);
+  void window.miyoriChatContinuation?.refresh();
 });
 
 el("addProject").addEventListener("click", async () => {
