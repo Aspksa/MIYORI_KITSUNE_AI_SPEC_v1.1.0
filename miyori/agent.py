@@ -24,6 +24,7 @@ from .db import (
 )
 from .planner import (
     MAX_AGENT_STEPS,
+    PlannerDecision,
     fallback_decision,
     parse_planner_payload,
     planner_prompt,
@@ -188,7 +189,17 @@ async def _continue_workflow(workflow: dict) -> AgentResult:
         for step in steps
         if step.get("kind") == "tool" and step.get("tool_name")
     }
-    tool_catalog = list_tools()
+    tool_permissions = workflow.get("route", {}).get("_tool_permissions")
+    allowed_permissions = (
+        {str(value) for value in tool_permissions}
+        if isinstance(tool_permissions, list) and tool_permissions
+        else None
+    )
+    tool_catalog = [
+        item
+        for item in list_tools()
+        if allowed_permissions is None or str(item.get("permission")) in allowed_permissions
+    ]
     allowed_tools = {item["name"] for item in tool_catalog}
     planner_mode = str(workflow.get("planner_mode") or "model")
     planner_available = planner_mode != "fallback"
@@ -250,6 +261,12 @@ async def _continue_workflow(workflow: dict) -> AgentResult:
                 decision = fallback_decision(message, route, planner_history)
         else:
             decision = fallback_decision(message, route, planner_history)
+
+        if decision.action == "tool" and (decision.tool_name or "") not in allowed_tools:
+            decision = PlannerDecision(
+                action="finish",
+                reason="Capability boundary не разрешает выбранный инструмент в этом workflow.",
+            )
 
         if decision.action == "finish":
             step = create_workflow_step(
@@ -542,6 +559,7 @@ async def run_agent(
     *,
     request_key: str,
     max_steps: int | None = None,
+    tool_permissions: tuple[str, ...] | None = None,
 ) -> AgentResult:
     existing = get_agent_workflow_by_request_key(project_id, request_key)
     if existing:
@@ -554,13 +572,21 @@ async def run_agent(
         message,
         step_budget,
     )
+    route_payload = route.to_dict()
+    if tool_permissions:
+        normalized_permissions = sorted({str(value) for value in tool_permissions})
+        invalid_permissions = set(normalized_permissions) - {"read", "write"}
+        if invalid_permissions:
+            raise ValueError("Недопустимое ограничение tool permissions.")
+        route_payload["_tool_permissions"] = normalized_permissions
+
     workflow = create_agent_workflow(
         project_id=project_id,
         conversation_id=conversation_id,
         agent_run_id=run_id,
         request_key=request_key,
         goal=message,
-        route=route.to_dict(),
+        route=route_payload,
         conversation_context=conversation_context or [],
         max_steps=step_budget,
     )
