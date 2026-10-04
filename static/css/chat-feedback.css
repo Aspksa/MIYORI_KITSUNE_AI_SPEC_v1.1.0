@@ -1,0 +1,36 @@
+/* 00.00.69 — one inline correction editor, opened only by the user. */
+.chat-correction-editor[hidden]{display:none!important}
+.chat-correction-editor{
+  margin:10px 0 5px;
+  padding:12px;
+  border:1px solid var(--ui-border);
+  border-radius:13px;
+  background:var(--ui-surface-soft);
+  display:flex;flex-direction:column;gap:10px;
+}
+.chat-correction-editor label{
+  color:var(--ui-text-2);font-size:12px;font-weight:650;
+}
+.chat-correction-editor textarea{
+  display:block;width:100%;
+  min-height:82px;max-height:180px;
+  resize:vertical;
+  padding:10px 12px;
+  border:1px solid var(--ui-border-strong);
+  background:var(--ui-surface);
+  color:var(--ui-text);
+  border-radius:10px;font-family:inherit;font-size:13px;line-height:1.55;
+}
+.chat-correction-actions{
+  display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;
+}
+.chat-correction-actions button{
+  padding:9px 13px;border:1px solid var(--ui-border);
+  border-radius:10px;background:var(--ui-surface);
+  color:var(--ui-text);font-family:inherit;font-size:12px;font-weight:600;line-height:1.4;
+}
+.chat-correction-actions button[type="submit"]{
+  background:var(--ui-accent);color:#fff;border-color:var(--ui-accent);
+}
+.chat-correction-actions button:disabled{opacity:.6;cursor:wait}
+.chat-correction-note{margin:8px 0 0;color:var(--ui-muted);font-size:12px}
