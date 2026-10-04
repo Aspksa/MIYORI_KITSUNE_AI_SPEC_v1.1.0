@@ -2,8 +2,32 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.49.**  
+**Внутренняя версия приложения: 00.00.50.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.50
+
+`00.00.50` — **NEXUS Proactive Miyori · инициативность с attention budget**.
+
+N10 добавляет инициативность как отдельный безопасный attention layer, а не как поток непрошеных сообщений:
+
+- новый `/api/projects/{id}/nexus/proactive` вычисляет сигналы из реального Actions/Knowledge state;
+- сигнал получает стабильный ID из project + source fingerprint;
+- persistence хранит только пользовательское решение `dismissed/snoozed`, а не копию workflow/knowledge;
+- dismiss и snooze переживают перезапуск;
+- snooze ограничен сервером диапазоном 15 минут – 7 дней;
+- новая реальная проблема получает новый signal ID и не скрывается старым dismiss;
+- attention budget зависит от `initiative_level`: low = 1, medium = 2, high = 3 видимых сигнала;
+- low-priority knowledge suggestion допускается только в пределах отдельного low-budget;
+- `suggest_next_steps=false` отключает необязательные Knowledge suggestions, но не скрывает ожидающие решения/recovery/errors;
+- каждый signal contract жёстко задаёт `auto_execute_allowed=false`, `write_tools_allowed=false`, `chat_interruption_allowed=false`, `creates_chat_message=false`;
+- UI — закрытый по умолчанию «Миёри заметила», расположенный вне message stream;
+- доступны только явные действия пользователя: открыть нужный раздел, «Позже» или «Скрыть»;
+- proactive inbox подавляет дублирующий Generative UI shelf, чтобы одна причина не отображалась дважды;
+- refresh использует реальный NEXUS event identity, а не таймеры/random;
+- proactive disposition записывается в audit trail.
+
+Таким образом Miyori может быть инициативной, но не назойливой: она замечает важное, ограничивает собственное внимание и никогда не превращает инициативу в автоматическое write-действие.
 
 ## Состояние релиза 00.00.49
 
