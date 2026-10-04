@@ -18,10 +18,10 @@ assert.ok(
 );
 assert.ok(
   workspace.includes("два read-only агента параллельно") &&
-    workspace.includes("dependency graph") &&
+    workspace.includes("Зависимости, бюджеты шагов") &&
     workspace.includes("step_budget") &&
     workspace.includes("read-only") &&
-    workspace.includes("write через разрешение"),
+    workspace.includes("запись требует разрешения"),
   "Agent Workspace must expose delegation, dependencies and budgets",
 );
 assert.ok(
