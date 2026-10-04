@@ -113,3 +113,16 @@ html[data-theme="dark"] .system-overview {
   .system-overview {padding:10px}
   .system-overview-metrics > div{padding:10px}
 }
+
+/* Historical chat citations reuse the existing sources row, never an extra panel. */
+.message-source-chip.message-history-source {
+  cursor:pointer;
+  font:inherit;
+  text-align:left;
+}
+.message-source-chip.message-history-source:hover,
+.message-source-chip.message-history-source:focus-visible {
+  outline:2px solid var(--ui-accent);
+  outline-offset:2px;
+  background:var(--ui-accent-soft);
+}
