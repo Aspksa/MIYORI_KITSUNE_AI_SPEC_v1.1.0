@@ -175,6 +175,7 @@ from miyori.nexus import build_nexus_snapshot
 from miyori.nexus_actions import build_nexus_action_center
 from miyori.nexus_knowledge import build_nexus_knowledge_center
 from miyori.nexus_surfaces import build_nexus_surfaces
+from miyori.nexus_presence import build_nexus_presence
 from miyori.nexus_events import list_nexus_events
 from miyori.system_settings import (
     cleanup_runtime_logs,
@@ -1637,6 +1638,14 @@ def project_nexus_surfaces(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/nexus/presence")
+def project_nexus_presence(project_id: int) -> dict:
+    try:
+        return build_nexus_presence(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/nexus/events")
