@@ -2383,6 +2383,7 @@
   font-size: 7px;
 }
 .nexus-body-canon {
+  position: relative;
   max-width: 250px;
   color: #766b7e;
   font-size: 7px;
@@ -2401,7 +2402,7 @@
 .nexus-body-canon-body {
   position: absolute;
   z-index: 8;
-  right: 24px;
+  right: 0;
   width: min(360px, calc(100vw - 48px));
   margin-top: 5px;
   padding: 10px;
@@ -2441,6 +2442,6 @@
     max-width: none;
   }
   .nexus-body-canon-body {
-    right: 8px;
+    right: 0;
   }
 }
