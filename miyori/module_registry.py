@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.42"
+PROJECT_VERSION = "00.00.43"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.5.0",
+        "version": "2.6.0",
         "status": "active",
-        "description": "AI Core v2.5: NEXUS state contract поверх persistent workflows, Document Intelligence, проверяемой памяти и безопасных инструментов.",
+        "description": "AI Core v2.6: NEXUS state + event fabric поверх persistent workflows, Document Intelligence, проверяемой памяти и безопасных инструментов.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "status": "active",
-        "description": "Versioned state/UI contract: реальные состояния модулей, typed Generative UI boundary, TypeScript island и accessibility foundation.",
+        "description": "Versioned state/event fabric: реальные состояния, unified event envelope, cursor/resync store, typed UI boundary и accessibility foundation.",
     },
     "settings": {
         "name": "Настройки",
@@ -138,6 +138,34 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.43",
+        "title": "NEXUS State & Event Fabric · единый нервный контур",
+        "summary": "NEXUS получил versioned read-only event fabric поверх существующих audit/workflow/task журналов и типизированный клиентский store с cursor/resync. Источники данных не переписываются: event stream сообщает об изменениях, а authoritative state по-прежнему берётся из NEXUS snapshot.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.2.0",
+                "changes": [
+                    "Добавлен /api/projects/{project_id}/nexus/events с единым envelope для audit_events, workflow_events и task_events.",
+                    "Cursor использует created_at + source rank + source id и не теряет события с одинаковым временем.",
+                    "tail=true даёт быстрый initial hydrate без перечитывания всей истории.",
+                    "Каждое событие помечено requires_resync: UI не вычисляет authoritative state из event stream.",
+                    "Добавлен NexusStore: hydrate, incremental sync, deduplication, bounded history и snapshot resync после новых событий.",
+                    "Новый store не подключён к legacy UI автоматически: визуальная миграция откладывается до NEXUS Shell."
+                ],
+            },
+            {
+                "key": "miyori_ai",
+                "version": "2.6.0",
+                "changes": [
+                    "Существующие task/workflow/audit журналы объединяются read-only адаптером без миграции или дублирования данных.",
+                    "Project isolation применяется к event stream на уровне SQL joins.",
+                    "Frontend CI дополнен исполняемым контрактным тестом NEXUS state store."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.42",
         "title": "NEXUS Foundation · контракты состояния и безопасная эволюция UI",

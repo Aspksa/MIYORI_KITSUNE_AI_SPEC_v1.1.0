@@ -172,6 +172,7 @@ from miyori.tools import (
 from miyori.account import cloudru_profile, list_cloudru_models, save_cloudru_profile, test_cloudru
 from miyori.module_registry import module_manifest, release_history
 from miyori.nexus import build_nexus_snapshot
+from miyori.nexus_events import list_nexus_events
 from miyori.system_settings import (
     cleanup_runtime_logs,
     load_system_settings,
@@ -249,7 +250,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.42", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.43", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -451,7 +452,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.42",
+        "version": "00.00.43",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -693,7 +694,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.42",
+        "project_version": "00.00.43",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1591,6 +1592,26 @@ def project_nexus(project_id: int) -> dict:
         return build_nexus_snapshot(project_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/nexus/events")
+def project_nexus_events(
+    project_id: int,
+    after: str | None = None,
+    limit: int = 100,
+    tail: bool = False,
+) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        return list_nexus_events(
+            project_id,
+            after=after,
+            limit=limit,
+            tail=tail,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/epistemic")

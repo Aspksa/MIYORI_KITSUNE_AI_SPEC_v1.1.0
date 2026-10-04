@@ -2,8 +2,26 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.42.**  
+**Внутренняя версия приложения: 00.00.43.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.43
+
+`00.00.43` — **NEXUS State & Event Fabric · единый нервный контур**.
+
+NEXUS теперь умеет наблюдать изменения в существующей системе без создания второй базы событий и без переписывания Workflow Engine.
+
+- `GET /api/projects/{project_id}/nexus/events` объединяет существующие `audit_events`, `workflow_events` и `task_events` в единый versioned envelope;
+- события остаются read-only представлением уже существующих журналов;
+- project isolation сохраняется на уровне SQL joins;
+- cursor устойчив к одинаковым timestamp: учитываются время, источник и исходный id;
+- `tail=true` используется для быстрого initial hydrate;
+- event stream не считается authoritative state: каждое событие требует resync с обычным NEXUS snapshot;
+- TypeScript `NexusStore` реализует hydrate, incremental sync, deduplication, bounded history и snapshot resync;
+- store пока не управляет legacy UI автоматически — визуальная миграция будет отдельным этапом NEXUS Shell;
+- frontend CI теперь исполняет отдельный state-store contract test.
+
+Это фундамент для будущих Desktop, Voice, Agents, Home и Generative UI: все клиенты смогут получать одинаковое состояние и одинаковые системные события, не изобретая собственную модель истины.
 
 ## Состояние релиза 00.00.42
 
@@ -198,6 +216,7 @@ data/
 - `miyori/brain.py` — публичный операционный план;
 - `miyori/context_router.py` — маршрутизация памяти, документов, знаний и tools;
 - `miyori/nexus.py` — versioned NEXUS snapshot и единые operational states для UI/будущих клиентов;
+- `miyori/nexus_events.py` — read-only unified event envelope поверх audit/workflow/task journals;
 - `miyori/document_intelligence.py` — document graph, outline, coverage, глубокий поиск и hierarchical map→reduce;
 - `miyori/document_questions.py` — exhaustive Q&A по всему документу, evidence, scan/source/overall coverage и fingerprint recovery;
 - `miyori/planner.py` — Planner schema, fallback и безопасная валидация решений;
@@ -240,7 +259,7 @@ CSS загружается в фиксированном cascade-порядке:
 
 С `00.00.42` рядом с legacy runtime существует отдельный NEXUS island:
 
-- `frontend/nexus/*.ts` — исходники TypeScript;
+- `frontend/nexus/*.ts` — TypeScript contracts, API client, accessibility runtime и state store;
 - `static/js/nexus/*.js` — собранные browser ES modules;
 - `static/css/nexus.css` — только функциональный accessibility/motion layer;
 - `tsconfig.nexus.json` — strict TypeScript contract;
@@ -304,6 +323,7 @@ GitHub Actions запускает полный `unittest`-контур на push
 - TypeScript `strict` typecheck;
 - сборку NEXUS ES modules;
 - accessibility contract;
+- исполняемый NEXUS state-store contract;
 - синтаксическую проверку classic JS и NEXUS modules;
 - `git diff --exit-code -- static/js/nexus`, чтобы committed build не расходился с TypeScript source.
 
@@ -343,6 +363,7 @@ Document Intelligence дополнительно проверяет:
 - `00.00.39` — Document Intelligence: structural document graph + hierarchical full-text analysis + coverage tracking + deep search + Drive UI + Agent/RAG integration;
 - `00.00.40` — Exhaustive Document Q&A: all-window verification + evidence/locators + question coverage + fingerprint recovery;
 - `00.00.41` — Extraction Integrity: source extraction coverage + Office/PDF completeness manifest + truthful exhaustive coverage;
-- `00.00.42` — NEXUS Foundation: versioned state contract + TypeScript island + typed Generative UI boundary + accessibility/frontend CI.
+- `00.00.42` — NEXUS Foundation: versioned state contract + TypeScript island + typed Generative UI boundary + accessibility/frontend CI;
+- `00.00.43` — NEXUS State & Event Fabric: unified read-only event envelope + cursor/tail + client store + authoritative snapshot resync.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

@@ -57,6 +57,9 @@ jobs:
       - name: Accessibility contract
         run: npm run check:nexus-a11y
 
+      - name: NEXUS state store contract
+        run: npm run test:nexus-state
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
