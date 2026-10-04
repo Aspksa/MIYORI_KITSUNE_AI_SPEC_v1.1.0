@@ -6,6 +6,7 @@ import {
   NEXUS_PROACTIVE_SCHEMA_VERSION,
   NEXUS_VOICE_SCHEMA_VERSION,
   NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION,
+  NEXUS_HOME_SCHEMA_VERSION,
   NEXUS_EVENT_SCHEMA_VERSION,
   NEXUS_SCHEMA_VERSION,
   isNexusActionState,
@@ -20,6 +21,7 @@ import {
   type NexusVoiceContract,
   type NexusAgentWorkspace,
   type NexusAgentWorkspaceSummary,
+  type NexusHomeCenter,
   type NexusEventPage,
   type NexusSnapshot,
 } from "./contracts.js";
