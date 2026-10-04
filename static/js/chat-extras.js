@@ -459,6 +459,15 @@
     searchResults.replaceChildren();
     if (!q || !state.conversationId) return;
     try {
+      const enhanced = window.miyoriConversationUX?.searchRequest?.(q);
+      if (enhanced) {
+        const data = await enhanced;
+        if (generation !== searchGeneration) return;
+        await window.miyoriConversationUX.renderUnifiedSearch(
+          data, searchResults, searchPanel
+        );
+        return;
+      }
       const data = await api(
         "/api/projects/" + state.projectId + "/conversations/" +
         state.conversationId + "/search?q=" + encodeURIComponent(q)
