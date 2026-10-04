@@ -244,8 +244,9 @@ export async function fetchNexusAgentWorkspaces(projectId) {
 export async function fetchNexusAgentWorkspace(projectId, workspaceId) {
     validateProjectId(projectId);
     const response = await fetch(`/api/projects/${projectId}/agent-workspaces/${workspaceId}`, { headers: { Accept: "application/json" } });
-    if (!response.ok)
+    if (!response.ok) {
         throw new Error(`Agent Workspace API: HTTP ${response.status}`);
+    }
     const payload = (await response.json());
     return validateAgentWorkspace(payload.workspace);
 }
