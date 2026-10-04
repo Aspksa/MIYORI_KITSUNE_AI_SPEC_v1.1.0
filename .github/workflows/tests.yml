@@ -120,6 +120,9 @@ jobs:
       - name: Fixed menu and System Status contract
         run: npm run test:menu-system
 
+      - name: Numeric answer self-check contract
+        run: npm run test:answer-check
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
