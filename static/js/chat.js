@@ -1,10 +1,27 @@
+let conversationLoadToken = 0;
+let conversationListController = null;
+let conversationOpenToken = 0;
+let conversationOpenController = null;
+
 async function loadConversations() {
   if (!state.projectId) return;
+  const token = ++conversationLoadToken;
+  conversationListController?.abort();
+  const controller = new AbortController();
+  conversationListController = controller;
   const search = el("conversationSearch")?.value?.trim() || "";
-  const data = await api(
-    "/api/projects/" + state.projectId + "/conversations" +
-    (search ? "?q=" + encodeURIComponent(search) : "")
-  );
+  let data;
+  try {
+    data = await api(
+      "/api/projects/" + state.projectId + "/conversations" +
+      (search ? "?q=" + encodeURIComponent(search) : ""),
+      {signal:controller.signal}
+    );
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    throw error;
+  }
+  if (controller.signal.aborted || token !== conversationLoadToken) return;
   conversationList.replaceChildren();
   if (!data.conversations?.length) {
     const empty = document.createElement("div");
@@ -87,12 +104,24 @@ function renderOlderControl() {
 
 async function openConversation(id, targetId = null) {
   if (!state.projectId) return;
-  window.miyoriDrafts?.save();
-  window.miyoriChatAttachments?.clear();
+  const token = ++conversationOpenToken;
+  conversationOpenController?.abort();
+  const controller = new AbortController();
+  conversationOpenController = controller;
   showError("");
   const url = "/api/projects/" + state.projectId + "/conversations/" + id +
     (targetId ? "?before_id=" + (Number(targetId) + 1) + "&limit=80" : "?limit=80");
-  const data = await api(url);
+  let data;
+  try {
+    data = await api(url, {signal:controller.signal});
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    showError(error.message);
+    return;
+  }
+  if (controller.signal.aborted || token !== conversationOpenToken) return;
+  window.miyoriDrafts?.save();
+  window.miyoriChatAttachments?.clear();
   state.conversationId = id;
   messages.replaceChildren();
   for (const item of data.messages) {
@@ -103,6 +132,7 @@ async function openConversation(id, targetId = null) {
   renderOlderControl();
   conversationTitle.textContent = "Миёри";
   await loadConversations();
+  if (token !== conversationOpenToken) return;
   window.miyoriDrafts?.restore();
   if (targetId) {
     const found = messages.querySelector('[data-message-id="' + Number(targetId) + '"]');
@@ -116,6 +146,7 @@ async function loadOlderMessages() {
   if (chatWindow.loading || !chatWindow.hasMore || !state.conversationId) return;
   chatWindow.loading = true;
   const before = chatWindow.beforeId;
+  const conversationAtStart = state.conversationId;
   const top = messages.scrollTop;
   const height = messages.scrollHeight;
   try {
@@ -123,6 +154,7 @@ async function loadOlderMessages() {
       "/api/projects/" + state.projectId + "/conversations/" +
       state.conversationId + "?before_id=" + before + "&limit=80"
     );
+    if (state.conversationId !== conversationAtStart) return;
     const existing = messages.querySelector(".message");
     for (const item of data.messages) {
       if (item.role !== "user" && item.role !== "assistant") continue;
