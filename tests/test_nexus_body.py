@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 from miyori.config import settings
 from miyori.db import create_project, init_db
+from miyori.document_intelligence import init_document_intelligence_db
+from miyori.epistemic import init_epistemic_db
 from miyori.nexus_body import (
     NEXUS_BODY_SCHEMA_VERSION,
     build_nexus_body,
@@ -23,6 +25,8 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
         object.__setattr__(settings, "database_path", root / "data" / "miyori.sqlite3")
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         init_db()
+        init_document_intelligence_db()
+        init_epistemic_db()
         self.project = create_project("Digital Body", kind="home")
         self.project_id = int(self.project["id"])
 
@@ -45,6 +49,12 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
             "attention": "none",
             "reasons": [],
         }
+
+    def test_real_body_build_stays_downstream_of_presence_without_recursion(self) -> None:
+        body = build_nexus_body(self.project_id)
+        self.assertEqual(body["schema_version"], NEXUS_BODY_SCHEMA_VERSION)
+        self.assertEqual(body["runtime"]["source"], "nexus_presence")
+        self.assertEqual(body["state"], "ready")
 
     def test_persona_canon_is_preserved_without_inventing_open_choices(self) -> None:
         with patch("miyori.nexus_body.build_nexus_presence", return_value=self._presence("ready")):
