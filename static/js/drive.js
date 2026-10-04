@@ -196,6 +196,9 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
   }[status] || status || "Не построено");
 
   const renderIntelligencePanel = async (documentId) => {
+    window.miyoriScreenContext={
+      module:"documents",document_id:Number(documentId)
+    };
     const resultNode = el("driveResult");
     resultNode.innerHTML = workspaceResult("Загружаю карту документа…", "working");
 
