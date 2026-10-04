@@ -171,7 +171,7 @@ function nexusActionPreviewMarkup(preview) {
     preview.reversible === false ? "без гарантированного отката" : null
   ].filter(Boolean).join(" · ");
   return '<details class="nexus-action-detail nexus-action-preview">' +
-    '<summary>Preview изменений</summary>' +
+    '<summary>Что изменится</summary>' +
     '<div class="nexus-action-detail-body">' +
       (preview.title ? '<strong>' + escapeHtml(preview.title) + '</strong>' : '') +
       (preview.summary ? '<p>' + escapeHtml(preview.summary) + '</p>' : '') +
@@ -184,10 +184,10 @@ function nexusActionPreviewMarkup(preview) {
 function nexusActionEvidenceMarkup(evidence) {
   if (!Array.isArray(evidence) || !evidence.length) return "";
   return '<details class="nexus-action-detail">' +
-    '<summary>Evidence · ' + evidence.length + '</summary>' +
+    '<summary>Источники проверки · ' + evidence.length + '</summary>' +
     '<div class="nexus-action-evidence-list">' +
       evidence.map(item =>
-        '<article><div><strong>' + escapeHtml(item.label || item.kind || "Evidence") + '</strong>' +
+        '<article><div><strong>' + escapeHtml(item.label || item.kind || "Источник") + '</strong>' +
           '<small>' + escapeHtml(item.status || "recorded") + '</small></div>' +
           (item.data !== null && item.data !== undefined
             ? '<pre>' + nexusActionJson(item.data) + '</pre>'
@@ -284,14 +284,14 @@ function nexusActionControlsMarkup(action) {
 function nexusActionCardMarkup(action) {
   const tool = action.tool || {};
   const meta = [
-    action.kind === "workflow" ? "Workflow #" + action.workflow_id :
-      action.kind === "task" ? "Task #" + action.task_id : "Tool action",
+    action.kind === "workflow" ? "Процесс #" + action.workflow_id :
+      action.kind === "task" ? "Задача #" + action.task_id : "Операция",
     tool.name || null,
-    tool.risk_level ? "risk: " + tool.risk_level : null,
+    tool.risk_level ? "Риск: " + tool.risk_level : null,
     action.updated_at ? nexusActionTime(action.updated_at) : null
   ].filter(Boolean).join(" · ");
   const progress = action.progress?.label
-    ? '<div class="nexus-action-progress"><span>Progress</span><strong>' +
+    ? '<div class="nexus-action-progress"><span>Ход выполнения</span><strong>' +
         escapeHtml(action.progress.label) + '</strong></div>'
     : "";
   const destructive = tool.destructive
@@ -314,7 +314,7 @@ function nexusActionCardMarkup(action) {
       nexusActionPreviewMarkup(action.preview) +
       nexusActionStepsMarkup(action) +
       nexusActionEvidenceMarkup(action.evidence) +
-      nexusActionResultMarkup("Result", action.result, "result") +
+      nexusActionResultMarkup("Результат", action.result, "result") +
       nexusActionResultMarkup("Ошибка", action.error, "error") +
       nexusActionHistoryMarkup(action.history) +
     '</div>' +
