@@ -43,6 +43,7 @@ def record_chat_feedback(
         raise ValueError("Введите исправление ответа.")
     if len(value)>2000:
         raise ValueError("Исправление не должно превышать 2000 символов.")
+    init_chat_feedback_db()
     with connect() as db:
         match=db.execute("""
             SELECT m.id,m.role FROM messages m
@@ -74,6 +75,7 @@ def relevant_owner_corrections(
         if term.casefold() not in _SKIP
     }
     if not tokens:return []
+    init_chat_feedback_db()
     with connect() as db:
         rows=db.execute("""
             SELECT f.id,f.message_id,f.conversation_id,f.correction,f.created_at,
@@ -119,6 +121,7 @@ def relevant_owner_corrections(
 
 
 def feedback_totals(project_id: int) -> dict:
+    init_chat_feedback_db()
     with connect() as db:
         rows=db.execute("""
             SELECT verdict,COUNT(*) AS events FROM chat_feedback_events
