@@ -9,7 +9,9 @@ from unittest.mock import patch
 
 from miyori import agent_workspace as aw
 from miyori.config import settings
-from miyori.db import create_project, init_db
+from miyori.agent import run_agent
+from miyori.context_router import route_context
+from miyori.db import create_project, get_agent_workflow, init_db, list_permission_requests
 
 
 class AgentWorkspaceTests(unittest.TestCase):
@@ -187,6 +189,57 @@ class AgentWorkspaceTests(unittest.TestCase):
             all(item["status"] == "cancelled" for item in final["nodes"])
         )
 
+
+    def test_read_only_capability_is_hard_enforced_in_workflow(self) -> None:
+        result = __import__("asyncio").run(
+            run_agent(
+                self.project_id,
+                None,
+                'Создай папку «forbidden»',
+                route_context('Создай папку «forbidden»'),
+                [],
+                request_key="workspace:read-only:test",
+                max_steps=2,
+                tool_permissions=("read",),
+            )
+        )
+        workflow = get_agent_workflow(result.workflow_id, self.project_id)
+        self.assertEqual(workflow["route"]["_tool_permissions"], ["read"])
+        self.assertEqual(result.workflow_status, "completed")
+        self.assertEqual(list_permission_requests(self.project_id), [])
+
+    def test_enqueue_is_idempotent_while_task_is_active(self) -> None:
+        workspace = aw.create_agent_workspace(self.project_id, "Queue once")
+        first = aw.enqueue_agent_workspace(self.project_id, int(workspace["id"]))
+        second = aw.enqueue_agent_workspace(self.project_id, int(workspace["id"]))
+        self.assertEqual(first["id"], second["id"])
+
+    def test_cancel_does_not_lie_when_child_recovery_blocks_cancel(self) -> None:
+        workspace = aw.create_agent_workspace(self.project_id, "Recovery cancel")
+        node = workspace["nodes"][0]
+        aw._update_node(
+            int(node["id"]),
+            status="running",
+            workflow_id=777,
+            mark_started=True,
+        )
+        with patch.object(
+            aw,
+            "cancel_agent_workflow",
+            side_effect=RuntimeError("recovery first"),
+        ):
+            final = aw.cancel_agent_workspace(self.project_id, int(workspace["id"]))
+
+        self.assertEqual(final["status"], "recovery")
+        by_id = {int(item["id"]): item for item in final["nodes"]}
+        self.assertEqual(by_id[int(node["id"])]["status"], "recovery")
+        self.assertTrue(
+            all(
+                item["status"] == "cancelled"
+                for item in final["nodes"]
+                if int(item["id"]) != int(node["id"])
+            )
+        )
 
 if __name__ == "__main__":
     unittest.main()
