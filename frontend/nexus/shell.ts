@@ -97,9 +97,15 @@ function renderSnapshot(snapshot: NexusSnapshot): void {
   );
 
   const home = moduleById(snapshot, "home");
+  const homeLinked = Number(snapshot.counts.home_linked ?? 0);
+  const homeOnline = Number(snapshot.counts.home_online ?? 0);
   setText(
     "nexusNavHomeMeta",
-    home ? STATE_LABELS[home.state].toLowerCase() : "—",
+    home?.state === "disabled"
+      ? "отключено"
+      : homeLinked > 0
+        ? `${homeOnline}/${homeLinked} online`
+        : "нет связей",
   );
 
   setText("nexusNavSystemMeta", label.toLowerCase());
