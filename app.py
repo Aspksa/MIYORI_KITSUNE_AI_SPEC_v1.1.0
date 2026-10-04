@@ -25,6 +25,7 @@ from miyori.chat_feedback import (
 )
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
+    chat_quality_summary,
 )
 from miyori.document_links import related_documents
 from miyori.screen_context import (
@@ -1299,6 +1300,13 @@ def chat_metrics(project_id: int, days: int = 30) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404,detail="Проект не найден.")
     return model_usage_summary(project_id, days=days)
+
+
+@app.get("/api/projects/{project_id}/chat/quality")
+def chat_quality(project_id: int, days: int = 30) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404,detail="Проект не найден.")
+    return chat_quality_summary(project_id, days=days)
 
 
 @app.get("/api/projects/{project_id}/conversations")
