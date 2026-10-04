@@ -9,13 +9,19 @@ import type {
   NexusSnapshot,
 } from "./contracts.js";
 
+type PageHandler = (page: NexusProactivePage) => void;
+
 function currentProjectId(): number | null {
   const select = document.getElementById("projectSelect") as HTMLSelectElement | null;
   const value = Number(select?.value);
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
-function navigate(target: NexusProactiveSignal["action"]["target"]): void {
+function currentView(): string {
+  return String(document.documentElement.dataset.nexusView || "chat");
+}
+
+function navigate(target: NexusProactiveSignal["destination"]): void {
   const id =
     target === "actions"
       ? "nexusNavActions"
@@ -24,6 +30,14 @@ function navigate(target: NexusProactiveSignal["action"]["target"]): void {
         : "nexusNavSystem";
   const button = document.getElementById(id) as HTMLButtonElement | null;
   button?.click();
+}
+
+function openLabel(target: NexusProactiveSignal["destination"]): string {
+  return target === "actions"
+    ? "Открыть действия"
+    : target === "knowledge"
+      ? "Открыть знания"
+      : "Открыть систему";
 }
 
 function setVisibilityState(visible: boolean): void {
@@ -35,31 +49,36 @@ function setVisibilityState(visible: boolean): void {
   );
 }
 
-function priorityLabel(priority: NexusProactiveSignal["priority"]): string {
-  return priority === "high"
+function severityLabel(severity: NexusProactiveSignal["severity"]): string {
+  return severity === "high"
     ? "важно"
-    : priority === "normal"
+    : severity === "normal"
       ? "проверить"
       : "когда удобно";
+}
+
+function shelfSignals(page: NexusProactivePage): NexusProactiveSignal[] {
+  const allowed = new Set(page.display.chat_shelf_ids);
+  return page.signals.filter(
+    (signal) =>
+      allowed.has(signal.id) &&
+      signal.channel_owner === "attention_shelf" &&
+      signal.safety?.executes_action === false &&
+      signal.safety?.changes_domain_state === false &&
+      signal.safety?.requires_existing_permission_flow === true,
+  );
 }
 
 export function renderNexusProactivePage(
   host: HTMLElement,
   page: NexusProactivePage,
+  onPage?: PageHandler,
 ): void {
   const previous = host.querySelector("details");
   const wasOpen = previous instanceof HTMLDetailsElement && previous.open;
   host.replaceChildren();
 
-  const signals = page.signals.filter(
-    (signal) =>
-      signal.policy?.auto_execute_allowed === false &&
-      signal.policy?.write_tools_allowed === false &&
-      signal.policy?.chat_interruption_allowed === false &&
-      signal.policy?.creates_chat_message === false &&
-      signal.policy?.requires_explicit_user_action === true,
-  );
-
+  const signals = currentView() === "chat" ? shelfSignals(page) : [];
   if (!signals.length) {
     host.hidden = true;
     setVisibilityState(false);
@@ -91,7 +110,7 @@ export function renderNexusProactivePage(
 
   for (const signal of signals) {
     const article = document.createElement("article");
-    article.className = `nexus-proactive-item priority-${signal.priority}`;
+    article.className = `nexus-proactive-item priority-${signal.severity}`;
     article.dataset.signalId = signal.id;
 
     const head = document.createElement("div");
@@ -105,21 +124,23 @@ export function renderNexusProactivePage(
 
     const priority = document.createElement("span");
     priority.className = "nexus-proactive-priority";
-    priority.textContent = priorityLabel(signal.priority);
+    priority.textContent = severityLabel(signal.severity);
     head.append(text, priority);
     article.appendChild(head);
 
     const controls = document.createElement("div");
     controls.className = "nexus-proactive-controls";
 
-    const open = document.createElement("button");
-    open.type = "button";
-    open.className = "nexus-proactive-open";
-    open.textContent = signal.action.label;
-    open.addEventListener("click", () => navigate(signal.action.target));
-    controls.appendChild(open);
+    if (signal.controls.open) {
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "nexus-proactive-open";
+      open.textContent = openLabel(signal.destination);
+      open.addEventListener("click", () => navigate(signal.destination));
+      controls.appendChild(open);
+    }
 
-    if (signal.controls.can_snooze) {
+    if (signal.controls.snooze) {
       const later = document.createElement("button");
       later.type = "button";
       later.className = "nexus-proactive-quiet";
@@ -130,8 +151,9 @@ export function renderNexusProactivePage(
         if (!projectId) return;
         later.disabled = true;
         try {
-          const next = await snoozeNexusProactive(projectId, signal.id, 60);
-          renderNexusProactivePage(host, next);
+          const next = await snoozeNexusProactive(projectId, signal, 60);
+          if (onPage) onPage(next);
+          else renderNexusProactivePage(host, next);
         } catch {
           later.disabled = false;
         }
@@ -139,7 +161,7 @@ export function renderNexusProactivePage(
       controls.appendChild(later);
     }
 
-    if (signal.controls.can_dismiss) {
+    if (signal.controls.dismiss) {
       const dismiss = document.createElement("button");
       dismiss.type = "button";
       dismiss.className = "nexus-proactive-quiet";
@@ -149,8 +171,9 @@ export function renderNexusProactivePage(
         if (!projectId) return;
         dismiss.disabled = true;
         try {
-          const next = await dismissNexusProactive(projectId, signal.id);
-          renderNexusProactivePage(host, next);
+          const next = await dismissNexusProactive(projectId, signal);
+          if (onPage) onPage(next);
+          else renderNexusProactivePage(host, next);
         } catch {
           dismiss.disabled = false;
         }
@@ -158,7 +181,7 @@ export function renderNexusProactivePage(
       controls.appendChild(dismiss);
     }
 
-    article.appendChild(controls);
+    if (controls.childElementCount) article.appendChild(controls);
     body.appendChild(article);
   }
 
@@ -174,6 +197,15 @@ export function installNexusProactive(): () => void {
   let stopped = false;
   let generation = 0;
   let lastFingerprint = "";
+  let wakeTimer: number | null = null;
+  let lastPage: NexusProactivePage | null = null;
+
+  const clearWake = (): void => {
+    if (wakeTimer !== null) {
+      window.clearTimeout(wakeTimer);
+      wakeTimer = null;
+    }
+  };
 
   const refresh = async (): Promise<void> => {
     if (stopped) return;
@@ -182,15 +214,31 @@ export function installNexusProactive(): () => void {
     const currentGeneration = ++generation;
     try {
       const page = await fetchNexusProactive(projectId);
-      if (!stopped && currentGeneration === generation) {
-        renderNexusProactivePage(host, page);
-      }
+      if (!stopped && currentGeneration === generation) acceptPage(page);
     } catch {
       if (currentGeneration === generation) {
         host.hidden = true;
         setVisibilityState(false);
       }
     }
+  };
+
+  const scheduleWake = (page: NexusProactivePage): void => {
+    clearWake();
+    if (!page.next_wakeup_at) return;
+    const due = Date.parse(page.next_wakeup_at);
+    if (!Number.isFinite(due)) return;
+    const delay = Math.max(1000, Math.min(due - Date.now() + 250, 86_400_000));
+    wakeTimer = window.setTimeout(() => {
+      wakeTimer = null;
+      void refresh();
+    }, delay);
+  };
+
+  const acceptPage = (page: NexusProactivePage): void => {
+    lastPage = page;
+    renderNexusProactivePage(host, page, acceptPage);
+    scheduleWake(page);
   };
 
   const onSnapshot = (event: Event): void => {
@@ -211,12 +259,20 @@ export function installNexusProactive(): () => void {
     void refresh();
   };
 
+  const onView = (): void => {
+    if (lastPage) renderNexusProactivePage(host, lastPage, acceptPage);
+    if (currentView() === "chat") void refresh();
+  };
+
   window.addEventListener("miyori:nexus-snapshot", onSnapshot);
+  window.addEventListener("miyori:nexus-view", onView);
 
   return () => {
     stopped = true;
     generation += 1;
+    clearWake();
     setVisibilityState(false);
     window.removeEventListener("miyori:nexus-snapshot", onSnapshot);
+    window.removeEventListener("miyori:nexus-view", onView);
   };
 }
