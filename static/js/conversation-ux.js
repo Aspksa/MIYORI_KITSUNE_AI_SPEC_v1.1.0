@@ -370,6 +370,7 @@
     ux.topicId = null;
     await Promise.all([refreshSnapshot(), refreshFolders()]);
     applyTopicFilter();
+    window.setTimeout(() => void markLatestRead(), 450);
   }
 
   async function afterSend(data) {
@@ -886,7 +887,8 @@
       shelf.replaceChildren();
       shelf.hidden = schedules.length === 0;
       for (const item of schedules) {
-        if (item.auto_send && !ux.dueSeen.has(item.id) && !state.busy) {
+        const composerFree = !input.value.trim() && !ux.reply && !ux.voiceNote;
+        if (item.auto_send && !ux.dueSeen.has(item.id) && !state.busy && composerFree) {
           ux.dueSeen.add(item.id);
           if (item.conversation_id && Number(item.conversation_id) !== conversationId()) {
             await openConversation(Number(item.conversation_id));
