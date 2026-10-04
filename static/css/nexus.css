@@ -449,3 +449,369 @@
   .nexus-header-status { display: none; }
   .nexus-action-metrics { grid-template-columns: 1fr; }
 }
+
+
+/* N3 — Agents & Actions. Every visual state is backed by persisted runtime state. */
+.nexus-action-groups {
+  display: grid;
+  gap: 12px;
+}
+.nexus-action-group {
+  overflow: hidden;
+  border: 1px solid #e7e0ef;
+  border-radius: 16px;
+  background: #fff;
+}
+.nexus-action-group > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid #eee8f4;
+}
+.nexus-action-group > header strong,
+.nexus-action-group > header small {
+  display: block;
+}
+.nexus-action-group > header strong {
+  color: #493d56;
+  font-size: 10px;
+}
+.nexus-action-group > header small {
+  margin-top: 3px;
+  color: #9890a2;
+  font-size: 8px;
+  line-height: 1.45;
+}
+.nexus-action-group > header > span {
+  min-width: 25px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f0ebf7;
+  color: #705d87;
+  font-size: 8px;
+  font-weight: 800;
+  text-align: center;
+}
+.nexus-action-card-list {
+  display: grid;
+}
+.nexus-action-card {
+  padding: 14px;
+  border-bottom: 1px solid #f0ebf5;
+  border-left: 3px solid #c6bdcf;
+  background: #fff;
+}
+.nexus-action-card:last-child {
+  border-bottom: 0;
+}
+.nexus-action-card.state-waiting_permission {
+  border-left-color: #c79742;
+  background: #fffdf8;
+}
+.nexus-action-card.state-recovery,
+.nexus-action-card.state-error {
+  border-left-color: #c96666;
+  background: #fffafa;
+}
+.nexus-action-card.state-running,
+.nexus-action-card.state-verifying {
+  border-left-color: #8069bf;
+  background: #fdfbff;
+}
+.nexus-action-card.state-completed {
+  border-left-color: #58a878;
+}
+.nexus-action-card.state-cancelled {
+  border-left-color: #aaa2b1;
+}
+.nexus-action-card-header {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+.nexus-action-card-title {
+  min-width: 0;
+}
+.nexus-action-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  color: #948b9e;
+  font-size: 7px;
+  font-weight: 700;
+}
+.nexus-action-card-title h4 {
+  margin: 5px 0 0;
+  color: #473a55;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.nexus-action-card-title p {
+  margin: 4px 0 0;
+  color: #8f8598;
+  font-size: 8px;
+  line-height: 1.5;
+}
+.nexus-action-state-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 1px solid #e3dcec;
+  border-radius: 999px;
+  background: #f8f5fb;
+  color: #655672;
+  font-size: 7px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.state-waiting_permission .nexus-action-state-chip {
+  border-color: #eadabf;
+  background: #fff7e9;
+  color: #946e31;
+}
+.state-running .nexus-action-state-chip,
+.state-verifying .nexus-action-state-chip {
+  border-color: #dcd2ef;
+  background: #f5f0ff;
+  color: #6e57aa;
+}
+.state-recovery .nexus-action-state-chip,
+.state-error .nexus-action-state-chip {
+  border-color: #ecd2d2;
+  background: #fff1f1;
+  color: #a64f4f;
+}
+.state-completed .nexus-action-state-chip {
+  border-color: #d5eadc;
+  background: #f2faf5;
+  color: #447b58;
+}
+.nexus-action-warning {
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: #fff0f0;
+  color: #a25050;
+  font-size: 7px;
+  font-weight: 800;
+}
+.nexus-action-progress {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid #eee8f4;
+  border-radius: 10px;
+  background: #fbf9fd;
+}
+.nexus-action-progress span {
+  color: #9b92a4;
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.nexus-action-progress strong {
+  color: #655971;
+  font-size: 8px;
+  text-align: right;
+}
+.nexus-action-card > .nexus-action-controls {
+  justify-content: flex-start;
+  margin-top: 11px;
+}
+.nexus-action-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+.nexus-action-detail {
+  min-width: 0;
+  border: 1px solid #ece6f2;
+  border-radius: 10px;
+  background: #fcfbfd;
+}
+.nexus-action-detail > summary {
+  cursor: pointer;
+  padding: 8px 10px;
+  color: #665971;
+  font-size: 8px;
+  font-weight: 800;
+}
+.nexus-action-detail[open] > summary {
+  border-bottom: 1px solid #eee8f3;
+}
+.nexus-action-detail-body {
+  padding: 10px;
+}
+.nexus-action-detail-body > strong,
+.nexus-action-detail-body > p,
+.nexus-action-detail-body > small {
+  display: block;
+}
+.nexus-action-detail-body > strong {
+  color: #51465d;
+  font-size: 9px;
+}
+.nexus-action-detail-body > p {
+  margin: 4px 0;
+  color: #857b8f;
+  font-size: 8px;
+  line-height: 1.5;
+}
+.nexus-action-detail-body > small {
+  color: #a098a8;
+  font-size: 7px;
+}
+.nexus-action-change-list {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.nexus-action-change-list li {
+  display: grid;
+  grid-template-columns: minmax(80px,.35fr) minmax(0,1fr);
+  gap: 8px;
+  padding-top: 5px;
+  border-top: 1px solid #f0ebf5;
+  font-size: 8px;
+}
+.nexus-action-change-list strong {
+  color: #61536d;
+}
+.nexus-action-change-list span {
+  overflow-wrap: anywhere;
+  color: #8c8296;
+}
+.nexus-action-detail pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  color: #62576e;
+  font: 8px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.nexus-action-detail.error pre {
+  color: #9b4d4d;
+}
+.nexus-action-evidence-list,
+.nexus-action-history {
+  display: grid;
+}
+.nexus-action-evidence-list > article {
+  padding: 9px 10px;
+  border-bottom: 1px solid #f0ebf5;
+}
+.nexus-action-evidence-list > article:last-child {
+  border-bottom: 0;
+}
+.nexus-action-evidence-list > article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.nexus-action-evidence-list strong {
+  color: #5b4f67;
+  font-size: 8px;
+}
+.nexus-action-evidence-list small {
+  color: #9d94a6;
+  font-size: 7px;
+}
+.nexus-action-step-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nexus-action-step-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0ebf5;
+}
+.nexus-action-step-list li:last-child {
+  border-bottom: 0;
+}
+.nexus-action-step-state {
+  align-self: start;
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: #f1edf5;
+  color: #766a80;
+  font-size: 7px;
+  font-weight: 750;
+}
+.nexus-action-step-list strong,
+.nexus-action-step-list small {
+  display: block;
+}
+.nexus-action-step-list strong {
+  color: #594d64;
+  font-size: 8px;
+}
+.nexus-action-step-list small {
+  margin-top: 2px;
+  color: #958c9e;
+  font-size: 7px;
+  line-height: 1.4;
+}
+.nexus-action-history > article {
+  display: grid;
+  grid-template-columns: 8px minmax(0,1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0ebf5;
+}
+.nexus-action-history > article:last-child {
+  border-bottom: 0;
+}
+.nexus-action-history strong,
+.nexus-action-history small {
+  display: block;
+}
+.nexus-action-history strong {
+  color: #594d64;
+  font-size: 8px;
+}
+.nexus-action-history small {
+  margin-top: 2px;
+  color: #9a91a3;
+  font-size: 7px;
+}
+.nexus-action-history .severity-success .nexus-event-mark { background: #58a878; }
+.nexus-action-history .severity-warning .nexus-event-mark { background: #cb9847; }
+.nexus-action-history .severity-error .nexus-event-mark { background: #c96666; }
+.nexus-action-history .severity-info .nexus-event-mark { background: #8268c8; }
+
+@media (max-width: 820px) {
+  .nexus-action-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .nexus-action-card-header {
+    grid-template-columns: 1fr;
+  }
+  .nexus-action-state-chip {
+    justify-self: start;
+  }
+  .nexus-action-progress {
+    display: grid;
+  }
+  .nexus-action-progress strong {
+    text-align: left;
+  }
+}
