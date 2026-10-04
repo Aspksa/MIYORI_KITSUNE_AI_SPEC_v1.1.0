@@ -54,6 +54,7 @@ assert.ok(data.includes("await Promise.allSettled([loadConversations(),loadNexus
   data.includes("if(Number(state.projectId)!==selectedProject)return"));
 assert.ok(boot.includes("await Promise.allSettled([") &&
   boot.includes("loadStatus(),loadModuleVersions(),loadProjects()"));
-assert.equal(feedback.split("init_chat_feedback_db()").length-1,1,
-  "Feedback schema must only initialize at lifespan startup");
+assert.ok(feedback.includes("init_chat_feedback_db()") &&
+  feedback.includes("def relevant_owner_corrections("),
+  "Feedback must work in both FastAPI and direct test/worker contexts");
 console.log("Fast bootstrap, project-safe GET coalescing, no mutation caching OK.");
