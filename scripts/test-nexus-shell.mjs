@@ -19,14 +19,25 @@ assert.match(
 assert.match(html, /id="nexusNavChat"[^>]+aria-current="page"/);
 assert.match(html, /id="nexusRailStatus"[^>]+role="status"[^>]+aria-live="polite"/);
 assert.match(html, /id="nexusHeaderStatus"[^>]+role="status"[^>]+aria-live="polite"/);
-const secondaryDetailsIndex = html.indexOf('<details class="nexus-secondary-details">');
-const secondarySummaryIndex = html.indexOf(
-  "<summary>Дополнительно</summary>",
-  secondaryDetailsIndex,
+const additionalIndex = html.indexOf('<section class="nexus-secondary-details" aria-labelledby="additionalMenuTitle">');
+const additionalHeadingIndex = html.indexOf(
+  '<h2 id="additionalMenuTitle" class="nexus-secondary-heading">Дополнительно</h2>',
+  additionalIndex,
 );
 assert.ok(
-  secondaryDetailsIndex >= 0 && secondarySummaryIndex > secondaryDetailsIndex,
-  "legacy secondary navigation must stay inside progressive disclosure",
+  additionalIndex >= 0 && additionalHeadingIndex > additionalIndex &&
+  !html.includes('<summary>Дополнительно</summary>'),
+  "Additional must be a permanently visible navigation group, not a disclosure",
+);
+assert.ok(
+  html.indexOf('id="openSystemStatus"') < html.indexOf('id="nexusPrimaryNav"'),
+  "System Status must be the first menu action",
+);
+assert.ok(
+  html.indexOf('id="nexusRailStatus"') > html.indexOf('id="systemStatusOverlay"') &&
+  html.indexOf('id="systemDocumentCount"') > html.indexOf('id="systemStatusOverlay"') &&
+  html.indexOf('id="systemMemoryCount"') > html.indexOf('id="systemStatusOverlay"'),
+  "Persistent project health, document and memory counts must live in System Status",
 );
 assert.ok(!html.includes("\\n"), "template must not contain literal escaped newlines");
 
