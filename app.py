@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import ipaddress
+import json
 import platform
 import socket
 import threading
@@ -11,7 +13,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -2557,6 +2559,7 @@ async def _build_agent_response(
     attachment_ids: list[int] | None = None,
     user_message_id: int | None = None,
     ui_context: dict | None = None,
+    stream_sink=None,
 ) -> dict:
     workflow_state = get_agent_workflow(agent.workflow_id, project_id) or {}
     current_step = int(workflow_state.get("current_step") or 0)
@@ -2676,6 +2679,7 @@ async def _build_agent_response(
         answer_sources=sources,
         usage_sink=actual_usage,
         quality_guidance=query_plan.public_summary(),
+        stream_sink=stream_sink,
     )
 
     set_chat_progress(
