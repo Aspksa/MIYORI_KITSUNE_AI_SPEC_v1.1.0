@@ -220,3 +220,30 @@
   overflow-wrap:anywhere
 }
 .saved-answer-row:hover{border-color:var(--ui-accent)}
+
+/* 00.00.77 — activity motion is bound to persisted request stages. */
+@keyframes miyori-chat-stage-active {
+  0%, 100% { transform: scale(.82); opacity: .55; }
+  50% { transform: scale(1); opacity: 1; }
+}
+.chat-activity:is(
+  [data-stage="accepted"],
+  [data-stage="agent"],
+  [data-stage="retrieving"],
+  [data-stage="generating"],
+  [data-stage="verifying"]
+) .chat-activity-led {
+  animation: miyori-chat-stage-active 1.05s ease-in-out infinite;
+}
+.chat-activity[data-stage="completed"] .chat-activity-led {
+  background: var(--ui-success);
+}
+.chat-activity[data-stage="error"] .chat-activity-led {
+  background: var(--ui-danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-activity .chat-activity-led {
+    animation: none !important;
+    transform: none !important;
+  }
+}
