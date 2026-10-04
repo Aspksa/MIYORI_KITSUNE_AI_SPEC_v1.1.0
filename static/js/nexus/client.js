@@ -1,4 +1,4 @@
-import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
+import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_VOICE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
 function validateProjectId(projectId) {
     if (!Number.isInteger(projectId) || projectId <= 0) {
         throw new Error("Некорректный projectId для MIYORI NEXUS.");
@@ -198,4 +198,25 @@ export async function dismissNexusProactive(projectId, signal) {
 }
 export async function snoozeNexusProactive(projectId, signal, minutes = 60) {
     return decideNexusProactive(projectId, signal, "snoozed", minutes);
+}
+export async function fetchNexusVoice(projectId) {
+    validateProjectId(projectId);
+    const response = await fetch(`/api/projects/${projectId}/nexus/voice`, {
+        headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+        throw new Error(`NEXUS voice API: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    if (payload.schema_version !== NEXUS_VOICE_SCHEMA_VERSION ||
+        !Array.isArray(payload.protocol?.states) ||
+        payload.permissions?.background_recording_allowed !== false ||
+        payload.safety?.voice_can_bypass_action_permissions !== false ||
+        payload.safety?.voice_can_auto_approve_actions !== false ||
+        payload.safety?.voice_can_auto_execute_write_tools !== false ||
+        payload.safety?.final_transcript_uses_existing_chat_pipeline !== true ||
+        payload.transport?.server_audio_storage !== false) {
+        throw new Error("NEXUS voice API нарушил Voice safety contract.");
+    }
+    return payload;
 }
