@@ -446,6 +446,7 @@
       });
     },
     complete() {
+      void window.miyoriChatContinuation?.refresh();
       if (activityTimer) clearInterval(activityTimer);
       activityTimer = null;
       activityGeneration++;
