@@ -51,7 +51,16 @@ def resolve_screen_document(
     document=get_document(project_id,document_id)
     if not document:
         return [],[]
-    packet=document_context_packet(project_id,document_id,message,max_chars=3200)
+    try:
+        packet=document_context_packet(
+            project_id,document_id,message,max_chars=3200
+        )
+    except (OSError, ValueError, RuntimeError):
+        packet={
+            "matches":[],
+            "summary":None,
+            "extraction_status":"unavailable",
+        }
     items=[]
     for node in (packet.get("matches") or [])[:6]:
         text=str(node.get("text") or "").strip()[:1200]
