@@ -302,7 +302,15 @@ function startNewChat() {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (state.busy || state.submissionPending || !state.projectId) return;
+  if (state.busy) {
+    if (state.streamController) {
+      state.streamController.abort();
+      const note = el("composerUploadStatus");
+      if (note) note.textContent = "Останавливаю ответ…";
+    }
+    return;
+  }
+  if (state.submissionPending || !state.projectId) return;
   const text = input.value.trim();
   if (!text) return;
   state.submissionPending = true;
@@ -359,42 +367,99 @@ form.addEventListener("submit", async (event) => {
   state.lastRequestId = requestId;
   window.miyoriChatActivity?.begin(requestId);
 
+  let streamRow = null;
+  let streamText = "";
+  const streamController = new AbortController();
+  state.streamController = streamController;
+
   try {
-    const response = await fetch("/api/chat", {
+    const payload = {
+      message: text,
+      project_id: state.projectId,
+      conversation_id: state.conversationId,
+      request_id: requestId,
+      read_only: readOnly,
+      attachment_ids,ui_context,
+      reply_to_message_id: ux_context.reply_to_message_id ?? null,
+      quoted_text: ux_context.quoted_text || "",
+      topic_id: ux_context.topic_id ?? null,
+      voice_note_id: ux_context.voice_note_id ?? null
+    };
+    const response = await fetch("/api/chat/stream", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        message: text,
-        project_id: state.projectId,
-        conversation_id: state.conversationId,
-        request_id: requestId,
-        read_only: readOnly,
-        attachment_ids,ui_context,
-        reply_to_message_id: ux_context.reply_to_message_id ?? null,
-        quoted_text: ux_context.quoted_text || "",
-        topic_id: ux_context.topic_id ?? null,
-        voice_note_id: ux_context.voice_note_id ?? null
-      })
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/x-ndjson"
+      },
+      body: JSON.stringify(payload),
+      signal: streamController.signal
     });
-    const data = await response.json();
     if (!response.ok) {
-      if (data?.detail?.conversation_id) {
-        state.conversationId = data.detail.conversation_id;
-        if (state.pendingRequest)
-          state.pendingRequest.conversationId = state.conversationId;
-      }
-      const detail = data?.detail?.message || data?.detail || "Ошибка запроса.";
+      let failure = null;
+      try { failure = await response.json(); } catch (_) {}
+      const detail = failure?.detail?.message || failure?.detail ||
+        "Ошибка потокового запроса.";
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
+    if (!response.body) throw new Error("Браузер не поддерживает потоковый ответ.");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let data = null;
+    let streamError = null;
+
+    while (true) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value || new Uint8Array(), {
+        stream: !chunk.done
+      });
+      const lines = buffer.split("\n");
+      buffer = chunk.done ? "" : lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let eventData;
+        try { eventData = JSON.parse(line); } catch (_) { continue; }
+
+        if (eventData.type === "delta" && eventData.text) {
+          streamText += String(eventData.text);
+          if (!streamRow) {
+            streamRow = addMessage("assistant", "", [], {
+              suppressEvent:true,
+              animate:true
+            });
+            streamRow.classList.add("message-streaming");
+            const liveBody = streamRow.querySelector(".message-body");
+            liveBody?.setAttribute("aria-live", "off");
+          }
+          streamRow._miyoriText = streamText;
+          const body = streamRow.querySelector(".message-body");
+          if (body) renderMessageMarkdown(body, streamText);
+          if (chatNearBottom()) messages.scrollTop = messages.scrollHeight;
+        } else if (eventData.type === "final") {
+          data = eventData.response;
+        } else if (eventData.type === "error") {
+          streamError = eventData.detail || "Ошибка генерации.";
+        }
+      }
+      if (chunk.done) break;
+    }
+
+    if (streamError) {
+      const detail = streamError?.message || streamError;
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    if (!data) throw new Error("Поток завершился без финального ответа.");
 
     state.conversationId = data.conversation_id;
     if (data.user_message_id) userRow.dataset.messageId = String(data.user_message_id);
+    streamRow?.remove();
     const assistantRow = addMessage("assistant", data.answer, data.sources || [], {
       id:data.assistant_message_id, diagnostics:data.diagnostics,
       comparison_offer:data.comparison_offer,
       task_goal:data.task_goal,
       workflow:data.workflow,
-      animate:true
+      animate:false
     });
     assistantRow._miyoriMeta = {
       topic_id:data.topic_id ?? ux_context.topic_id ?? null,
@@ -474,14 +539,36 @@ form.addEventListener("submit", async (event) => {
         "Ответ сохранён. Часть дополнительных статусов пока недоступна.";
     }
   } catch (error) {
-    showError(error.message || "Не удалось получить ответ.");
-    // Keep the stable request ID for safe retry of a persisted workflow.
-    // Restore the draft and staged files instead of losing the user's work.
-    if (userRow) userRow.remove();
-    input.value = text;
-    input.dispatchEvent(new Event("input", {bubbles:true}));
-    await loadConversations();
+    if (error?.name === "AbortError") {
+      streamRow?.remove();
+      const note = el("composerUploadStatus");
+      if (note) note.textContent =
+        "Ответ остановлен. Полученная часть сохраняется как незавершённая.";
+      await new Promise(resolve => setTimeout(resolve, 80));
+      try {
+        const progress = await api(
+          "/api/projects/" + state.projectId + "/chat/progress/" +
+          encodeURIComponent(requestId)
+        );
+        const conversation = Number(progress?.progress?.conversation_id);
+        if (Number.isInteger(conversation) && conversation > 0) {
+          state.conversationId = conversation;
+          state.pendingRequest.conversationId = conversation;
+          await openConversation(conversation);
+        }
+      } catch (_) {}
+    } else {
+      showError(error.message || "Не удалось получить ответ.");
+      // Keep the stable request ID for safe retry of a persisted workflow.
+      if (userRow && !userRow.dataset.messageId) userRow.remove();
+      input.value = text;
+      input.dispatchEvent(new Event("input", {bubbles:true}));
+      await loadConversations();
+    }
   } finally {
+    if (state.streamController === streamController) {
+      state.streamController = null;
+    }
     window.miyoriChatActivity?.complete();
     setBusy(false);
     input.focus();
