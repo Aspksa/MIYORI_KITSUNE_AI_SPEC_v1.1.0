@@ -19,6 +19,7 @@ from miyori.db import (
     update_tool_operation,
     update_workflow_step,
 )
+from miyori.nexus import build_nexus_snapshot
 from miyori.nexus_actions import build_nexus_action_center
 from miyori.tools import execute_approved_request, execute_tool
 
@@ -143,6 +144,10 @@ class NexusActionsContractTests(unittest.TestCase):
         self.assertEqual(card["permission_id"], int(request["id"]))
         self.assertEqual(card["preview"]["summary"], "Будет создан workflow.txt")
         self.assertEqual(center["counts"]["waiting_permission"], 1)
+
+        snapshot = build_nexus_snapshot(self.project_id)
+        self.assertEqual(snapshot["counts"]["active_actions"], 1)
+        self.assertEqual(snapshot["counts"]["attention_actions"], 1)
 
     def test_verifying_is_a_real_persisted_action_state(self) -> None:
         operation = create_tool_operation(
