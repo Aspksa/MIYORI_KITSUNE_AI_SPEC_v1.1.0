@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.51"
+PROJECT_VERSION = "00.00.52"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.9.0",
+        "version": "1.0.0",
         "status": "active",
-        "description": "NEXUS Voice Core: explicit microphone permission, optional STT, transcript/confidence, opt-in TTS, interruption semantics и integration с Living Presence.",
+        "description": "NEXUS Agent Workspace: persistent DAG orchestration, parallel-ready agents, budgets, handoff и inherited Actions permissions/recovery.",
     },
     "settings": {
         "name": "Настройки",
@@ -144,6 +144,25 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.52",
+        "title": "NEXUS Agent Workspace · DAG orchestration",
+        "summary": "N8 добавляет persistent Agent Workspace как coordinator поверх существующего Workflow Engine: роли, dependency graph, parallel-ready execution, budgets, handoff и сохранение permission/recovery semantics.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "1.0.0",
+                "changes": [
+                    "Добавлены agent_workspaces и agent_workspace_nodes с project isolation.",
+                    "DAG валидирует циклы, зависимости и суммарный step budget до запуска.",
+                    "Независимые ready nodes выполняются параллельно; downstream nodes ждут prerequisites.",
+                    "Каждый node использует существующий run_agent и per-workflow max_steps.",
+                    "Permission/recovery/cancel остаются в едином Workflow Engine.",
+                    "Actions получил отдельный Agent Workspace экран без Chat pollution."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.51",
         "title": "NEXUS Voice Core · explicit permission and safe interaction",
