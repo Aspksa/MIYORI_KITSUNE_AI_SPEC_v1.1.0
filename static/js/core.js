@@ -197,6 +197,66 @@ function addMessage(role, text, sources = [], options = {}) {
       line("Режим",plan.mode==="deep"?"углублённый":"обычный");
       line("Источники",Number(evidence.source_count)||0);
       line("Покрытие",names[evidence.status]||"не определено");
+      const review=diagnostics.document_review;
+      if (review && Array.isArray(review.documents)) {
+        const partial=review.documents.some(doc=>doc.requires_ocr ||
+          !doc.stored_text_scanned ||
+          (typeof doc.source_extraction_coverage==="number" &&
+           doc.source_extraction_coverage<1));
+        line("Сверка",review.documents.length+" документа(ов), "+
+          (review.difference_count||0)+" группы отличающихся значений");
+        if (partial)
+          line("Ограничения","Часть фрагментов или оригинала не распознана.");
+        const differences=Array.isArray(review.potential_differences)
+          ? review.potential_differences.slice(0,8) : [];
+        for (const entry of differences) {
+          const paragraph=document.createElement("p");
+          paragraph.className="chat-review-field";
+          const name=document.createElement("strong");
+          name.textContent=entry.field+": ";
+          paragraph.appendChild(name);
+          const parts=(entry.evidence||[]).slice(0,5).map(doc=>{
+            const sample=(doc.values||[])[0]||{};
+            return doc.filename+" · фрагм. "+
+                   (Number(sample.chunk_index)+1)+": "+
+                   (doc.values||[]).map(v=>v.value).slice(0,4).join(", ");
+          });
+          paragraph.appendChild(document.createTextNode(parts.join(" / ")));
+          paragraph.title="Сравнение наблюдаемых фрагментов. Не доказанное противоречие.";
+          content.appendChild(paragraph);
+        }
+        const action=document.createElement("button");
+        action.type="button";
+        action.className="chat-full-review-button";
+        action.textContent="Запустить полную проверку (Cloud.ru)";
+        action.title="Создаст фоновые задачи проверки всех фрагментов выбранных документов. Могут расходоваться токены Cloud.ru.";
+        action.addEventListener("click",async()=>{
+          if(action.disabled||!state.projectId) return;
+          action.disabled=true;
+          const projectAtStart=state.projectId;
+          let started=0;
+          try {
+            for (const doc of review.documents) {
+              if(projectAtStart!==state.projectId)throw Error("Проект изменён.");
+              await api("/api/projects/"+projectAtStart+"/documents/"+
+                Number(doc.document_id)+"/questions", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({
+                  question:String(diagnostics.document_review_query||"Проверь документ")}),
+              });
+              started+=1;
+            }
+            action.textContent="Запущено проверок: "+started+
+              " · результаты в Документах";
+          }catch(error){
+            action.textContent="Запущено "+started+
+              "; ошибка: "+String(error.message||error);
+            action.disabled=false;
+          }
+        });
+        content.appendChild(action);
+      }
       if (Number.isFinite(diagnostics.retrieval_ms))
         line("Поиск",diagnostics.retrieval_ms+" мс");
       if (Number.isFinite(usage.latency_ms))
