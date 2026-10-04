@@ -87,6 +87,32 @@ function setBusy(value) {
   );
 }
 
+function renderMessageMarkdown(container, value) {
+  const content = String(value ?? "");
+  if (!window.marked?.parse || !window.DOMPurify?.sanitize) {
+    container.innerHTML = escapeHtml(content).replace(/\n/g, "<br>");
+    return;
+  }
+  try {
+    const html = window.marked.parse(content, {gfm: true, breaks: true});
+    container.innerHTML = window.DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: [
+        "p", "br", "strong", "b", "em", "i", "ul", "ol", "li",
+        "h1", "h2", "h3", "h4", "blockquote", "pre", "code",
+        "hr", "a", "table", "thead", "tbody", "tr", "th", "td", "del"
+      ],
+      ALLOWED_ATTR: ["href", "title"],
+      FORBID_TAGS: ["img", "svg", "iframe", "video", "audio", "style", "script", "form", "input"]
+    });
+    container.querySelectorAll("a[href]").forEach(link => {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    });
+  } catch (_) {
+    container.innerHTML = escapeHtml(content).replace(/\n/g, "<br>");
+  }
+}
+
 function addMessage(role, text, sources = []) {
   if (role === "user") messages.querySelector(".welcome-message")?.remove();
   const article = document.createElement("article");
@@ -102,8 +128,10 @@ function addMessage(role, text, sources = []) {
   const author = document.createElement("strong");
   author.textContent = role === "assistant" ? "Миёри" : "Вы";
 
-  const body = document.createElement("p");
-  body.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+  const body = document.createElement("div");
+  body.className = "message-body";
+  if (role === "assistant") renderMessageMarkdown(body, text);
+  else body.textContent = String(text ?? "");
   bubble.append(author, body);
 
   if (role === "assistant" && Array.isArray(sources) && sources.length) {
