@@ -511,6 +511,7 @@ function nexusAgentNodeMarkup(node) {
     '<p>' + escapeHtml(node.instruction || "") + '</p>' +
     '<div class="agent-workspace-node-meta">' +
       '<span>budget ' + Number(node.step_budget || 0) + '</span>' +
+      '<span>' + (node.capability === "standard" ? "standard · write через разрешение" : "read-only") + '</span>' +
       (deps.length ? '<span>после: ' + deps.map(escapeHtml).join(", ") + '</span>' : '<span>независимый старт</span>') +
       (node.workflow_id ? '<span>workflow #' + Number(node.workflow_id) + '</span>' : '') +
       (workflowStatus ? '<span>' + escapeHtml(workflowStatus) + '</span>' : '') +
@@ -564,7 +565,7 @@ async function renderNexusAgentWorkspace() {
         '<label for="agentWorkspaceGoal">Цель</label>' +
         '<div><textarea id="agentWorkspaceGoal" rows="3" maxlength="6000" placeholder="Например: проверь договор, найди риски и подготовь безопасный план действий" required></textarea>' +
         '<button class="primary-sheet-button" type="submit">Создать workspace</button></div>' +
-        '<small>По умолчанию: Исследователь + Ревьюер рисков параллельно → Координатор после их handoff.</small>' +
+        '<small>По умолчанию: два read-only агента параллельно → Координатор standard после handoff; write всегда через permission.</small>' +
       '</form>' +
       '<div id="agentWorkspaceStatus" class="knowledge-quiet-status" role="status" aria-live="polite"></div>' +
       '<div id="agentWorkspaceList" class="agent-workspace-list"><div class="workspace-loading">Загружаю workspace…</div></div>' +
