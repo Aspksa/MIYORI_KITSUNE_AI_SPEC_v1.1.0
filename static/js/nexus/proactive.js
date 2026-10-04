@@ -1,4 +1,8 @@
-import { dismissNexusProactive, fetchNexusProactive, snoozeNexusProactive, } from "./client.js";
+import {
+    dismissNexusProactive,
+    fetchNexusProactive,
+    snoozeNexusProactive,
+} from "./client.js";
 function currentProjectId() {
     const select = document.getElementById("projectSelect");
     const value = Number(select?.value);
@@ -16,13 +20,6 @@ function navigate(target) {
     const button = document.getElementById(id);
     button?.click();
 }
-function openLabel(target) {
-    return target === "actions"
-        ? "Открыть действия"
-        : target === "knowledge"
-            ? "Открыть знания"
-            : "Открыть систему";
-}
 function setVisibilityState(visible) {
     document.documentElement.dataset.nexusProactiveVisible = visible ? "true" : "false";
     window.dispatchEvent(new CustomEvent("miyori:proactive-visibility", {
@@ -36,19 +33,21 @@ function severityLabel(severity) {
             ? "проверить"
             : "когда удобно";
 }
-function shelfSignals(page) {
-    const allowed = new Set(page.display.chat_shelf_ids);
-    return page.signals.filter((signal) => allowed.has(signal.id) &&
+export function renderNexusProactivePage(host, page) {
+    const previous = host.querySelector("details");
+    const wasOpen = previous instanceof HTMLDetailsElement && previous.open;
+    host.replaceChildren();
+    if (currentView() !== "chat") {
+        host.hidden = true;
+        setVisibilityState(false);
+        return;
+    }
+    const shelfIds = new Set(page.display.chat_shelf_ids);
+    const signals = page.signals.filter((signal) => shelfIds.has(signal.id) &&
         signal.channel_owner === "attention_shelf" &&
         signal.safety?.executes_action === false &&
         signal.safety?.changes_domain_state === false &&
         signal.safety?.requires_existing_permission_flow === true);
-}
-export function renderNexusProactivePage(host, page, onPage) {
-    const previous = host.querySelector("details");
-    const wasOpen = previous instanceof HTMLDetailsElement && previous.open;
-    host.replaceChildren();
-    const signals = currentView() === "chat" ? shelfSignals(page) : [];
     if (!signals.length) {
         host.hidden = true;
         setVisibilityState(false);
@@ -95,7 +94,12 @@ export function renderNexusProactivePage(host, page, onPage) {
             const open = document.createElement("button");
             open.type = "button";
             open.className = "nexus-proactive-open";
-            open.textContent = openLabel(signal.destination);
+            open.textContent =
+                signal.destination === "actions"
+                    ? "Открыть действия"
+                    : signal.destination === "knowledge"
+                        ? "Открыть знания"
+                        : "Открыть систему";
             open.addEventListener("click", () => navigate(signal.destination));
             controls.appendChild(open);
         }
@@ -112,10 +116,7 @@ export function renderNexusProactivePage(host, page, onPage) {
                 later.disabled = true;
                 try {
                     const next = await snoozeNexusProactive(projectId, signal, 60);
-                    if (onPage)
-                        onPage(next);
-                    else
-                        renderNexusProactivePage(host, next);
+                    renderNexusProactivePage(host, next);
                 }
                 catch {
                     later.disabled = false;
@@ -135,10 +136,7 @@ export function renderNexusProactivePage(host, page, onPage) {
                 dismiss.disabled = true;
                 try {
                     const next = await dismissNexusProactive(projectId, signal);
-                    if (onPage)
-                        onPage(next);
-                    else
-                        renderNexusProactivePage(host, next);
+                    renderNexusProactivePage(host, next);
                 }
                 catch {
                     dismiss.disabled = false;
@@ -161,25 +159,23 @@ export function installNexusProactive() {
     let stopped = false;
     let generation = 0;
     let lastFingerprint = "";
-    let wakeTimer = null;
-    let lastPage = null;
-    const clearWake = () => {
-        if (wakeTimer !== null) {
-            window.clearTimeout(wakeTimer);
-            wakeTimer = null;
-        }
-    };
     const refresh = async () => {
         if (stopped)
             return;
+        if (currentView() !== "chat") {
+            host.hidden = true;
+            setVisibilityState(false);
+            return;
+        }
         const projectId = currentProjectId();
         if (!projectId)
             return;
         const currentGeneration = ++generation;
         try {
             const page = await fetchNexusProactive(projectId);
-            if (!stopped && currentGeneration === generation)
-                acceptPage(page);
+            if (!stopped && currentGeneration === generation) {
+                renderNexusProactivePage(host, page);
+            }
         }
         catch {
             if (currentGeneration === generation) {
@@ -187,24 +183,6 @@ export function installNexusProactive() {
                 setVisibilityState(false);
             }
         }
-    };
-    const scheduleWake = (page) => {
-        clearWake();
-        if (!page.next_wakeup_at)
-            return;
-        const due = Date.parse(page.next_wakeup_at);
-        if (!Number.isFinite(due))
-            return;
-        const delay = Math.max(1000, Math.min(due - Date.now() + 250, 86_400_000));
-        wakeTimer = window.setTimeout(() => {
-            wakeTimer = null;
-            void refresh();
-        }, delay);
-    };
-    const acceptPage = (page) => {
-        lastPage = page;
-        renderNexusProactivePage(host, page, acceptPage);
-        scheduleWake(page);
     };
     const onSnapshot = (event) => {
         if (!(event instanceof CustomEvent))
@@ -227,17 +205,13 @@ export function installNexusProactive() {
         void refresh();
     };
     const onView = () => {
-        if (lastPage)
-            renderNexusProactivePage(host, lastPage, acceptPage);
-        if (currentView() === "chat")
-            void refresh();
+        void refresh();
     };
     window.addEventListener("miyori:nexus-snapshot", onSnapshot);
     window.addEventListener("miyori:nexus-view", onView);
     return () => {
         stopped = true;
         generation += 1;
-        clearWake();
         setVisibilityState(false);
         window.removeEventListener("miyori:nexus-snapshot", onSnapshot);
         window.removeEventListener("miyori:nexus-view", onView);
