@@ -72,6 +72,17 @@ assert.ok(
   shell.includes('document.documentElement.dataset.nexusView || "chat"'),
   "shell must preserve a startup view already selected by legacy startup preferences",
 );
-assert.ok(!css.includes("@keyframes"), "NEXUS shell must not add decorative keyframe animation");
+const keyframes = [...css.matchAll(/@keyframes\\s+([a-zA-Z0-9_-]+)/g)]
+  .map((match) => match[1])
+  .sort();
+assert.deepEqual(
+  keyframes,
+  ["nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].sort(),
+  "NEXUS shell may only contain the explicit N12.3 state-driven rig keyframes",
+);
+assert.ok(
+  css.includes("@media (prefers-reduced-motion: reduce)"),
+  "all N12.3 rig motion must be disabled for reduced-motion users",
+);
 
 console.log("NEXUS shell contract OK.");
