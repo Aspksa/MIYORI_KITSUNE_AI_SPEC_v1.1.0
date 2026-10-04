@@ -82,10 +82,11 @@ function renderSnapshot(snapshot: NexusSnapshot): void {
   setText("nexusHeaderDetail", detail);
   setStateDot("nexusHeaderStateDot", state);
 
-  const pending = Number(snapshot.counts.pending_permissions ?? 0);
-  const tasks = Number(snapshot.counts.active_tasks ?? 0);
-  const workflows = Number(snapshot.counts.active_workflows ?? 0);
-  const actionCount = pending + tasks + workflows;
+  const actionCount = Number(
+    snapshot.counts.active_actions ??
+      (Number(snapshot.counts.active_tasks ?? 0) +
+        Number(snapshot.counts.active_workflows ?? 0)),
+  );
   setText("nexusNavActionsMeta", actionCount ? String(actionCount) : "чисто");
 
   const documents = Number(snapshot.counts.documents ?? 0);
@@ -98,7 +99,7 @@ function renderSnapshot(snapshot: NexusSnapshot): void {
   );
 
   setText("nexusNavSystemMeta", label.toLowerCase());
-  setText("nexusNavChatMeta", state === "processing" ? "в работе" : "готово");
+  setText("nexusNavChatMeta", label.toLowerCase());
 }
 
 function renderConnectionError(message: string): void {
