@@ -48,10 +48,13 @@ def build_nexus_presence(project_id: int) -> dict:
     failed_actions = [
         item for item in actions if item.get("state") == "error"
     ]
+    verifying = [
+        item for item in actions if item.get("state") == "verifying"
+    ]
     active = [
         item
         for item in actions
-        if item.get("state") in {"planned", "running", "verifying"}
+        if item.get("state") in {"planned", "running"}
     ]
 
     knowledge_attention = int(counts.get("knowledge_attention") or 0)
@@ -182,7 +185,8 @@ def build_nexus_presence(project_id: int) -> dict:
             "waiting_permissions": len(waiting),
             "recovering_actions": len(recovering),
             "failed_actions": len(failed_actions),
-            "active_actions": len(active),
+            "active_actions": len(active) + len(verifying),
+            "verifying_actions": len(verifying),
             "failed_tasks": failed_tasks,
             "knowledge_attention": knowledge_attention,
         },
