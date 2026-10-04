@@ -107,6 +107,23 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
         self.assertTrue(body["render_policy"]["owner_global_appearance_profile"])
         self.assertTrue(body["render_policy"]["static_portrait_is_non_dynamic"])
 
+    def test_body_exposes_trusted_renderer_registry_without_fake_dynamic_claim(self) -> None:
+        with patch(
+            "miyori.nexus_body.build_nexus_presence",
+            return_value=self._presence("ready"),
+        ):
+            body = build_nexus_body(self.project_id)
+
+        renderer = body["renderer"]
+        self.assertEqual(renderer["schema_version"], "1.0.0")
+        self.assertEqual(renderer["selected_adapter"], "neutral_shell")
+        self.assertFalse(renderer["selected_dynamic"])
+        self.assertEqual(renderer["dynamic_extension"]["status"], "not_installed")
+        self.assertFalse(renderer["dynamic_extension"]["may_execute_asset_javascript"])
+        self.assertFalse(renderer["dynamic_extension"]["may_override_operational_state"])
+        self.assertTrue(renderer["policy"]["trusted_registry_only"])
+        self.assertFalse(renderer["policy"]["arbitrary_renderer_module_allowed"])
+
     def test_server_body_state_is_derived_from_presence(self) -> None:
         cases = {
             "ready": ("rest", "neutral", "still"),
