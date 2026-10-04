@@ -85,6 +85,7 @@ function messageFromRecord(item) {
   return addMessage(item.role, item.content, item.metadata?.sources || [], {
     id: item.id,
     bookmarked: Boolean(item.bookmarked),
+    diagnostics: item.metadata?.diagnostics,
     attachments: (item.metadata?.attachments || []).map(id => ({id})),
     suppressEvent: true,
     suppressScroll: true
@@ -359,7 +360,9 @@ form.addEventListener("submit", async (event) => {
 
     state.conversationId = data.conversation_id;
     if (data.user_message_id) userRow.dataset.messageId = String(data.user_message_id);
-    addMessage("assistant", data.answer, data.sources || [], {id:data.assistant_message_id});
+    addMessage("assistant", data.answer, data.sources || [], {
+      id:data.assistant_message_id, diagnostics:data.diagnostics
+    });
     attachmentStore?.clear();
     state.pendingRequest = null;
     window.miyoriForkReadOnly = false;
