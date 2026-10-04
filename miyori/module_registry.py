@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.61"
+PROJECT_VERSION = "00.00.62"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.8.0",
+        "version": "2.8.1",
         "status": "active",
-        "description": "Чат с документами для конкретного запроса, источниками, поиском, сохранением, версиями ответов и постраничной историей.",
+        "description": "Чат с документами, историей и безопасными read-only версиями ответов; идемпотентное восстановление неудачных запросов.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -156,6 +156,24 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.62",
+        "title": "Safe Chat Forks and Idempotent Recovery",
+        "summary": "Дополнение к 00.00.61: повтор старого вопроса больше не запускает инструменты, повторный запрос после сбоя использует прежний request_id. Верхние логотип и аватар остаются удалены.",
+        "modules": [
+            {
+                "key": "miyori_ai",
+                "version": "2.8.1",
+                "changes": [
+                    "У клонированной ветки read_only=true: Context Router запрещает tool execution даже для исходных команд записи.",
+                    "Повтор вопроса не записывает одни и те же воспоминания и утверждения повторно.",
+                    "Повтор request_id с другим режимом read_only отклоняется кодом 409.",
+                    "После ошибки отправки сохраняются текст и вложения; повтор в том же разговоре использует прежний request_id и не переисполняет workflow.",
+                    "CI проверяет блокировку инструментов, idempotency, обычные запросы и сохранённое отсутствие верхних логотипа/аватара.",
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.61",
         "title": "Chat Productivity · Real Attachments & Clean Header",
