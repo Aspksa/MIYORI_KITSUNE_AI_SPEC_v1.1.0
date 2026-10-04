@@ -280,3 +280,44 @@ def attached_document_context(project_id: int, ids: list[int]) -> tuple[list[dic
                 "truncated": len(chunks) > len(used),
             })
     return documents, sources
+
+
+def search_conversation_messages(
+    project_id: int, conversation_id: int, query: str, *, limit: int = 40
+) -> list[dict]:
+    if not get_conversation(conversation_id, project_id):
+        raise LookupError("Разговор не найден.")
+    term = query.strip()[:120]
+    if not term:
+        return []
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = "%" + escaped + "%"
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT m.id, m.role, substr(m.content,1,280) AS preview, m.created_at
+            FROM messages m JOIN conversations c ON c.id = m.conversation_id
+            WHERE c.project_id = ? AND c.id = ?
+              AND m.content LIKE ? ESCAPE '\\'
+            ORDER BY m.id DESC LIMIT ?
+            """,
+            (project_id, conversation_id, pattern, min(60, max(1, limit))),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_bookmarked_messages(project_id: int, *, limit: int = 50) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT m.id, m.conversation_id, substr(m.content,1,240) AS preview,
+                   c.title AS conversation_title, b.created_at
+            FROM message_bookmarks b
+            JOIN messages m ON m.id = b.message_id
+            JOIN conversations c ON c.id = m.conversation_id
+            WHERE b.project_id = ? AND c.project_id = ?
+            ORDER BY b.created_at DESC, m.id DESC LIMIT ?
+            """,
+            (project_id, project_id, min(100, max(1, limit))),
+        ).fetchall()
+    return [dict(row) for row in rows]
