@@ -21,7 +21,7 @@ assert.ok(
 
 assert.ok(
   !html.includes("Проект и разговоры") &&
-    html.includes('<div class="workspace-details" hidden aria-hidden="true">') &&
+    html.includes('<div class="workspace-details" hidden aria-hidden="true" role="region" aria-label="История переписки">') &&
     html.includes('id="projectSelect"') &&
     html.includes('id="conversationList"'),
   "legacy project/conversation controls must stay available to runtime but hidden from the UI",
