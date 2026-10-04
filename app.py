@@ -2110,6 +2110,7 @@ async def _build_agent_response(
     captured_claims: list[dict] | None = None,
     request_id: str | None = None,
     attachment_ids: list[int] | None = None,
+    user_message_id: int | None = None,
 ) -> dict:
     workflow_state = get_agent_workflow(agent.workflow_id, project_id) or {}
     current_step = int(workflow_state.get("current_step") or 0)
@@ -2183,7 +2184,7 @@ async def _build_agent_response(
         answer_sources=sources,
     )
 
-    add_message(
+    assistant_message_id = add_message(
         conversation_id,
         "assistant",
         answer,
@@ -2208,6 +2209,8 @@ async def _build_agent_response(
     response = {
         "conversation_id": conversation_id,
         "project_id": project_id,
+        "user_message_id": user_message_id,
+        "assistant_message_id": assistant_message_id,
         "request_id": request_id,
         "response_key": response_key,
         "answer": answer,
@@ -2767,6 +2770,7 @@ async def send_message(request: ChatRequest) -> dict:
             captured_claims=captured_claims,
             request_id=request.request_id,
             attachment_ids=attachment_ids,
+            user_message_id=user_message_id,
         )
     except ProviderError as exc:
         raise HTTPException(
