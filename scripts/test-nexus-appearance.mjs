@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const body = readFileSync("frontend/nexus/body.ts", "utf8");
 const client = readFileSync("frontend/nexus/client.ts", "utf8");
 const contracts = readFileSync("frontend/nexus/contracts.ts", "utf8");
+const renderer = readFileSync("frontend/nexus/body_renderer.ts", "utf8");
 const css = readFileSync("static/css/nexus.css", "utf8");
 
 assert.ok(
@@ -38,8 +39,8 @@ assert.ok(
 );
 
 assert.ok(
-  body.includes('asset.kind === "static_portrait"') &&
-    body.includes("nexus-body-static-portrait") &&
+  renderer.includes('asset.kind !== "static_portrait" || !asset.url') &&
+    renderer.includes("nexus-body-static-portrait") &&
     body.includes("Статический портрет не изображает pose/expression"),
   "static portrait adapter must disclose non-dynamic behavior",
 );
@@ -58,9 +59,13 @@ assert.ok(
 
 assert.ok(
   !body.includes("innerHTML") &&
+    !renderer.includes("innerHTML") &&
     !body.includes("Math.random") &&
+    !renderer.includes("Math.random") &&
     !body.includes("setInterval") &&
-    !body.includes("setTimeout"),
+    !renderer.includes("setInterval") &&
+    !body.includes("setTimeout") &&
+    !renderer.includes("setTimeout"),
   "appearance editor must remain trusted DOM and free of fake liveness",
 );
 
