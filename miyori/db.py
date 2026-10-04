@@ -2260,6 +2260,42 @@ def add_document(
     return dict(row)
 
 
+def replace_document_chunks(
+    project_id: int,
+    document_id: int,
+    chunks: list[str],
+) -> int:
+    """Atomically replace searchable chunks after a verified re-extraction/OCR pass."""
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT id FROM documents
+            WHERE id=? AND project_id=? AND deleted_at IS NULL
+            """,
+            (document_id, project_id),
+        ).fetchone()
+        if not row:
+            raise ValueError("Документ не найден в текущем проекте.")
+        conn.execute("DELETE FROM document_chunks WHERE document_id=?", (document_id,))
+        now = utc_now()
+        for index, content in enumerate(chunks):
+            clean = str(content or "").strip()
+            if not clean:
+                continue
+            conn.execute(
+                """
+                INSERT INTO document_chunks(document_id,chunk_index,content,created_at)
+                VALUES(?,?,?,?)
+                """,
+                (document_id, index, clean, now),
+            )
+        count = conn.execute(
+            "SELECT COUNT(*) AS n FROM document_chunks WHERE document_id=?",
+            (document_id,),
+        ).fetchone()["n"]
+    return int(count)
+
+
 def update_document_storage_path(project_id: int, document_id: int, stored_path: str) -> None:
     with connect() as conn:
         conn.execute(
