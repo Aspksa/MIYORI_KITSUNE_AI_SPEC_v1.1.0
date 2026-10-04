@@ -12,7 +12,6 @@ from .db import (
     create_task,
     get_agent_workflow,
     get_project,
-    list_tasks,
     record_audit_event,
     utc_now,
 )
@@ -650,14 +649,25 @@ def enqueue_agent_workspace(project_id: int, workspace_id: int) -> dict:
     if workspace["status"] in {"completed", "cancelled"}:
         raise ValueError("Этот Agent Workspace уже завершён.")
 
-    for task in list_tasks(project_id):
-        payload = task.get("payload") or {}
-        if (
-            task.get("task_type") == "agent_workspace"
-            and task.get("status") in {"queued", "running"}
-            and int(payload.get("workspace_id") or 0) == workspace_id
-        ):
-            return task
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, project_id, task_type, status, cancel_requested,
+                   payload_json, created_at, started_at, finished_at
+            FROM tasks
+            WHERE project_id = ?
+              AND task_type = 'agent_workspace'
+              AND status IN ('queued','running')
+            ORDER BY id DESC
+            """,
+            (project_id,),
+        ).fetchall()
+    for row in rows:
+        item = dict(row)
+        payload = _loads(item.pop("payload_json", None), {})
+        if int(payload.get("workspace_id") or 0) == workspace_id:
+            item["cancel_requested"] = bool(item.get("cancel_requested"))
+            return item
 
     return create_task(
         project_id,
