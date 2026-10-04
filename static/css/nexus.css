@@ -1745,3 +1745,148 @@
     justify-self: start;
   }
 }
+
+
+/* N10 — Proactive Miyori. Budgeted inbox, never inserted into Chat messages. */
+.nexus-proactive-host {
+  width: min(920px, calc(100% - 28px));
+  margin: 7px auto 0;
+}
+.nexus-proactive-host[hidden] {
+  display: none;
+}
+.nexus-proactive-shelf {
+  overflow: hidden;
+  border: 1px solid #e7e1eb;
+  border-radius: 12px;
+  background: #fcfbfd;
+}
+.nexus-proactive-shelf > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 11px;
+  cursor: pointer;
+  list-style: none;
+}
+.nexus-proactive-shelf > summary::-webkit-details-marker {
+  display: none;
+}
+.nexus-proactive-shelf > summary strong,
+.nexus-proactive-shelf > summary small {
+  display: block;
+}
+.nexus-proactive-shelf > summary strong {
+  color: #5a4e62;
+  font-size: 9px;
+}
+.nexus-proactive-shelf > summary small {
+  margin-top: 2px;
+  color: #978e9e;
+  font-size: 7px;
+}
+.nexus-proactive-shelf > summary b {
+  min-width: 23px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f0ebf3;
+  color: #71647b;
+  font-size: 7px;
+  text-align: center;
+}
+.nexus-proactive-shelf[open] > summary {
+  border-bottom: 1px solid #ebe5ef;
+  background: #fff;
+}
+.nexus-proactive-list {
+  display: grid;
+  gap: 6px;
+  padding: 7px;
+}
+.nexus-proactive-item {
+  padding: 10px 11px;
+  border: 1px solid #ebe5ef;
+  border-left: 3px solid #b8afbF;
+  border-radius: 9px;
+  background: #fff;
+}
+.nexus-proactive-item.priority-high {
+  border-left-color: #b96868;
+}
+.nexus-proactive-item.priority-normal {
+  border-left-color: #b98b4c;
+}
+.nexus-proactive-item.priority-low {
+  border-left-color: #8e82a0;
+}
+.nexus-proactive-item-head {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+.nexus-proactive-item-head strong {
+  display: block;
+  color: #574b60;
+  font-size: 9px;
+  line-height: 1.4;
+}
+.nexus-proactive-item-head p {
+  margin: 3px 0 0;
+  color: #897f90;
+  font-size: 8px;
+  line-height: 1.45;
+}
+.nexus-proactive-priority {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f5f1f7;
+  color: #817587;
+  font-size: 7px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.nexus-proactive-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.nexus-proactive-open,
+.nexus-proactive-quiet {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid #dcd3e4;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 8px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.nexus-proactive-open {
+  background: #f6f2f9;
+  color: #62556d;
+}
+.nexus-proactive-quiet {
+  background: #fff;
+  color: #817687;
+}
+.nexus-proactive-open:disabled,
+.nexus-proactive-quiet:disabled {
+  cursor: default;
+  opacity: .55;
+}
+@media (max-width: 620px) {
+  .nexus-proactive-host {
+    width: calc(100% - 16px);
+    margin-top: 6px;
+  }
+  .nexus-proactive-item-head {
+    grid-template-columns: 1fr;
+  }
+  .nexus-proactive-priority {
+    justify-self: start;
+  }
+}
