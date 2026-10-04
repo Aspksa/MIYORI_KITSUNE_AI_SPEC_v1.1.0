@@ -123,6 +123,9 @@ jobs:
       - name: Numeric answer self-check contract
         run: npm run test:answer-check
 
+      - name: Chat feedback form and scope
+        run: npm run test:chat-feedback
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
