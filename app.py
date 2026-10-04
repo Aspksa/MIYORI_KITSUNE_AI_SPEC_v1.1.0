@@ -26,6 +26,7 @@ from miyori.chat_feedback import (
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
+from miyori.document_links import related_documents
 from miyori.document_comparisons import (
     init_document_comparisons_db,
     enqueue_document_comparison,
@@ -315,7 +316,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.70", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.71", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -587,7 +588,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.70",
+        "version": "00.00.71",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -885,7 +886,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.70",
+        "project_version": "00.00.71",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1667,6 +1668,16 @@ def document_intelligence_project_status(project_id: int) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     return document_intelligence_status(project_id)
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/related")
+def document_related(project_id: int, document_id: int, limit: int = 8) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        return related_documents(project_id,document_id,limit=limit)
+    except LookupError as exc:
+        raise HTTPException(status_code=404,detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/documents/{document_id}/intelligence")

@@ -1316,3 +1316,42 @@
   font-size: 10px;
   line-height: 1.45;
 }
+
+/* 00.00.71: quiet and opt-in provenance-based candidate connections. */
+.drive-related-documents {
+  border:1px solid var(--ui-border)!important;
+  border-radius:13px;
+  padding:12px 14px!important;
+  background:var(--ui-surface-soft)!important;
+}
+.drive-related-documents summary {
+  cursor:pointer;
+  color:var(--ui-text);
+  font-size:13px;
+  font-weight:750;
+}
+.drive-related-documents .drive-intelligence-help {
+  margin:9px 0 13px;color:var(--ui-muted);font-size:12px;
+}
+#driveRelatedResults {display:grid;gap:10px}
+.drive-related-item {
+  border:1px solid var(--ui-border);
+  border-radius:11px;
+  padding:11px 13px;
+  background:var(--ui-surface);
+}
+.drive-related-item p {
+  margin:7px 0 0;
+  color:var(--ui-text-2);
+  line-height:1.55;font-size:11px;
+  overflow-wrap:anywhere;
+}
+.drive-related-open {
+  display:block;border:0;background:transparent;
+  color:var(--ui-accent);
+  font-size:13px;font-weight:700;
+  text-align:left;cursor:pointer;
+  padding:0;
+}
+.drive-related-open:hover{text-decoration:underline}
+.drive-related-warning{color:var(--ui-muted);font-size:12px}

@@ -129,6 +129,9 @@ jobs:
       - name: Chat startup and network performance safety
         run: npm run test:chat-performance
 
+      - name: Document candidate links
+        run: npm run test:document-links
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
