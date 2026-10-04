@@ -2305,6 +2305,10 @@ async def _build_agent_response(
             "request_id": request_id,
             "response_key": response_key,
             "diagnostics": diagnostics,
+            "comparison_offer": (
+                {"document_ids": list(attachment_ids), "question": text}
+                if attachment_ids and len(attachment_ids) >= 2 else None
+            ),
         },
         client_request_id=response_key,
     )
@@ -2326,6 +2330,10 @@ async def _build_agent_response(
         "answer": answer,
         "sources": sources,
         "diagnostics": diagnostics,
+        "comparison_offer": (
+            {"document_ids": list(attachment_ids), "question": text}
+            if attachment_ids and len(attachment_ids) >= 2 else None
+        ),
         "attachments": attachment_sources,
         "workflow": {
             "id": agent.workflow_id,
