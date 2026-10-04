@@ -355,6 +355,19 @@
       await forkMessage(row, false);
     } else if (action === "correct") {
       showCorrectionEditor(row);
+    } else if (action === "tasks") {
+      const goal = String(row._miyoriTaskGoal || "").trim();
+      if (!goal || typeof openAgentWorkspaceFromChat !== "function") return;
+      button.disabled = true;
+      try {
+        await openAgentWorkspaceFromChat(goal);
+      } finally {
+        button.disabled = false;
+      }
+    } else if (action === "actions") {
+      if (typeof renderNexusActionsWorkspace === "function") {
+        await renderNexusActionsWorkspace();
+      }
     }
   });
 
