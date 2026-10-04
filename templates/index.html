@@ -297,6 +297,11 @@
       </section>
       <section id="messages" class="messages" aria-live="polite" aria-label="Сообщения чата"></section>
       <section id="chatActivity" class="chat-activity" aria-label="Подтверждённые действия Миёри" hidden>
+        <details id="chatContinuationDetails" class="chat-continuation" hidden>
+          <summary><strong id="chatContinuationLabel">Незавершённая работа</strong></summary>
+          <div id="chatContinuationItems" class="chat-continuation-items"></div>
+          <button id="chatContinuationOpen" type="button" class="chat-continuation-open">Открыть Действия</button>
+        </details>
         <details id="chatActivityDetails">
           <summary><span class="chat-activity-led" aria-hidden="true"></span><strong>Что делает Миёри</strong><span id="chatActivitySummary">Проверка событий…</span></summary>
           <div id="chatActivityEvents" class="chat-activity-events" role="log"></div>
