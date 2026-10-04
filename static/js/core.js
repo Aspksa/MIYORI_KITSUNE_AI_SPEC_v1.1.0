@@ -151,7 +151,8 @@ function addMessage(role, text, sources = [], options = {}) {
       const indexes = Array.isArray(source?.chunk_indexes)
         ? source.chunk_indexes.map((value) => Number(value) + 1).filter(Number.isFinite)
         : [];
-      const past = source?.source_type === "chat_history" &&
+      const past = (source?.source_type === "chat_history" ||
+        source?.source_type === "owner_feedback") &&
         Number.isSafeInteger(Number(source.conversation_id)) &&
         Number.isSafeInteger(Number(source.message_id));
       const chip = document.createElement(past ? "button" :
@@ -167,7 +168,7 @@ function addMessage(role, text, sources = [], options = {}) {
                                   Number(source.message_id));
         });
       }
-      chip.textContent = past ? title + " · из переписки (непроверено)"
+      chip.textContent = past ? title + " · прежнее сообщение"
         : source?.readable === false
         ? title + " · нужен OCR"
         : indexes.length
@@ -223,6 +224,9 @@ function addMessage(role, text, sources = [], options = {}) {
           content.appendChild(warning);
         }
       }
+      if (Number(diagnostics.owner_feedback_count)>0)
+        line("Уточнения владельца",
+          diagnostics.owner_feedback_count+" (не являются проверенными фактами)");
       const history=diagnostics.historical_chat || {};
       if (history.requested) {
         line("Ранние разговоры",(history.matches||0)+
@@ -373,7 +377,9 @@ function addMessage(role, text, sources = [], options = {}) {
   controls.setAttribute("aria-label", "Действия с сообщением");
   const commands = role === "user"
     ? [["copy", "Копировать"], ["edit", "Изменить"]]
-    : [["copy", "Копировать"], ["retry", "Повторить"], ["save", options.bookmarked ? "Сохранено" : "Сохранить"]];
+    : [["copy", "Копировать"], ["retry", "Повторить"],
+       ["save", options.bookmarked ? "Сохранено" : "Сохранить"],
+       ["correct", "Исправить"]];
   commands.forEach(([action, label]) => {
     const button = document.createElement("button");
     button.type = "button";
