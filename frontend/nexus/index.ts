@@ -1,8 +1,9 @@
 import { installDialogAccessibility, installDisclosureAccessibility } from "./a11y.js";
 import { installNexusShell } from "./shell.js";
 import { installNexusSurfaceHost } from "./surfaces.js";
+import { installNexusPresence } from "./presence.js";
 
-const NEXUS_FRONTEND_VERSION = "0.6.0";
+const NEXUS_FRONTEND_VERSION = "0.7.0";
 
 function boot(): void {
   document.documentElement.dataset.nexus = "ready";
@@ -10,6 +11,7 @@ function boot(): void {
   installDisclosureAccessibility();
   installNexusShell();
   installNexusSurfaceHost();
+  installNexusPresence();
   window.dispatchEvent(
     new CustomEvent("miyori:nexus-ready", {
       detail: { version: NEXUS_FRONTEND_VERSION },
