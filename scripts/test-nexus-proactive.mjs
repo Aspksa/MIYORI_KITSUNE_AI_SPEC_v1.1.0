@@ -21,16 +21,21 @@ assert.ok(
 assert.ok(
   client.includes("fetchNexusProactive") &&
     client.includes("dismissNexusProactive") &&
-    client.includes("snoozeNexusProactive"),
-  "typed proactive client controls are missing",
+    client.includes("snoozeNexusProactive") &&
+    client.includes("/nexus/proactive/decision") &&
+    client.includes("signal_key") &&
+    client.includes("fingerprint") &&
+    !client.includes("/nexus/proactive/${encodeURIComponent(signalId)}/dismiss") &&
+    !client.includes("/nexus/proactive/${encodeURIComponent(signalId)}/snooze"),
+  "typed proactive client must use the canonical fingerprint decision endpoint",
 );
 assert.ok(
-  ts.includes("auto_execute_allowed === false") &&
-    ts.includes("write_tools_allowed === false") &&
-    ts.includes("chat_interruption_allowed === false") &&
-    ts.includes("creates_chat_message === false") &&
-    ts.includes("requires_explicit_user_action === true"),
-  "Proactive renderer must reject unsafe signal policy",
+  ts.includes("page.display.chat_shelf_ids") &&
+    ts.includes('signal.channel_owner === "attention_shelf"') &&
+    ts.includes("signal.safety?.executes_action === false") &&
+    ts.includes("signal.safety?.changes_domain_state === false") &&
+    ts.includes("signal.safety?.requires_existing_permission_flow === true"),
+  "Proactive renderer must show only budgeted advisory signals with safe policy",
 );
 assert.ok(
   ts.includes("Позже") &&
@@ -49,8 +54,10 @@ assert.ok(
   !ts.includes("Math.random") &&
     !js.includes("Math.random") &&
     !ts.includes("setInterval") &&
-    !js.includes("setInterval"),
-  "Proactive Miyori must be state/event-driven, not timer/random driven",
+    !js.includes("setInterval") &&
+    ts.includes("next_wakeup_at") &&
+    ts.includes("window.setTimeout"),
+  "Proactive Miyori may only schedule a one-shot snooze wakeup, never simulated liveness",
 );
 assert.ok(
   surfaces.includes("nexusProactiveVisible") &&
