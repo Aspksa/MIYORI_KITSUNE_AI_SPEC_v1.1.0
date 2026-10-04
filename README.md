@@ -11,43 +11,23 @@
 
 N10 добавляет инициативность как отдельный безопасный attention layer, а не как поток непрошеных сообщений:
 
-- новый `/api/projects/{id}/nexus/proactive` вычисляет сигналы из реального Actions/Knowledge state;
-- сигнал получает стабильный ID из project + source fingerprint;
-- persistence хранит только пользовательское решение `dismissed/snoozed`, а не копию workflow/knowledge;
-- dismiss и snooze переживают перезапуск;
-- snooze ограничен сервером диапазоном 15 минут – 7 дней;
-- новая реальная проблема получает новый signal ID и не скрывается старым dismiss;
-- attention budget зависит от `initiative_level`: low = 1, medium = 2, high = 3 видимых сигнала;
-- low-priority knowledge suggestion допускается только в пределах отдельного low-budget;
-- `suggest_next_steps=false` отключает необязательные Knowledge suggestions, но не скрывает ожидающие решения/recovery/errors;
-- каждый signal contract жёстко задаёт `auto_execute_allowed=false`, `write_tools_allowed=false`, `chat_interruption_allowed=false`, `creates_chat_message=false`;
-- UI — закрытый по умолчанию «Миёри заметила», расположенный вне message stream;
-- доступны только явные действия пользователя: открыть нужный раздел, «Позже» или «Скрыть»;
-- proactive inbox подавляет дублирующий Generative UI shelf, чтобы одна причина не отображалась дважды;
-- refresh использует реальный NEXUS event identity, а не таймеры/random;
-- proactive disposition записывается в audit trail.
+- `GET /api/projects/{id}/nexus/proactive` вычисляет сигналы из реального Actions/Knowledge state;
+- один canonical engine `miyori/proactive.py` отвечает за candidates, fingerprint, budget и persistence; `nexus_proactive.py` оставлен только compatibility facade;
+- signal fingerprint строится из фактического состояния источника, поэтому dismiss относится только к той же версии проблемы;
+- persistence хранит только пользовательское решение `dismissed/snoozed`, а не копию workflow, permission или Knowledge;
+- snooze поддерживает два понятных интервала: 1 час и 1 день;
+- новая/изменившаяся проблема получает новый fingerprint и снова может быть показана;
+- attention budget уважает существующие `initiative_level` и `suggest_next_steps`: low не показывает advisory shelf, medium показывает максимум 1, high — максимум 2;
+- operational blockers (permission/recovery/error) остаются contract-сигналами для будущих Desktop/Voice, но в текущем Chat принадлежат Presence/Actions и не дублируются в proactive shelf;
+- Chat shelf получает только сигналы с `channel_owner=attention_shelf` и только ID, выбранные сервером в `display.chat_shelf_ids`;
+- сервер запрещает `auto_execute`, write-action, chat-message injection, interruption и OS notifications;
+- UI закрыт по умолчанию и находится вне message stream;
+- доступны только явные действия пользователя: открыть доверенный раздел, «Позже» или «Скрыть»;
+- proactive visibility подавляет дублирующий Generative UI shelf, чтобы одна и та же advisory-причина не отображалась дважды;
+- refresh использует authoritative snapshot/event fingerprint, а не random/timer-driven activity;
+- dismiss/snooze записываются в audit trail.
 
-Таким образом Miyori может быть инициативной, но не назойливой: она замечает важное, ограничивает собственное внимание и никогда не превращает инициативу в автоматическое write-действие.
-
-## Состояние релиза 00.00.49
-
-`00.00.49` — **NEXUS Living Presence · жизнь только из реального состояния**.
-
-N9 добавляет спокойный presence layer, который не симулирует «характер» случайными эффектами:
-
-- `/api/projects/{id}/nexus/presence` формирует versioned authoritative presence contract;
-- режимы ограничены `ready / working / waiting / attention / recovery / degraded`;
-- приоритет recovery/waiting/error определяется реальным Actions state;
-- knowledge attention и failed tasks участвуют как реальные причины состояния;
-- last event берётся из существующего NEXUS Event Fabric;
-- frontend получает реальный локальный `miyori:interaction-state` только на время фактически отправленного chat-request;
-- idle/ready не занимает экран: presence host скрыт;
-- нет `Math.random`, timer-driven «дыхания», `setInterval` или keyframe-анимации;
-- высокий attention может раскрыть последнее подтверждённое событие;
-- contextual button ведёт в Actions, Knowledge или System в зависимости от фактической причины;
-- Presence capability опубликован в NEXUS snapshot с запретом random liveness.
-
-Такой контракт готов к будущим Voice/Desktop/Avatar: визуальное или голосовое поведение сможет подписываться на те же состояния, не изобретая собственную «эмоцию».
+Итог: Miyori может замечать важное и сохранять инициативность, но право на внимание и любое реальное действие остаётся у пользователя.
 
 ## Состояние релиза 00.00.49
 
