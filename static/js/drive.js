@@ -51,7 +51,7 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
           '<div id="driveResult"></div>' +
         '</section>' +
       '</main>' +
-      '<input id="driveFileInput" type="file" multiple hidden>' +
+      '<input id="driveFileInput" type="file" accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.markdown,.json,.png,.jpg,.jpeg,.webp" multiple hidden>' +
     '</section>';
 
   let activeFolderId = initialFolderId ? Number(initialFolderId) : null;
@@ -66,6 +66,7 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
   const fileType = (name) => {
     const ext = String(name || "").split(".").pop().toLowerCase();
     if (ext === "pdf") return {icon: "PDF", cls: "pdf"};
+    if (["png","jpg","jpeg","webp"].includes(ext)) return {icon: "IMG", cls: "image"};
     if (ext === "docx") return {icon: "W", cls: "word"};
     if (ext === "xlsx") return {icon: "X", cls: "excel"};
     if (ext === "pptx") return {icon: "P", cls: "powerpoint"};
@@ -204,7 +205,7 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
 
     try {
       clearTimeout(documentQuestionPoll);
-      const [data, questionData] = await Promise.all([
+      const [data, questionData, visionData] = await Promise.all([
         api(
           "/api/projects/" + state.projectId + "/documents/" +
           documentId + "/intelligence"
@@ -212,10 +213,16 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
         api(
           "/api/projects/" + state.projectId + "/documents/" +
           documentId + "/questions?limit=12"
+        ),
+        api(
+          "/api/projects/" + state.projectId + "/documents/" +
+          documentId + "/vision"
         )
       ]);
       const profile = data.intelligence || {};
       const questions = questionData.questions || [];
+      const visionState = visionData.state || {status:"not_started"};
+      const visionItems = visionData.items || [];
       const coverage = Math.max(0, Math.min(100, Math.round(
         Number(profile.coverage_ratio || 0) * 100
       )));
@@ -261,7 +268,9 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
                     ? " · часть страниц/слайдов не содержит доступного текстового слоя."
                     : extractionStatus === "needs_ocr"
                       ? " · для полного чтения нужен OCR."
-                      : "") +
+                      : extractionStatus === "vision_augmented"
+                        ? " · локальный текст дополнен OCR/визуальным анализом с привязкой к источникам."
+                        : "") +
             '</small>' +
           '</div>' +
           (extractionWarnings.length
@@ -271,6 +280,38 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
               ).join("") +
               '</div>'
             : '') +
+          '<section class="drive-intelligence-section drive-vision-status">' +
+            '<div class="drive-vision-head"><div><h4>Зрение и OCR</h4>' +
+              '<p>Сканированные страницы и изображения обрабатываются только по явному запуску. ' +
+              'Источник сохраняется до страницы или media-объекта; непроверенные координаты не показываются.</p></div>' +
+              '<span class="state-chip">' + escapeHtml(visionState.status || "not_started") + '</span></div>' +
+            '<div class="drive-vision-metrics">' +
+              '<span>Запрошено <strong>' + Number(visionState.requested_items || 0) + '</strong></span>' +
+              '<span>Готово <strong>' + Number(visionState.processed_items || 0) + '</strong></span>' +
+              '<span>Ошибки <strong>' + Number(visionState.failed_items || 0) + '</strong></span>' +
+            '</div>' +
+            (visionItems.length
+              ? '<div class="drive-vision-sources">' +
+                visionItems.slice(0,24).map(item =>
+                  '<div><strong>' + escapeHtml(item.locator || "") + '</strong>' +
+                    '<small>' + escapeHtml(item.status || "") +
+                    ' · OCR ' + Number(item.text_chars || 0) + ' симв.' +
+                    (Number(item.visual_chars || 0) ? ' · Vision ' + Number(item.visual_chars || 0) + ' симв.' : '') +
+                    '</small></div>'
+                ).join("") + '</div>'
+              : '<div class="workspace-empty">OCR/визуальный анализ ещё не запускался.</div>') +
+            (visionState.last_error
+              ? '<div class="sheet-note warning">' + escapeHtml(visionState.last_error) + '</div>'
+              : '') +
+            '<div class="sheet-actions">' +
+              '<button id="driveVisionStart" class="secondary-sheet-button" type="button"' +
+                (["queued","running"].includes(visionState.status) ? " disabled" : "") +
+                '>' + (["queued","running"].includes(visionState.status)
+                  ? "Распознавание выполняется…"
+                  : (visionItems.length ? "Обновить OCR / Vision" : "Распознать страницы и изображения")) +
+              '</button>' +
+            '</div>' +
+          '</section>' +
           '<div class="drive-intelligence-coverage">' +
             '<div><strong>AI-анализ извлечённого текста</strong><span>' + coverage + '%</span></div>' +
             '<div class="drive-intelligence-progress"><i style="width:' + coverage + '%"></i></div>' +
@@ -505,6 +546,46 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
         };
       }
 
+      const visionButton = el("driveVisionStart");
+      if (visionButton) visionButton.onclick = async () => {
+        visionButton.disabled = true;
+        visionButton.textContent = "Ставлю в очередь…";
+        try {
+          const queued = await api(
+            "/api/projects/" + state.projectId + "/documents/" +
+            documentId + "/vision",
+            {
+              method:"POST",
+              headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({
+                force:Boolean(visionItems.length),
+                max_items:12,
+                include_text_pages:false
+              })
+            }
+          );
+          if (typeof loadTasks === "function") loadTasks();
+          resultNode.insertAdjacentHTML(
+            "afterbegin",
+            workspaceResult(
+              queued.already_running
+                ? "OCR / Vision уже выполняется."
+                : "OCR / Vision поставлен в фоновую очередь" +
+                  (queued.task?.id ? " · задача #" + queued.task.id : "") + ".",
+              "success"
+            )
+          );
+          setTimeout(() => renderIntelligencePanel(documentId), 900);
+        } catch (error) {
+          resultNode.insertAdjacentHTML(
+            "afterbegin",
+            workspaceResult(error.message, "error")
+          );
+          visionButton.disabled = false;
+          visionButton.textContent = "Распознать страницы и изображения";
+        }
+      };
+
       el("driveIntelligenceRefresh").onclick = () => renderIntelligencePanel(documentId);
       el("driveIntelligenceRebuild").onclick = async () => {
         resultNode.innerHTML = workspaceResult("Перестраиваю локальную карту документа…", "working");
@@ -551,7 +632,10 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
         }
       };
 
-      if (questions.some(item => ["queued", "analyzing"].includes(item.status))) {
+      if (
+        questions.some(item => ["queued", "analyzing"].includes(item.status)) ||
+        ["queued","running"].includes(visionState.status)
+      ) {
         documentQuestionPoll = setTimeout(() => {
           if (document.body.contains(resultNode)) {
             renderIntelligencePanel(documentId);
