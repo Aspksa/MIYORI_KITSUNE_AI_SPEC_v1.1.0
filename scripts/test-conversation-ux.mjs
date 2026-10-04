@@ -60,9 +60,13 @@ assert.ok(
 );
 assert.ok(
   backend.includes("chat_voice_notes") &&
+  backend.includes("delete_voice_note") &&
   client.includes("MediaRecorder") &&
-  client.includes("SpeechRecognition"),
-  "Voice notes must persist real audio and only use browser STT when available.",
+  client.includes("SpeechRecognition") &&
+  client.includes("drawVoiceWaveform") &&
+  client.includes("encodeTrimmedWav") &&
+  client.includes("trimVoiceDraft"),
+  "Voice notes must persist real audio, expose waveform trimming and clean drafts safely.",
 );
 assert.ok(
   chat.includes("reply_to_message_id") &&
