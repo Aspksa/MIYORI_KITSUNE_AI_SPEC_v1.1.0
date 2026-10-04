@@ -77,7 +77,8 @@ function setBusy(value) {
   sendButton.disabled = value;
   input.disabled = value;
   projectSelect.disabled = value;
-  sendButton.textContent = value ? "Думаю…" : "Отправить";
+  sendButton.title = value ? "Миёри отвечает…" : "Отправить сообщение";
+  sendButton.setAttribute("aria-label", value ? "Миёри отвечает…" : "Отправить сообщение");
   setPulse(value ? "thinking" : "ready");
   window.dispatchEvent(
     new CustomEvent("miyori:interaction-state", {
@@ -87,18 +88,19 @@ function setBusy(value) {
 }
 
 function addMessage(role, text, sources = []) {
+  if (role === "user") messages.querySelector(".welcome-message")?.remove();
   const article = document.createElement("article");
   article.className = "message " + role;
 
   const avatar = document.createElement("div");
   avatar.className = "avatar";
-  avatar.textContent = role === "assistant" ? "狐" : "Вы";
+  avatar.textContent = role === "assistant" ? "狐" : "●";
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
 
   const author = document.createElement("strong");
-  author.textContent = role === "assistant" ? "Миёри" : "Господин";
+  author.textContent = role === "assistant" ? "Миёри" : "Вы";
 
   const body = document.createElement("p");
   body.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
@@ -150,23 +152,19 @@ function showWelcome() {
 
   const article = document.createElement("article");
   article.className = "message assistant welcome-message";
-
-  const avatar = document.createElement("div");
-  avatar.className = "avatar nexus-avatar";
-  avatar.textContent = "狐";
-
   const bubble = document.createElement("div");
   bubble.className = "bubble welcome-bubble clean-welcome";
-  bubble.innerHTML =
-    '<div class="quiet-welcome-top">' +
-      '<div><strong>Миёри</strong><p>Здравствуйте, Господин. Чем займёмся?</p></div>' +
-      '<div class="pulse-mini"><span class="pulse-dot"></span><span id="pulseText">готова</span></div>' +
-    '</div>' +
-    '<div id="nexusSuggestions" hidden></div>';
-
-  article.append(avatar, bubble);
+  const title = document.createElement("h3");
+  title.textContent = "С чего начнём, Господин?";
+  const subtitle = document.createElement("p");
+  subtitle.textContent = "Миёри готова помочь с документами, проектами и вопросами.";
+  const suggestions = document.createElement("div");
+  suggestions.id = "nexusSuggestions";
+  suggestions.hidden = true;
+  bubble.append(title, subtitle, suggestions);
+  article.appendChild(bubble);
   messages.appendChild(article);
-  conversationTitle.textContent = "Miyori Kitsune";
+  conversationTitle.textContent = "Миёри";
   messages.scrollTop = 0;
   setPulse("ready");
 }
