@@ -13,6 +13,24 @@ if (el("workspaceBackToChat")) el("workspaceBackToChat").onclick = showChatWorks
 if (menuAccount) menuAccount.onclick = renderAccountWorkspace;
 if (menuProjectUpdate) menuProjectUpdate.onclick = () => renderUpdateWorkspace(false);
 if (menuSettings) menuSettings.onclick = renderSettingsWorkspace;
+const menuAppearance = el("menuAppearance");
+if (menuAppearance) menuAppearance.onclick = () => {
+  showChatWorkspace();
+  const host = el("nexusBodyHost");
+  if (!host) return;
+  host.dataset.appearanceOpen = "true";
+  const canon = host.querySelector(".nexus-body-canon");
+  if (canon) canon.open = true;
+};
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  const host = el("nexusBodyHost");
+  if (host?.dataset.appearanceOpen === "true") {
+    host.dataset.appearanceOpen = "false";
+    const canon = host.querySelector(".nexus-body-canon");
+    if (canon) canon.open = false;
+  }
+});
 if (menuMobileApp) menuMobileApp.onclick = renderMobileWorkspace;
 if (menuDocumentsHub) menuDocumentsHub.onclick = renderDocumentsWorkspace;
 if (menuWorkProjects) menuWorkProjects.onclick = () => renderProjectsWorkspace("work");
