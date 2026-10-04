@@ -5,15 +5,22 @@ import unittest
 from pathlib import Path
 
 from miyori.config import settings
-from miyori.db import connect, create_project, init_db
+from miyori.db import (
+    add_memory_fact,
+    connect,
+    create_project,
+    get_ai_preferences,
+    init_db,
+    list_audit_events,
+    update_ai_preferences,
+)
 from miyori.document_intelligence import init_document_intelligence_db
 from miyori.document_questions import init_document_questions_db
 from miyori.epistemic import init_epistemic_db
-from miyori.nexus_proactive import (
+from miyori.proactive import (
     NEXUS_PROACTIVE_SCHEMA_VERSION,
+    apply_proactive_decision,
     build_nexus_proactive,
-    init_proactive_db,
-    set_proactive_disposition,
 )
 from miyori.tools import execute_tool
 
@@ -27,11 +34,11 @@ class NexusProactiveContractTests(unittest.TestCase):
         object.__setattr__(settings, "data_dir", root / "data")
         object.__setattr__(settings, "database_path", root / "data" / "miyori.sqlite3")
         settings.data_dir.mkdir(parents=True, exist_ok=True)
+
         init_db()
         init_document_intelligence_db()
         init_document_questions_db()
         init_epistemic_db()
-        init_proactive_db()
         self.project = create_project("NEXUS Proactive", kind="work")
         self.project_id = int(self.project["id"])
 
@@ -40,43 +47,53 @@ class NexusProactiveContractTests(unittest.TestCase):
         object.__setattr__(settings, "database_path", self.old_database_path)
         self.tmp.cleanup()
 
-    def _waiting_signal(self, suffix: str = "1") -> dict:
+    def _set_initiative(self, level: str, suggest: bool = True) -> None:
+        current = get_ai_preferences()
+        update_ai_preferences(
+            communication_style=current.get("communication_style", "balanced"),
+            detail_level=current.get("detail_level", "normal"),
+            initiative_level=level,
+            ask_before_assuming=bool(current.get("ask_before_assuming", 0)),
+            suggest_next_steps=suggest,
+            use_rag=bool(current.get("use_rag", 1)),
+            use_verified_memory=bool(current.get("use_verified_memory", 1)),
+            show_uncertainty=bool(current.get("show_uncertainty", 1)),
+            priority_mode=current.get("priority_mode", "accuracy"),
+            operating_mode=current.get("operating_mode", "personal"),
+        )
+
+    def _add_knowledge_attention(self, statement: str) -> None:
+        add_memory_fact(
+            self.project_id,
+            statement,
+            status="disputed",
+            memory_scope="project",
+            memory_kind="constraint",
+        )
+
+    def test_operational_blocker_is_presence_owned_and_never_auto_executes(self) -> None:
         result = execute_tool(
             "workspace_create",
             self.project_id,
-            {"path": f"proactive-{suffix}.txt", "content": "hello"},
+            {"path": "proactive.txt", "content": "hello"},
             reason="Создать файл.",
-            idempotency_key=f"proactive:test:{suffix}",
+            idempotency_key="proactive:permission:1",
         )
         self.assertEqual(result["status"], "approval_required")
-        page = build_nexus_proactive(self.project_id)
-        return next(item for item in page["signals"] if item["category"] == "action")
 
-    def test_waiting_action_becomes_non_executing_proactive_signal(self) -> None:
-        signal = self._waiting_signal()
         page = build_nexus_proactive(self.project_id)
-
         self.assertEqual(page["schema_version"], NEXUS_PROACTIVE_SCHEMA_VERSION)
-        self.assertIn(signal, page["signals"])
-        self.assertEqual(signal["priority"], "normal")
-        self.assertEqual(signal["action"]["target"], "actions")
-        self.assertFalse(signal["policy"]["auto_execute_allowed"])
-        self.assertFalse(signal["policy"]["write_tools_allowed"])
-        self.assertFalse(signal["policy"]["chat_interruption_allowed"])
-        self.assertFalse(signal["policy"]["creates_chat_message"])
-        self.assertTrue(signal["policy"]["requires_explicit_user_action"])
-
-    def test_dismiss_persists_and_does_not_mutate_underlying_action(self) -> None:
-        signal = self._waiting_signal("dismiss")
-        set_proactive_disposition(
-            self.project_id,
-            signal["id"],
-            disposition="dismissed",
+        blocker = next(
+            item for item in page["signals"] if item["kind"] == "operational"
         )
 
-        page = build_nexus_proactive(self.project_id)
-        self.assertEqual(page["counts"]["dismissed"], 1)
-        self.assertFalse(any(item["id"] == signal["id"] for item in page["signals"]))
+        self.assertEqual(blocker["channel_owner"], "presence")
+        self.assertIn(blocker["id"], page["display"]["presence_owned_ids"])
+        self.assertNotIn(blocker["id"], page["display"]["chat_shelf_ids"])
+        self.assertFalse(page["policy"]["auto_execute_allowed"])
+        self.assertFalse(page["policy"]["write_action_allowed"])
+        self.assertFalse(page["policy"]["chat_message_injection_allowed"])
+        self.assertTrue(blocker["safety"]["requires_existing_permission_flow"])
 
         with connect() as conn:
             request = conn.execute(
@@ -90,62 +107,121 @@ class NexusProactiveContractTests(unittest.TestCase):
             ).fetchone()
         self.assertEqual(request["status"], "pending")
 
-    def test_snooze_is_persistent_and_bounded(self) -> None:
-        signal = self._waiting_signal("snooze")
-        result = set_proactive_disposition(
+    def test_medium_initiative_allows_one_integrity_signal_in_quiet_shelf(self) -> None:
+        self._set_initiative("medium", suggest=True)
+        self._add_knowledge_attention("Budget is disputed.")
+
+        page = build_nexus_proactive(self.project_id)
+        signal = next(
+            item
+            for item in page["signals"]
+            if item["kind"] == "knowledge_integrity"
+        )
+
+        self.assertEqual(signal["channel_owner"], "attention_shelf")
+        self.assertEqual(page["budget"]["max_chat_shelf"], 1)
+        self.assertEqual(page["display"]["chat_shelf_ids"], [signal["id"]])
+
+    def test_low_initiative_keeps_advisory_signal_out_of_chat_shelf(self) -> None:
+        self._set_initiative("low", suggest=True)
+        self._add_knowledge_attention("Delivery date is disputed.")
+
+        page = build_nexus_proactive(self.project_id)
+        self.assertTrue(
+            any(item["kind"] == "knowledge_integrity" for item in page["signals"])
+        )
+        self.assertEqual(page["budget"]["max_chat_shelf"], 0)
+        self.assertEqual(page["display"]["chat_shelf_ids"], [])
+
+    def test_suggest_next_steps_off_disables_advisory_shelf(self) -> None:
+        self._set_initiative("high", suggest=False)
+        self._add_knowledge_attention("Contract amount is disputed.")
+
+        page = build_nexus_proactive(self.project_id)
+        self.assertEqual(page["budget"]["max_chat_shelf"], 0)
+        self.assertEqual(page["display"]["chat_shelf_ids"], [])
+
+    def test_dismiss_is_fingerprint_scoped_and_does_not_hide_changed_reality(self) -> None:
+        self._add_knowledge_attention("Budget limit is disputed.")
+        before = build_nexus_proactive(self.project_id)
+        signal = next(
+            item
+            for item in before["signals"]
+            if item["kind"] == "knowledge_integrity"
+        )
+
+        result = apply_proactive_decision(
             self.project_id,
-            signal["id"],
-            disposition="snoozed",
+            signal_key=signal["signal_key"],
+            fingerprint=signal["fingerprint"],
+            decision="dismissed",
+        )
+        self.assertTrue(result["ok"])
+        after = result["proactive"]
+        self.assertNotIn(signal["id"], [item["id"] for item in after["signals"]])
+        self.assertTrue(
+            any(
+                item["signal_key"] == signal["signal_key"]
+                and item["reason"] == "dismissed"
+                for item in after["suppressed"]
+            )
+        )
+
+        self._add_knowledge_attention("Another disputed constraint.")
+        changed = build_nexus_proactive(self.project_id)
+        next_signal = next(
+            item
+            for item in changed["signals"]
+            if item["kind"] == "knowledge_integrity"
+        )
+        self.assertNotEqual(next_signal["fingerprint"], signal["fingerprint"])
+
+        audit = list_audit_events(self.project_id, limit=20)
+        self.assertTrue(
+            any(item["event_type"] == "proactive.dismissed" for item in audit)
+        )
+
+    def test_snooze_persists_and_reports_next_wakeup(self) -> None:
+        self._add_knowledge_attention("Evidence needs review.")
+        before = build_nexus_proactive(self.project_id)
+        signal = next(
+            item
+            for item in before["signals"]
+            if item["kind"] == "knowledge_integrity"
+        )
+
+        result = apply_proactive_decision(
+            self.project_id,
+            signal_key=signal["signal_key"],
+            fingerprint=signal["fingerprint"],
+            decision="snoozed",
             snooze_minutes=60,
         )
         self.assertIsNotNone(result["snoozed_until"])
 
-        init_proactive_db()
-        page = build_nexus_proactive(self.project_id)
-        self.assertEqual(page["counts"]["snoozed"], 1)
-        self.assertFalse(any(item["id"] == signal["id"] for item in page["signals"]))
-
-    def test_low_initiative_caps_visible_attention_to_one(self) -> None:
-        self._waiting_signal("budget-a")
-        self._waiting_signal("budget-b")
-        with connect() as conn:
-            conn.execute(
-                """
-                UPDATE ai_preferences
-                SET initiative_level = 'low', updated_at = updated_at
-                WHERE id = 1
-                """
+        # Re-running init_db represents a process restart; the decision must survive.
+        init_db()
+        after = build_nexus_proactive(self.project_id)
+        self.assertNotIn(signal["id"], [item["id"] for item in after["signals"]])
+        self.assertIsNotNone(after["next_wakeup_at"])
+        self.assertTrue(
+            any(
+                item["signal_key"] == signal["signal_key"]
+                and item["reason"] == "snoozed"
+                for item in after["suppressed"]
             )
-
-        page = build_nexus_proactive(self.project_id)
-        self.assertEqual(page["initiative_level"], "low")
-        self.assertEqual(page["budget"]["effective_max_visible"], 1)
-        self.assertEqual(len(page["signals"]), 1)
-        self.assertGreaterEqual(page["counts"]["budget_suppressed"], 1)
-
-    def test_dismissed_signal_does_not_hide_new_distinct_signal(self) -> None:
-        first = self._waiting_signal("first")
-        set_proactive_disposition(
-            self.project_id,
-            first["id"],
-            disposition="dismissed",
         )
-        second = self._waiting_signal("second")
-        self.assertNotEqual(first["id"], second["id"])
 
+    def test_policy_forbids_chat_injection_interruptions_and_os_notifications(self) -> None:
         page = build_nexus_proactive(self.project_id)
-        visible_ids = {item["id"] for item in page["signals"]}
-        self.assertNotIn(first["id"], visible_ids)
-        self.assertIn(second["id"], visible_ids)
-
-    def test_server_policy_never_allows_chat_interruption_or_tool_execution(self) -> None:
-        page = build_nexus_proactive(self.project_id)
-        self.assertFalse(page["policy"]["chat_interruption_allowed"])
-        self.assertFalse(page["policy"]["auto_execute_allowed"])
-        self.assertFalse(page["policy"]["write_tools_allowed"])
-        self.assertFalse(page["policy"]["creates_chat_messages"])
-        self.assertTrue(page["policy"]["persistent_dismiss_snooze"])
-        self.assertTrue(page["policy"]["derived_from_authoritative_state"])
+        policy = page["policy"]
+        self.assertFalse(policy["auto_execute_allowed"])
+        self.assertFalse(policy["write_action_allowed"])
+        self.assertFalse(policy["chat_message_injection_allowed"])
+        self.assertFalse(policy["interrupt_user_allowed"])
+        self.assertFalse(policy["os_notification_allowed"])
+        self.assertTrue(policy["operational_blockers_owned_by_presence"])
+        self.assertTrue(policy["decisions_change_signal_visibility_only"])
 
 
 if __name__ == "__main__":
