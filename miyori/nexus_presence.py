@@ -107,6 +107,16 @@ def build_nexus_presence(project_id: int) -> dict:
                 state="background_attention",
             )
         )
+    if verifying:
+        item = verifying[0]
+        reasons.append(
+            _reason(
+                "action",
+                str(item.get("title") or "Проверяется действие"),
+                state="verifying",
+                entity_id=str(item.get("id") or ""),
+            )
+        )
     if active:
         item = active[0]
         reasons.append(
@@ -133,11 +143,21 @@ def build_nexus_presence(project_id: int) -> dict:
         headline = "Жду вашего решения"
         detail = "Есть действие, которое не продолжится без явного разрешения."
         attention = "normal"
+    elif verifying:
+        active_item = verifying[0]
+        mode = "verifying"
+        headline = "Проверяю"
+        detail = str(
+            (active_item.get("progress") or {}).get("label")
+            or active_item.get("title")
+            or active_item.get("state_label")
+            or "Проверяю фактическое состояние действия."
+        )
+        attention = "low"
     elif active:
         active_item = active[0]
-        active_state = str(active_item.get("state") or "running")
-        mode = "verifying" if active_state == "verifying" else "working"
-        headline = "Проверяю" if mode == "verifying" else "Работаю"
+        mode = "working"
+        headline = "Работаю"
         detail = str(
             (active_item.get("progress") or {}).get("label")
             or active_item.get("title")
@@ -200,6 +220,8 @@ def build_nexus_presence(project_id: int) -> dict:
             ],
             "random_liveness_allowed": False,
             "decorative_activity_allowed": False,
+            "chat_interruption_allowed": False,
+            "knowledge_attention_changes_primary_presence": False,
         },
         "generated_at": _now(),
     }
