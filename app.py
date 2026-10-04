@@ -296,7 +296,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.61", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.62", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -316,6 +316,7 @@ class ChatRequest(BaseModel):
     conversation_id: int | None = None
     request_id: str | None = Field(default=None, min_length=8, max_length=128)
     attachment_ids: list[int] = Field(default_factory=list, max_length=5)
+    read_only: bool = False
 
 
 class ConversationUiPatch(BaseModel):
@@ -556,7 +557,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.61",
+        "version": "00.00.62",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -854,7 +855,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.61",
+        "project_version": "00.00.62",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -2678,6 +2679,7 @@ async def send_message(request: ChatRequest) -> dict:
         if (
             existing_message["content"] != text
             or (existing_message.get("metadata") or {}).get("attachments", []) != attachment_ids
+            or bool((existing_message.get("metadata") or {}).get("read_only", False)) != request.read_only
         ):
             raise HTTPException(
                 status_code=409,
@@ -2718,7 +2720,7 @@ async def send_message(request: ChatRequest) -> dict:
             "user",
             text,
             client_request_id=request.request_id,
-            metadata={"attachments": attachment_ids},
+            metadata={"attachments": attachment_ids, "read_only": request.read_only},
         )
         is_new_message = True
         request_key = (
@@ -2743,17 +2745,15 @@ async def send_message(request: ChatRequest) -> dict:
                 "attachment_count": len(attachment_ids),
             },
         )
-        captured_memory = maybe_capture_user_memory(
-            request.project_id,
-            conversation_id,
-            user_message_id,
-            text,
+        captured_memory = (
+            None if request.read_only else maybe_capture_user_memory(
+                request.project_id, conversation_id, user_message_id, text
+            )
         )
-        captured_claims = capture_user_claims(
-            request.project_id,
-            conversation_id,
-            user_message_id,
-            text,
+        captured_claims = (
+            [] if request.read_only else capture_user_claims(
+                request.project_id, conversation_id, user_message_id, text
+            )
         )
     else:
         captured_memory = None
@@ -2764,9 +2764,15 @@ async def send_message(request: ChatRequest) -> dict:
         if existing_workflow else
         route_context(text)
     )
+    from dataclasses import replace as replace_route
+    if request.read_only:
+        route = replace_route(
+            route,
+            use_tools=False,
+            reasons=route.reasons + ("safe_read_only_fork",),
+        )
     if attachment_ids and not route.use_documents:
-        from dataclasses import replace
-        route = replace(route, use_documents=True)
+        route = replace_route(route, use_documents=True)
     context = recent_messages(conversation_id)
 
     agent = await run_agent(

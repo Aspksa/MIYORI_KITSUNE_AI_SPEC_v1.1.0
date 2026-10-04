@@ -28,6 +28,7 @@
     "test:nexus-body-renderer": "node scripts/test-nexus-body-renderer.mjs",
     "test:ui-unification": "node scripts/test-ui-unification.mjs",
     "test:chat-experience": "node scripts/test-chat-experience.mjs",
-    "test:chat-capabilities": "node scripts/test-chat-capabilities.mjs"
+    "test:chat-capabilities": "node scripts/test-chat-capabilities.mjs",
+    "test:chat-safe-forks": "node scripts/test-chat-safe-forks.mjs"
   }
 }

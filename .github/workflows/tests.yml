@@ -102,6 +102,9 @@ jobs:
       - name: Chat capability integration
         run: npm run test:chat-capabilities
 
+      - name: Safe chat forks and retries
+        run: npm run test:chat-safe-forks
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

@@ -267,6 +267,8 @@ async function loadMemory() {
 }
 
 function startNewChat() {
+  window.miyoriForkReadOnly = false;
+  state.pendingRequest = null;
   window.miyoriDrafts?.save();
   window.miyoriChatAttachments?.clear();
   state.conversationId = null;
@@ -301,6 +303,7 @@ form.addEventListener("submit", async (event) => {
     return;
   }
   const attachment_ids = attachedFiles.map(file => Number(file.id));
+  const readOnly = Boolean(window.miyoriForkReadOnly);
   showError("");
   const uploadStatus = el("composerUploadStatus");
   if (uploadStatus) uploadStatus.textContent = "";
@@ -314,9 +317,20 @@ form.addEventListener("submit", async (event) => {
   state.submissionPending = false;
   window.miyoriChatActivity?.begin();
 
-  const requestId = (window.crypto?.randomUUID?.() || (
-    Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
-  ));
+  const pending = state.pendingRequest;
+  const reuse = pending &&
+    pending.projectId === state.projectId &&
+    pending.text === text &&
+    pending.readOnly === readOnly &&
+    pending.conversationId === state.conversationId &&
+    JSON.stringify(pending.attachment_ids) === JSON.stringify(attachment_ids);
+  const requestId = reuse ? pending.requestId :
+    (window.crypto?.randomUUID?.() ||
+      (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)));
+  state.pendingRequest = {
+    requestId, projectId:state.projectId, conversationId:state.conversationId,
+    text, readOnly, attachment_ids:[...attachment_ids],
+  };
   state.lastRequestId = requestId;
 
   try {
@@ -328,12 +342,17 @@ form.addEventListener("submit", async (event) => {
         project_id: state.projectId,
         conversation_id: state.conversationId,
         request_id: requestId,
+        read_only: readOnly,
         attachment_ids
       })
     });
     const data = await response.json();
     if (!response.ok) {
-      if (data?.detail?.conversation_id) state.conversationId = data.detail.conversation_id;
+      if (data?.detail?.conversation_id) {
+        state.conversationId = data.detail.conversation_id;
+        if (state.pendingRequest)
+          state.pendingRequest.conversationId = state.conversationId;
+      }
       const detail = data?.detail?.message || data?.detail || "Ошибка запроса.";
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
@@ -342,6 +361,8 @@ form.addEventListener("submit", async (event) => {
     if (data.user_message_id) userRow.dataset.messageId = String(data.user_message_id);
     addMessage("assistant", data.answer, data.sources || [], {id:data.assistant_message_id});
     attachmentStore?.clear();
+    state.pendingRequest = null;
+    window.miyoriForkReadOnly = false;
     window.dispatchEvent(new CustomEvent("miyori:chat-response", {detail: data}));
 
     // Технические данные обновляются внутри системы, но не добавляются в пользовательский чат.
@@ -393,6 +414,11 @@ form.addEventListener("submit", async (event) => {
     ]);
   } catch (error) {
     showError(error.message || "Не удалось получить ответ.");
+    // Keep the stable request ID for safe retry of a persisted workflow.
+    // Restore the draft and staged files instead of losing the user's work.
+    if (userRow) userRow.remove();
+    input.value = text;
+    input.dispatchEvent(new Event("input", {bubbles:true}));
     await loadConversations();
   } finally {
     window.miyoriChatActivity?.complete();
@@ -402,6 +428,8 @@ form.addEventListener("submit", async (event) => {
 });
 
 projectSelect.addEventListener("change", async () => {
+  window.miyoriForkReadOnly = false;
+  state.pendingRequest = null;
   ++conversationOpenToken;
   conversationOpenController?.abort();
   window.miyoriDrafts?.save();
