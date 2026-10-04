@@ -322,6 +322,7 @@ class AgentWorkspaceNodeRequest(BaseModel):
     role: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=160)
     instruction: str = Field(min_length=1, max_length=6000)
+    capability: str = Field(default="read_only", pattern="^(read_only|standard)$")
     depends_on: list[str] = Field(default_factory=list, max_length=8)
     step_budget: int = Field(default=3, ge=1, le=5)
 
