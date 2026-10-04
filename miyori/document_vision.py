@@ -131,6 +131,21 @@ def _set_state(
         )
 
 
+def mark_document_vision_queued(
+    project_id: int,
+    document_id: int,
+) -> dict:
+    if not get_document(project_id, document_id):
+        raise LookupError("Документ не найден в текущем проекте.")
+    _set_state(
+        project_id,
+        document_id,
+        "queued",
+        error=None,
+    )
+    return document_vision_status(project_id, document_id)
+
+
 def document_vision_status(project_id: int, document_id: int) -> dict:
     init_document_vision_db()
     if not get_document(project_id, document_id):
