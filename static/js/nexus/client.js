@@ -235,8 +235,9 @@ export async function fetchNexusAgentWorkspaces(projectId) {
     const response = await fetch(`/api/projects/${projectId}/agent-workspaces`, {
         headers: { Accept: "application/json" },
     });
-    if (!response.ok)
+    if (!response.ok) {
         throw new Error(`Agent Workspace API: HTTP ${response.status}`);
+    }
     const payload = (await response.json());
     return Array.isArray(payload.workspaces) ? payload.workspaces : [];
 }
@@ -255,24 +256,27 @@ export async function createNexusAgentWorkspace(projectId, goal, maxParallel = 2
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ goal, max_parallel: maxParallel }),
     });
-    if (!response.ok)
+    if (!response.ok) {
         throw new Error(`Agent Workspace create: HTTP ${response.status}`);
+    }
     const payload = (await response.json());
     return validateAgentWorkspace(payload.workspace);
 }
 export async function runNexusAgentWorkspace(projectId, workspaceId) {
     validateProjectId(projectId);
     const response = await fetch(`/api/projects/${projectId}/agent-workspaces/${workspaceId}/run`, { method: "POST", headers: { Accept: "application/json" } });
-    if (!response.ok)
+    if (!response.ok) {
         throw new Error(`Agent Workspace run: HTTP ${response.status}`);
+    }
     const payload = (await response.json());
     return validateAgentWorkspace(payload.workspace);
 }
 export async function cancelNexusAgentWorkspace(projectId, workspaceId) {
     validateProjectId(projectId);
     const response = await fetch(`/api/projects/${projectId}/agent-workspaces/${workspaceId}/cancel`, { method: "POST", headers: { Accept: "application/json" } });
-    if (!response.ok)
+    if (!response.ok) {
         throw new Error(`Agent Workspace cancel: HTTP ${response.status}`);
+    }
     const payload = (await response.json());
     return validateAgentWorkspace(payload.workspace);
 }
