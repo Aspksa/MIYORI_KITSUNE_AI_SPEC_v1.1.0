@@ -49,7 +49,8 @@ export function renderNexusProactivePage(host, page) {
     const title = document.createElement("strong");
     title.textContent = "Миёри заметила";
     const note = document.createElement("small");
-    note.textContent = `${signals.length} ${signals.length === 1 ? "пункт" : "пункта"} · без вмешательства в чат`;
+    note.textContent =
+        `${signals.length} ${signals.length === 1 ? "пункт" : "пункта"} · без вмешательства в чат`;
     copy.append(title, note);
     const count = document.createElement("b");
     count.textContent = String(signals.length);
