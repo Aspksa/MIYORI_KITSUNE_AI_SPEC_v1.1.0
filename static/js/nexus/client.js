@@ -1,4 +1,4 @@
-import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_VOICE_SCHEMA_VERSION, NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION, NEXUS_HOME_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
+import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_VOICE_SCHEMA_VERSION, NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION, NEXUS_HOME_SCHEMA_VERSION, NEXUS_BODY_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
 function validateProjectId(projectId) {
     if (!Number.isInteger(projectId) || projectId <= 0) {
         throw new Error("Некорректный projectId для MIYORI NEXUS.");
@@ -300,6 +300,31 @@ export async function fetchNexusHome(projectId) {
         payload.policy?.parental_rules_applied_by_server !== false ||
         payload.policy?.device_commands_enabled !== false) {
         throw new Error("NEXUS Home API нарушил device evidence contract.");
+    }
+    return payload;
+}
+export async function fetchNexusBody(projectId) {
+    validateProjectId(projectId);
+    const response = await fetch(`/api/projects/${projectId}/nexus/body`, {
+        headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+        throw new Error(`NEXUS body API: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    if (payload.schema_version !== NEXUS_BODY_SCHEMA_VERSION ||
+        !payload.presentation ||
+        !payload.appearance ||
+        !Array.isArray(payload.appearance.confirmed) ||
+        !Array.isArray(payload.appearance.open_for_owner_choice) ||
+        payload.runtime?.source !== "nexus_presence" ||
+        payload.motion_policy?.random_liveness_allowed !== false ||
+        payload.motion_policy?.timer_idle_animation_allowed !== false ||
+        payload.motion_policy?.sentiment_to_expression_allowed !== false ||
+        payload.motion_policy?.model_authored_motion_allowed !== false ||
+        payload.render_policy?.invent_open_appearance_choices_allowed !== false ||
+        payload.render_policy?.body_state_source !== "presence_plus_explicit_local_runtime") {
+        throw new Error("NEXUS Digital Body API нарушил runtime truth contract.");
     }
     return payload;
 }
