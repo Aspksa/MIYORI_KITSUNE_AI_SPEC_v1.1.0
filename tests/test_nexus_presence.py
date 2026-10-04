@@ -75,6 +75,24 @@ class NexusPresenceContractTests(unittest.TestCase):
         self.assertEqual(presence["activity"]["waiting_permissions"], 1)
         self.assertEqual(presence["reasons"][0]["kind"], "permission")
 
+    def test_verifying_is_visible_as_its_real_presence_phase(self) -> None:
+        operation = create_tool_operation(
+            self.project_id,
+            "workspace_create",
+            "presence:test:verifying",
+            {"path": "verify.txt", "content": "hello"},
+            preflight={"path": "verify.txt", "exists": False},
+        )
+        update_tool_operation(
+            int(operation["id"]),
+            status="verifying",
+            mark_started=True,
+        )
+
+        presence = build_nexus_presence(self.project_id)
+        self.assertEqual(presence["mode"], "verifying")
+        self.assertEqual(presence["activity"]["verifying_actions"], 1)
+
     def test_recovery_has_highest_operational_priority(self) -> None:
         operation = create_tool_operation(
             self.project_id,
