@@ -36,14 +36,14 @@ assert.ok(window.miyoriChatAttachments, "Staged per-message upload is unavailabl
 const file = new window.File(["Hello"],"contract.docx",{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
 window.miyoriChatAttachments.queueFiles([file]);
 const ready = await window.miyoriChatAttachments.ready();
-assert.deepEqual(ready.map(x=>x.id),[35]);
+assert.deepEqual(Array.from(ready,x=>Number(x.id)),[35]);
 assert.equal($("chatAttachments").hidden,false);
 assert.match($("chatAttachments").textContent,/contract.docx/);
 assert.match($("chatAttachments").textContent,/Прикреплено/);
 window.miyoriChatAttachments.clear();
 assert.equal($("chatAttachments").hidden,true);
 window.miyoriChatAttachments.useExisting([{id:35,filename:"existing.docx"}]);
-assert.deepEqual((await window.miyoriChatAttachments.ready()).map(x=>x.id),[35]);
+assert.deepEqual(Array.from(await window.miyoriChatAttachments.ready(),x=>Number(x.id)),[35]);
 window.state.projectId=43;
 await assert.rejects(() => window.miyoriChatAttachments.ready(), /Проект изменился/);
 window.state.projectId=42;
