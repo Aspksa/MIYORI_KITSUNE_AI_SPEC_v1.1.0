@@ -19,7 +19,7 @@
   border:1px solid var(--ui-border-strong);
   background:var(--ui-surface);
   color:var(--ui-text);
-  border-radius:10px;font:13px/1.55 inherit;
+  border-radius:10px;font-family:inherit;font-size:13px;line-height:1.55;
 }
 .chat-correction-actions{
   display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;
@@ -27,7 +27,7 @@
 .chat-correction-actions button{
   padding:9px 13px;border:1px solid var(--ui-border);
   border-radius:10px;background:var(--ui-surface);
-  color:var(--ui-text);font:600 12px/1.4 inherit;
+  color:var(--ui-text);font-family:inherit;font-size:12px;font-weight:600;line-height:1.4;
 }
 .chat-correction-actions button[type="submit"]{
   background:var(--ui-accent);color:#fff;border-color:var(--ui-accent);
