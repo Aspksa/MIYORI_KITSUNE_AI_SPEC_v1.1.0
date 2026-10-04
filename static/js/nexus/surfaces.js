@@ -165,7 +165,9 @@ export function renderNexusSurfacePage(host, page) {
         surface.policy?.trusted_component_only === true &&
         surface.policy?.interrupts_chat === false &&
         Boolean(SURFACE_REGISTRY[surface.component]));
-    if (!valid.length || currentView() !== "chat") {
+    if (!valid.length ||
+        currentView() !== "chat" ||
+        document.documentElement.dataset.nexusProactiveVisible === "true") {
         host.hidden = true;
         return;
     }
@@ -255,12 +257,24 @@ export function installNexusSurfaceHost() {
         }
         void refresh(true);
     };
+    const onProactiveVisibility = (event) => {
+        if (!(event instanceof CustomEvent))
+            return;
+        if (event.detail?.visible === true) {
+            host.hidden = true;
+        }
+        else {
+            void refresh(true);
+        }
+    };
     window.addEventListener("miyori:nexus-snapshot", onSnapshot);
     window.addEventListener("miyori:nexus-view", onView);
+    window.addEventListener("miyori:proactive-visibility", onProactiveVisibility);
     return () => {
         stopped = true;
         generation += 1;
         window.removeEventListener("miyori:nexus-snapshot", onSnapshot);
         window.removeEventListener("miyori:nexus-view", onView);
+        window.removeEventListener("miyori:proactive-visibility", onProactiveVisibility);
     };
 }

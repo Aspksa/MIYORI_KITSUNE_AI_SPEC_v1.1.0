@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.49"
+PROJECT_VERSION = "00.00.50"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.7.0",
+        "version": "0.8.0",
         "status": "active",
-        "description": "NEXUS Living Presence: authoritative runtime presence поверх Actions/Knowledge/Event Fabric и реального chat interaction state; idle остаётся тихим.",
+        "description": "NEXUS Proactive Miyori: attention budget, stable derived signals, persistent snooze/dismiss, explicit-user-action policy и quiet inbox вне Chat stream.",
     },
     "settings": {
         "name": "Настройки",
@@ -144,6 +144,28 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.50",
+        "title": "NEXUS Proactive Miyori · attention budget",
+        "summary": "N10 добавляет безопасную инициативность: сигналы выводятся из authoritative Actions/Knowledge state, fingerprint привязан к фактическому состоянию, attention budget учитывает инициативность, а dismiss/snooze сохраняют только решение пользователя. Автоматическое выполнение и Chat interruption запрещены.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.8.0",
+                "changes": [
+                    "Добавлен /api/projects/{project_id}/nexus/proactive и persistence proactive_signal_state.",
+                    "Signal fingerprint строится из фактического runtime/knowledge состояния; изменившаяся причина может появиться снова.",
+                    "Dismiss/snooze сохраняются между перезапусками, привязаны к fingerprint и записываются в audit trail.",
+                    "Attention budget уважает initiative_level и suggest_next_steps: advisory shelf может быть полностью отключён.",
+                    "Operational blockers принадлежат Presence/Actions и не дублируются в proactive Chat shelf.",
+                    "Proactive policy запрещает auto_execute, write-action, Chat message injection, interruption и OS notifications.",
+                    "UI использует закрытый quiet inbox «Миёри заметила» с явными Open/Later/Dismiss controls.",
+                    "Generative UI shelf скрывается при видимом proactive inbox, устраняя дублирование advisory surfaces.",
+                    "Snooze использует только одноразовое пробуждение к next_wakeup_at; случайная и циклическая liveness-механика отсутствует."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.49",
         "title": "NEXUS Living Presence · реальное состояние без симуляции",

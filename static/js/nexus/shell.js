@@ -187,7 +187,11 @@ export function installNexusShell() {
             if (state.snapshot) {
                 renderSnapshot(state.snapshot);
                 window.dispatchEvent(new CustomEvent("miyori:nexus-snapshot", {
-                    detail: { snapshot: state.snapshot },
+                    detail: {
+                        snapshot: state.snapshot,
+                        event_cursor: state.cursor,
+                        last_event_id: state.events.at(-1)?.id ?? null,
+                    },
                 }));
             }
         });

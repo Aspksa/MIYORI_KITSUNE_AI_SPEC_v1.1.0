@@ -4,6 +4,7 @@ export const NEXUS_ACTION_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_KNOWLEDGE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_SURFACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_PRESENCE_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -343,6 +344,71 @@ export interface NexusPresence {
     decorative_activity_allowed: false;
     chat_interruption_allowed: false;
     knowledge_attention_changes_primary_presence: false;
+  };
+  generated_at: string;
+}
+
+export type NexusProactiveSeverity = "high" | "normal" | "low";
+export type NexusProactiveDestination = "actions" | "knowledge" | "system";
+export type NexusProactiveChannelOwner = "presence" | "attention_shelf";
+
+export interface NexusProactiveSignal {
+  id: string;
+  signal_key: string;
+  fingerprint: string;
+  kind: string;
+  severity: NexusProactiveSeverity;
+  priority: number;
+  title: string;
+  detail: string;
+  destination: NexusProactiveDestination;
+  channel_owner: NexusProactiveChannelOwner;
+  source: Record<string, unknown>;
+  controls: {
+    open: boolean;
+    dismiss: boolean;
+    snooze: boolean;
+    snooze_options_minutes: number[];
+  };
+  safety: {
+    executes_action: false;
+    changes_domain_state: false;
+    requires_existing_permission_flow: true;
+  };
+}
+
+export interface NexusProactivePage {
+  schema_version: typeof NEXUS_PROACTIVE_SCHEMA_VERSION;
+  project: NexusProjectRef;
+  signals: NexusProactiveSignal[];
+  display: {
+    chat_shelf_ids: string[];
+    presence_owned_ids: string[];
+  };
+  budget: {
+    initiative_level: "low" | "medium" | "high";
+    suggest_next_steps: boolean;
+    max_contract_signals: number;
+    max_chat_shelf: number;
+    active_candidates: number;
+    suppressed_candidates: number;
+    selected_chat_shelf: number;
+  };
+  suppressed: Array<{
+    id: string;
+    reason: "dismissed" | "snoozed" | string;
+    signal_key: string;
+    until?: string;
+  }>;
+  next_wakeup_at: string | null;
+  policy: {
+    auto_execute_allowed: false;
+    write_action_allowed: false;
+    chat_message_injection_allowed: false;
+    interrupt_user_allowed: false;
+    os_notification_allowed: false;
+    operational_blockers_owned_by_presence: true;
+    decisions_change_signal_visibility_only: true;
   };
   generated_at: string;
 }

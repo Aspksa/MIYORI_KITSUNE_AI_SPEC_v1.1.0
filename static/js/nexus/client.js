@@ -1,4 +1,4 @@
-import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
+import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
 function validateProjectId(projectId) {
     if (!Number.isInteger(projectId) || projectId <= 0) {
         throw new Error("Некорректный projectId для MIYORI NEXUS.");
@@ -145,4 +145,57 @@ export async function fetchNexusPresence(projectId) {
         throw new Error("NEXUS presence API нарушил authoritative state contract.");
     }
     return payload;
+}
+function validateProactivePage(payload) {
+    if (payload.schema_version !== NEXUS_PROACTIVE_SCHEMA_VERSION ||
+        !Array.isArray(payload.signals) ||
+        !Array.isArray(payload.display?.chat_shelf_ids) ||
+        payload.policy?.auto_execute_allowed !== false ||
+        payload.policy?.write_action_allowed !== false ||
+        payload.policy?.chat_message_injection_allowed !== false ||
+        payload.policy?.interrupt_user_allowed !== false ||
+        payload.policy?.os_notification_allowed !== false ||
+        payload.policy?.operational_blockers_owned_by_presence !== true ||
+        payload.policy?.decisions_change_signal_visibility_only !== true) {
+        throw new Error("NEXUS proactive API нарушил attention safety contract.");
+    }
+    return payload;
+}
+export async function fetchNexusProactive(projectId) {
+    validateProjectId(projectId);
+    const response = await fetch(`/api/projects/${projectId}/nexus/proactive`, { headers: { Accept: "application/json" } });
+    if (!response.ok) {
+        throw new Error(`NEXUS proactive API: HTTP ${response.status}`);
+    }
+    return validateProactivePage((await response.json()));
+}
+async function decideNexusProactive(projectId, signal, decision, snoozeMinutes) {
+    validateProjectId(projectId);
+    const body = {
+        signal_key: signal.signal_key,
+        fingerprint: signal.fingerprint,
+        decision,
+    };
+    if (decision === "snoozed") {
+        body.snooze_minutes = snoozeMinutes ?? 60;
+    }
+    const response = await fetch(`/api/projects/${projectId}/nexus/proactive/decision`, {
+        method: "POST",
+        headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+        throw new Error(`NEXUS proactive decision: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    return validateProactivePage(payload.proactive ?? {});
+}
+export async function dismissNexusProactive(projectId, signal) {
+    return decideNexusProactive(projectId, signal, "dismissed");
+}
+export async function snoozeNexusProactive(projectId, signal, minutes = 60) {
+    return decideNexusProactive(projectId, signal, "snoozed", minutes);
 }

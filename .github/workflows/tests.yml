@@ -72,6 +72,9 @@ jobs:
       - name: NEXUS Living Presence contract
         run: npm run test:nexus-presence
 
+      - name: NEXUS Proactive Miyori contract
+        run: npm run test:nexus-proactive
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

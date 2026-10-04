@@ -288,6 +288,14 @@ def build_nexus_snapshot(project_id: int) -> dict:
             updated_at=generated_at,
         ),
         _module(
+            "proactive",
+            "Proactive Miyori",
+            "ready",
+            last_result="Attention budget активен; сигналы не выполняют действия автоматически.",
+            limitation="Dismiss/snooze сохраняются; Chat не прерывается proactive-сообщениями.",
+            updated_at=generated_at,
+        ),
+        _module(
             "home",
             "Home",
             "ready" if project.get("kind") == "home" else "disabled",
@@ -373,5 +381,8 @@ def build_nexus_snapshot(project_id: int) -> dict:
             "script_allowed": False,
             "presence_source": "authoritative_runtime_events",
             "random_liveness_allowed": False,
+            "proactive_attention_budgeted": True,
+            "proactive_chat_interruption_allowed": False,
+            "proactive_auto_execute_allowed": False,
         },
     }

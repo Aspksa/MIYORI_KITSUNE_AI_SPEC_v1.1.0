@@ -197,7 +197,11 @@ export function renderNexusSurfacePage(
       Boolean(SURFACE_REGISTRY[surface.component]),
   );
 
-  if (!valid.length || currentView() !== "chat") {
+  if (
+    !valid.length ||
+    currentView() !== "chat" ||
+    document.documentElement.dataset.nexusProactiveVisible === "true"
+  ) {
     host.hidden = true;
     return;
   }
@@ -291,13 +295,24 @@ export function installNexusSurfaceHost(): () => void {
     void refresh(true);
   };
 
+  const onProactiveVisibility = (event: Event): void => {
+    if (!(event instanceof CustomEvent)) return;
+    if (event.detail?.visible === true) {
+      host.hidden = true;
+    } else {
+      void refresh(true);
+    }
+  };
+
   window.addEventListener("miyori:nexus-snapshot", onSnapshot);
   window.addEventListener("miyori:nexus-view", onView);
+  window.addEventListener("miyori:proactive-visibility", onProactiveVisibility);
 
   return () => {
     stopped = true;
     generation += 1;
     window.removeEventListener("miyori:nexus-snapshot", onSnapshot);
     window.removeEventListener("miyori:nexus-view", onView);
+    window.removeEventListener("miyori:proactive-visibility", onProactiveVisibility);
   };
 }
