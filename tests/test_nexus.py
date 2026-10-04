@@ -88,10 +88,14 @@ class NexusContractTests(unittest.TestCase):
         self.assertEqual(modules["desktop"]["state"], "disabled")
         self.assertEqual(modules["generative_ui"]["state"], "ready")
         self.assertEqual(modules["presence"]["state"], "ready")
+        self.assertEqual(modules["proactive"]["state"], "ready")
         self.assertEqual(modules["presence"]["state"], "ready")
         self.assertFalse(snapshot["ui_contract"]["model_html_allowed"])
         self.assertFalse(snapshot["ui_contract"]["script_allowed"])
         self.assertTrue(snapshot["ui_contract"]["unknown_components_rejected"])
+        self.assertTrue(snapshot["ui_contract"]["proactive_attention_budgeted"])
+        self.assertFalse(snapshot["ui_contract"]["proactive_chat_interruption_allowed"])
+        self.assertFalse(snapshot["ui_contract"]["proactive_auto_execute_allowed"])
 
     def test_configured_provider_is_ready_without_faking_live_health(self) -> None:
         object.__setattr__(settings, "cloudru_api_key", "configured-key")
