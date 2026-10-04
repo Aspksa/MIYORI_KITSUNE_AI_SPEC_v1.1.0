@@ -171,6 +171,7 @@ from miyori.tools import (
 )
 from miyori.account import cloudru_profile, list_cloudru_models, save_cloudru_profile, test_cloudru
 from miyori.module_registry import module_manifest, release_history
+from miyori.nexus import build_nexus_snapshot
 from miyori.system_settings import (
     cleanup_runtime_logs,
     load_system_settings,
@@ -248,7 +249,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.41", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.42", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -450,7 +451,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.41",
+        "version": "00.00.42",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -692,7 +693,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.41",
+        "project_version": "00.00.42",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1586,67 +1587,10 @@ def rag_search(project_id: int, q: str = "", limit: int = 8) -> dict:
 
 @app.get("/api/projects/{project_id}/nexus")
 def project_nexus(project_id: int) -> dict:
-    project = get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Проект не найден.")
-
-    documents = list_documents(project_id)
-    memory = list_memory_facts(project_id)
-    permissions = list_permission_requests(project_id)
-    tasks = list_tasks(project_id)
-    development = development_snapshot(project_id)
-
-    verified_memory = [item for item in memory if item.get("status") == "verified"]
-    pending_permissions = [item for item in permissions if item.get("status") == "pending"]
-    active_tasks = [item for item in tasks if item.get("status") in {"queued", "running"}]
-    failed_tasks = [item for item in tasks if item.get("status") == "failed"]
-
-    suggestions = []
-    if pending_permissions:
-        suggestions.append({
-            "kind": "permission",
-            "label": "Решить ожидающие действия",
-            "detail": f"Ожидают решения: {len(pending_permissions)}",
-        })
-    if active_tasks:
-        suggestions.append({
-            "kind": "tasks",
-            "label": "Проверить активные задачи",
-            "detail": f"В работе или очереди: {len(active_tasks)}",
-        })
-    if failed_tasks:
-        suggestions.append({
-            "kind": "failed_tasks",
-            "label": "Разобрать ошибки задач",
-            "detail": f"Ошибок: {len(failed_tasks)}",
-        })
-    if documents:
-        suggestions.append({
-            "kind": "documents",
-            "label": "Работать с материалами проекта",
-            "detail": f"Документов: {len(documents)}",
-        })
-    if not suggestions:
-        suggestions.append({
-            "kind": "start",
-            "label": "Начать новую задачу",
-            "detail": "Опишите цель своими словами.",
-        })
-
-    return {
-        "project": project,
-        "counts": {
-            "documents": len(documents),
-            "verified_memory": len(verified_memory),
-            "pending_permissions": len(pending_permissions),
-            "active_tasks": len(active_tasks),
-            "failed_tasks": len(failed_tasks),
-            "checks_passed": development.get("checks_passed", 0),
-            "checks_total": development.get("checks_total", 0),
-        },
-        "suggestions": suggestions[:3],
-        "epistemic": epistemic_snapshot(project_id),
-    }
+    try:
+        return build_nexus_snapshot(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/epistemic")

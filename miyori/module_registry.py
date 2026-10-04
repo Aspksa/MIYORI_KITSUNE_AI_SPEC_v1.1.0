@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.41"
+PROJECT_VERSION = "00.00.42"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.4.0",
+        "version": "2.5.0",
         "status": "active",
-        "description": "AI Core v2.4: persistent workflows, Document Intelligence, extraction integrity, exhaustive verification и проверяемые источники.",
+        "description": "AI Core v2.5: NEXUS state contract поверх persistent workflows, Document Intelligence, проверяемой памяти и безопасных инструментов.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -26,6 +26,12 @@ MODULES = {
         "version": "0.1.0",
         "status": "planned",
         "description": "Подготовленный раздел будущего мобильного клиента и привязки устройств.",
+    },
+    "nexus": {
+        "name": "MIYORI NEXUS",
+        "version": "0.1.0",
+        "status": "active",
+        "description": "Versioned state/UI contract: реальные состояния модулей, typed Generative UI boundary, TypeScript island и accessibility foundation.",
     },
     "settings": {
         "name": "Настройки",
@@ -132,6 +138,41 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.42",
+        "title": "NEXUS Foundation · контракты состояния и безопасная эволюция UI",
+        "summary": "Начато постепенное внедрение MIYORI NEXUS без переписывания рабочего интерфейса: существующий /nexus превращён в versioned state contract, добавлен TypeScript island, typed Generative UI boundary, accessibility runtime и отдельный frontend CI gate.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.1.0",
+                "changes": [
+                    "Добавлен отдельный miyori/nexus.py как server-side агрегатор фактического состояния проекта.",
+                    "Состояния нормализованы по контракту disabled / not_connected / ready / processing / degraded / error.",
+                    "Legacy поля counts, suggestions и epistemic сохранены для совместимости текущего classic JS.",
+                    "Будущие Voice, Desktop и Generative UI отображаются как реально недоступные capability, а не имитируются интерфейсом.",
+                    "Generative UI boundary разрешает только типизированные status/progress/action/source/collection surfaces; произвольный model HTML запрещён."
+                ],
+            },
+            {
+                "key": "miyori_ai",
+                "version": "2.5.0",
+                "changes": [
+                    "Зафиксирован архитектурный аудит относительно полной спецификации и roadmap N0–N8.",
+                    "NEXUS развивается поверх существующих Memory, Documents, Agents, Home и Epistemic API без big-bang rewrite.",
+                    "Provider configuration отделён от фактического health: настроенная модель не маркируется как безусловно ready без сетевой проверки."
+                ],
+            },
+            {
+                "key": "settings",
+                "version": "0.4.1",
+                "changes": [
+                    "Добавлен общий accessibility runtime для существующих modal overlays: initial focus, Tab trap, Escape и возврат focus.",
+                    "Добавлены focus-visible и prefers-reduced-motion правила без декоративной анимации."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.41",
         "title": "Extraction Integrity · честная полнота чтения оригинала",

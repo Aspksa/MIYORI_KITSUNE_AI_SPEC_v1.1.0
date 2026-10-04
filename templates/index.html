@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0d12">
   <title>Miyori Kitsune AI</title>
-  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.41">
-  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.41">
-  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.41">
-  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.41">
-  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.41">
-  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.41">
-  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.41">
+  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.42">
+  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.42">
+  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.42">
+  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.42">
+  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.42">
+  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.42">
+  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.42">\n  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.42">
 </head>
 <body>
   <div class="app-shell">
@@ -21,7 +21,7 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.41</span>
+            <span class="version-pill" id="versionText">00.00.42</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
@@ -99,7 +99,7 @@
       </header>
 
       <section id="miyoriConsole" class="miyori-console developer-layer collapsed" hidden>
-        <button id="consoleHeader" class="console-header" type="button">
+        <button id="consoleHeader" class="console-header" type="button" aria-expanded="false">
           <span class="console-symbol">◎</span>
           <span class="console-title"><strong>Технический слой</strong><small>Brain · Agent · Memory · Data · System</small></span>
           <span id="consoleSummary" class="console-summary">готова</span>
@@ -137,7 +137,7 @@
                 <div class="module-head">
                   <div class="module-icon">✦</div>
                   <div class="module-title"><span>Память</span><small>Факты текущего проекта</small></div>
-                  <button id="refreshMemory" class="card-action" type="button">↻</button>
+                  <button id="refreshMemory" class="card-action" type="button" aria-label="Обновить память">↻</button>
                 </div>
                 <input id="memorySearch" class="search-field" type="search" placeholder="Поиск в памяти…">
                 <div id="memoryList" class="memory-list"></div>
@@ -162,7 +162,7 @@
                 <div class="module-head">
                   <div class="module-icon">◇</div>
                   <div class="module-title"><span>Разрешения</span><small>Действия, ожидающие решения</small></div>
-                  <button id="refreshPermissions" class="card-action" type="button">↻</button>
+                  <button id="refreshPermissions" class="card-action" type="button" aria-label="Обновить разрешения">↻</button>
                 </div>
                 <div id="permissionList" class="permission-list"></div>
               </section>
@@ -171,7 +171,7 @@
                 <div class="module-head">
                   <div class="module-icon">≡</div>
                   <div class="module-title"><span>Журнал действий</span><small>Workflow · разрешения · tools</small></div>
-                  <button id="refreshAudit" class="card-action" type="button">↻</button>
+                  <button id="refreshAudit" class="card-action" type="button" aria-label="Обновить журнал действий">↻</button>
                 </div>
                 <div id="auditList" class="audit-event-list"></div>
               </section>
@@ -182,7 +182,7 @@
                 <div class="module-head">
                   <div class="module-icon">⟳</div>
                   <div class="module-title"><span>Фоновые задачи</span><small>Очередь и выполнение</small></div>
-                  <button id="refreshTasks" class="card-action" type="button">↻</button>
+                  <button id="refreshTasks" class="card-action" type="button" aria-label="Обновить фоновые задачи">↻</button>
                 </div>
                 <div class="quick-actions">
                   <button id="runSelfCheckTask" class="compact-button" type="button">Самопроверка</button>
@@ -195,7 +195,7 @@
                 <div class="module-head">
                   <div class="module-icon">↗</div>
                   <div class="module-title"><span>Развитие</span><small>Проверяемые метрики</small></div>
-                  <button id="runDevelopmentCheck" class="card-action" type="button">✓</button>
+                  <button id="runDevelopmentCheck" class="card-action" type="button" aria-label="Запустить самопроверку развития">✓</button>
                 </div>
                 <div id="developmentStats" class="development-stats empty-copy">Нет данных.</div>
               </section>
@@ -229,12 +229,12 @@
       <footer class="composer-wrap" id="chatComposer">
         <form id="chatForm" class="composer">
           <div class="composer-field">
-            <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Задать вопрос…" required></textarea>
+            <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Задать вопрос…" aria-label="Сообщение Миёри" required></textarea>
             <div class="composer-hint">Enter — отправить · Shift+Enter — новая строка</div>
           </div>
           <button id="sendButton" class="send-button" type="submit" aria-label="Отправить">↑</button>
         </form>
-        <div id="errorBox" class="error" hidden></div>
+        <div id="errorBox" class="error" role="alert" aria-live="assertive" hidden></div>
       </footer>
     </main>
 
@@ -363,13 +363,13 @@
     </section>
   </div>
 
-  <script src="/static/js/core.js?v=00.00.41"></script>
-  <script src="/static/js/data.js?v=00.00.41"></script>
-  <script src="/static/js/chat.js?v=00.00.41"></script>
-  <script src="/static/js/workspace.js?v=00.00.41"></script>
-  <script src="/static/js/drive.js?v=00.00.41"></script>
-  <script src="/static/js/projects.js?v=00.00.41"></script>
-  <script src="/static/js/settings.js?v=00.00.41"></script>
-  <script src="/static/js/boot.js?v=00.00.41"></script>
+  <script src="/static/js/core.js?v=00.00.42"></script>
+  <script src="/static/js/data.js?v=00.00.42"></script>
+  <script src="/static/js/chat.js?v=00.00.42"></script>
+  <script src="/static/js/workspace.js?v=00.00.42"></script>
+  <script src="/static/js/drive.js?v=00.00.42"></script>
+  <script src="/static/js/projects.js?v=00.00.42"></script>
+  <script src="/static/js/settings.js?v=00.00.42"></script>
+  <script src="/static/js/boot.js?v=00.00.42"></script>\n  <script type="module" src="/static/js/nexus/index.js?v=00.00.42"></script>
 </body>
 </html>

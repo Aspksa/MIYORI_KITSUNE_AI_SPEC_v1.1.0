@@ -32,3 +32,36 @@ jobs:
         env:
           CLOUDRU_API_KEY: ""
         run: python -m unittest discover -s tests -p "test_*.py" -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend toolchain
+        run: npm install --package-lock=false --no-audit --no-fund
+
+      - name: TypeScript strict check
+        run: npm run typecheck:nexus
+
+      - name: Build NEXUS frontend
+        run: npm run build:nexus
+
+      - name: Accessibility contract
+        run: npm run check:nexus-a11y
+
+      - name: Validate JavaScript syntax
+        run: |
+          for file in static/js/*.js; do node --check "$file"; done
+          for file in static/js/nexus/*.js; do node --check "$file"; done
+
+      - name: Verify committed NEXUS build
+        run: git diff --exit-code -- static/js/nexus
+

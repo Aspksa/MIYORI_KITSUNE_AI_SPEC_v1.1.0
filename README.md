@@ -2,8 +2,29 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.41.**  
+**Внутренняя версия приложения: 00.00.42.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.42
+
+`00.00.42` — **NEXUS Foundation · контракты состояния и безопасная эволюция UI**.
+
+Перед изменениями проведён полный аудит текущего проекта относительно спецификации. MIYORI NEXUS внедряется не как второй декоративный интерфейс, а как совместимый state/UI layer поверх уже работающих Chat, Memory, Documents, Agents, Home и системных модулей.
+
+Первый этап намеренно не переписывает существующий frontend:
+
+- существующий `GET /api/projects/{project_id}/nexus` сохранён и расширен versioned-контрактом;
+- legacy-поля `project / counts / suggestions / epistemic` остаются доступными текущему classic JS;
+- введены единые состояния `disabled / not_connected / ready / processing / degraded / error`;
+- состояния строятся из реальных runtime-данных, а отсутствующие Voice/Desktop/Generative UI не изображаются как работающие;
+- добавлен TypeScript island в `frontend/nexus/` без big-bang миграции восьми существующих JS-модулей;
+- Generative UI получает typed boundary `status / progress / action / source / collection`; произвольный HTML/JavaScript от модели запрещён;
+- добавлен общий accessibility runtime для modal overlays: initial focus, Tab trap, Escape и возврат focus;
+- добавлены `:focus-visible` и `prefers-reduced-motion` правила;
+- GitHub Actions теперь отдельно проверяет TypeScript strict typecheck, frontend build, accessibility contract и актуальность committed build artifacts;
+- архитектурный аудит и дальнейший план N0–N8 зафиксированы в `docs/MIYORI_NEXUS_ARCHITECTURE.md`.
+
+Ключевой принцип NEXUS: новая визуальная поверхность допускается только тогда, когда у неё есть реальный источник состояния или события. Декоративная «активность» не считается функциональностью.
 
 ## Состояние релиза 00.00.41
 
@@ -76,7 +97,7 @@ Miyori теперь различает быстрый retrieval и доказу�
 - локальный контекст проекта;
 - Brain plan;
 - Context Router для выборочной загрузки контекста;
-- Agent Core v2.2 с model-assisted Planner и deterministic fallback;
+- Agent Core v2.5 с model-assisted Planner, deterministic fallback и NEXUS state contract;
 - persistent Workflow Engine для многошаговых задач;
 - Document Intelligence для целостного понимания длинных документов и книг;
 - до 5 проверяемых инструментальных шагов на один workflow;
@@ -176,6 +197,7 @@ data/
 - `miyori/provider.py` — Cloud.ru provider;
 - `miyori/brain.py` — публичный операционный план;
 - `miyori/context_router.py` — маршрутизация памяти, документов, знаний и tools;
+- `miyori/nexus.py` — versioned NEXUS snapshot и единые operational states для UI/будущих клиентов;
 - `miyori/document_intelligence.py` — document graph, outline, coverage, глубокий поиск и hierarchical map→reduce;
 - `miyori/document_questions.py` — exhaustive Q&A по всему документу, evidence, scan/source/overall coverage и fingerprint recovery;
 - `miyori/planner.py` — Planner schema, fallback и безопасная валидация решений;
@@ -191,7 +213,7 @@ data/
 - `miyori/updater.py` / `portable_updater.py` — обновление;
 - `miyori/module_registry.py` — версии модулей и changelog.
 
-### Frontend с 00.00.35
+### Frontend: legacy-compatible + NEXUS TypeScript island
 
 JavaScript загружается в фиксированном порядке:
 
@@ -215,6 +237,16 @@ CSS загружается в фиксированном cascade-порядке:
 7. `static/css/audit.css`
 
 Порядок файлов является частью frontend-контракта и не должен произвольно меняться.
+
+С `00.00.42` рядом с legacy runtime существует отдельный NEXUS island:
+
+- `frontend/nexus/*.ts` — исходники TypeScript;
+- `static/js/nexus/*.js` — собранные browser ES modules;
+- `static/css/nexus.css` — только функциональный accessibility/motion layer;
+- `tsconfig.nexus.json` — strict TypeScript contract;
+- `scripts/check-nexus-a11y.mjs` — статический accessibility gate.
+
+Classic JS не удаляется, пока соответствующая функция не перенесена, не проверена и не имеет совместимого API/state contract.
 
 ## Фундамент дальнейшего развития
 
@@ -267,6 +299,14 @@ CLOUDRU_MODEL_ID=deepseek-ai/DeepSeek-V4-Flash
 
 GitHub Actions запускает полный `unittest`-контур на push/PR.
 
+Отдельный frontend job выполняет:
+
+- TypeScript `strict` typecheck;
+- сборку NEXUS ES modules;
+- accessibility contract;
+- синтаксическую проверку classic JS и NEXUS modules;
+- `git diff --exit-code -- static/js/nexus`, чтобы committed build не расходился с TypeScript source.
+
 Document Intelligence дополнительно проверяет:
 
 - сохранение Markdown-outline и locator-ов;
@@ -302,6 +342,7 @@ Document Intelligence дополнительно проверяет:
 - `00.00.38` — AI Reliability & Workflow Engine: persistent workflows + permission resume + idempotency + Tool Registry v2 + audit + crash recovery + CI;
 - `00.00.39` — Document Intelligence: structural document graph + hierarchical full-text analysis + coverage tracking + deep search + Drive UI + Agent/RAG integration;
 - `00.00.40` — Exhaustive Document Q&A: all-window verification + evidence/locators + question coverage + fingerprint recovery;
-- `00.00.41` — Extraction Integrity: source extraction coverage + Office/PDF completeness manifest + truthful exhaustive coverage.
+- `00.00.41` — Extraction Integrity: source extraction coverage + Office/PDF completeness manifest + truthful exhaustive coverage;
+- `00.00.42` — NEXUS Foundation: versioned state contract + TypeScript island + typed Generative UI boundary + accessibility/frontend CI.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

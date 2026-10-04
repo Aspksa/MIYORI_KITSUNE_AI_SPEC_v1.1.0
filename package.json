@@ -1,0 +1,17 @@
+{
+  "name": "miyori-nexus-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  },
+  "scripts": {
+    "typecheck:nexus": "tsc -p tsconfig.nexus.json --noEmit",
+    "build:nexus": "tsc -p tsconfig.nexus.json",
+    "check:nexus-a11y": "node scripts/check-nexus-a11y.mjs"
+  }
+}
