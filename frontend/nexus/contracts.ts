@@ -8,8 +8,8 @@ export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_HOME_SCHEMA_VERSION = "1.0.0" as const;
-export const NEXUS_BODY_SCHEMA_VERSION = "1.3.0" as const;
-export const BODY_RENDERER_SCHEMA_VERSION = "1.1.0" as const;
+export const NEXUS_BODY_SCHEMA_VERSION = "1.4.0" as const;
+export const BODY_RENDERER_SCHEMA_VERSION = "1.2.0" as const;
 export const MIYORI_APPEARANCE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
@@ -587,7 +587,8 @@ export interface MiyoriAppearanceProfile {
 export type NexusBodyRendererAdapterId =
   | "neutral_shell"
   | "static_portrait"
-  | "trusted_vector_rig";
+  | "trusted_vector_rig"
+  | "trusted_character_rig";
 
 export interface NexusBodyRendererAdapter {
   id: NexusBodyRendererAdapterId;
@@ -614,11 +615,18 @@ export interface NexusBodyRendererContract {
     gesture: "body.presentation.gesture";
     state: "body.state_or_explicit_local_runtime";
   };
+  appearance_channels: {
+    hair_color: "body.appearance.selections.hair_color";
+    eye_color: "body.appearance.selections.eye_color";
+    tail_count: "body.appearance.selections.tail_count";
+    main_outfit: "body.appearance.selections.main_outfit";
+    owner_values_only: true;
+  };
   dynamic_extension: {
     status: "installed";
-    adapter_id: "trusted_vector_rig";
-    engine: "trusted_dom_css_vector_v1";
-    asset_requirement: "builtin_neutral_vector";
+    adapter_id: "trusted_character_rig";
+    engine: "trusted_dom_css_character_v1";
+    asset_requirement: "owner_choice_aware_builtin_character";
     adapter_contract_required: true;
     must_be_trusted_registry_entry: true;
     must_consume_existing_presentation_channels: true;
@@ -635,6 +643,8 @@ export interface NexusBodyRendererContract {
     static_portrait_is_dynamic: false;
     dynamic_renderer_claim_requires_installed_adapter: true;
     dynamic_motion_source: "versioned_presentation_channels_only";
+    appearance_source: "owner_profile_only";
+    unresolved_appearance_uses_neutral_visuals: true;
   };
 }
 
@@ -688,6 +698,9 @@ export interface NexusDigitalBody {
     owner_global_appearance_profile: true;
     static_portrait_is_non_dynamic: true;
     trusted_vector_rig_installed: true;
+    trusted_character_rig_installed: true;
+    character_rig_owner_choices_only: true;
+    unresolved_character_features_neutral: true;
     dynamic_renderer_may_invent_appearance: false;
     invent_open_appearance_choices_allowed: false;
     tail_count_may_be_invented: false;
