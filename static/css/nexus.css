@@ -2445,3 +2445,125 @@
     right: 0;
   }
 }
+
+
+/* N12.1 — Owner Appearance Profile. No system-authored defaults. */
+.nexus-body-portrait.has-static-asset {
+  overflow: hidden;
+  border-radius: 11px;
+  background: #f6f2f7;
+}
+.nexus-body-static-portrait {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.nexus-body-portrait.has-static-asset .nexus-body-state-mark {
+  right: 2px;
+  bottom: 2px;
+}
+.nexus-body-appearance-editor {
+  margin-top: 10px;
+  border-top: 1px solid #eee8f1;
+  padding-top: 8px;
+}
+.nexus-body-appearance-editor > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #e2dbe7;
+  border-radius: 8px;
+  background: #fbfafc;
+  color: #675d6e;
+  cursor: pointer;
+  font-weight: 750;
+}
+.nexus-body-appearance-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+.nexus-body-appearance-panel > p,
+.nexus-body-asset-editor > p {
+  margin: 0;
+  color: #8b8190;
+  font-size: 7px;
+  line-height: 1.45;
+}
+.nexus-body-appearance-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.nexus-body-field {
+  display: grid;
+  gap: 4px;
+  color: #716777;
+  font-size: 7px;
+  font-weight: 700;
+}
+.nexus-body-field.wide {
+  grid-column: 1 / -1;
+}
+.nexus-body-field input,
+.nexus-body-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ded7e3;
+  border-radius: 7px;
+  background: #fff;
+  color: #5f5566;
+  font: inherit;
+  font-size: 8px;
+  padding: 7px 8px;
+  resize: vertical;
+}
+.nexus-body-field input:focus,
+.nexus-body-field textarea:focus {
+  outline: 2px solid #b7a9c3;
+  outline-offset: 1px;
+}
+.nexus-body-editor-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.nexus-body-editor-actions input[type="file"] {
+  max-width: 100%;
+  color: #766c7d;
+  font-size: 7px;
+}
+.nexus-body-editor-status {
+  grid-column: 1 / -1;
+  min-height: 12px;
+  color: #786e7e;
+  font-size: 7px;
+}
+.nexus-body-asset-editor {
+  display: grid;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid #eee8f1;
+}
+.nexus-body-asset-editor > strong {
+  color: #625868;
+  font-size: 8px;
+}
+@media (max-width: 620px) {
+  .nexus-body-appearance-form {
+    grid-template-columns: 1fr;
+  }
+  .nexus-body-field.wide {
+    grid-column: auto;
+  }
+  .nexus-body-editor-actions,
+  .nexus-body-editor-status {
+    grid-column: auto;
+  }
+}
