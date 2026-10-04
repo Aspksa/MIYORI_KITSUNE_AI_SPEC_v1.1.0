@@ -66,6 +66,9 @@ jobs:
       - name: NEXUS Knowledge contract
         run: npm run test:nexus-knowledge
 
+      - name: NEXUS Generative UI contract
+        run: npm run test:nexus-surfaces
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

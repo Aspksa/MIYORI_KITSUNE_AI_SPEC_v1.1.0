@@ -205,7 +205,14 @@ export function installNexusShell(): () => void {
     store = new NexusStore(projectId, undefined, 160);
     unsubscribeStore = store.subscribe((state) => {
       if (currentGeneration !== generation) return;
-      if (state.snapshot) renderSnapshot(state.snapshot);
+      if (state.snapshot) {
+        renderSnapshot(state.snapshot);
+        window.dispatchEvent(
+          new CustomEvent("miyori:nexus-snapshot", {
+            detail: { snapshot: state.snapshot },
+          }),
+        );
+      }
     });
 
     try {

@@ -2,8 +2,29 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.47.**  
+**Внутренняя версия приложения: 00.00.48.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.48
+
+`00.00.48` — **NEXUS Generative UI · trusted surfaces без шума в чате**.
+
+N7 вводит безопасный слой структурированного интерфейса поверх существующего NEXUS state:
+
+- новый `/api/projects/{id}/nexus/surfaces` возвращает versioned surface specs;
+- surface kind и component выбираются только из закрытых allowlist;
+- model-authored HTML и JavaScript запрещены контрактом;
+- неизвестные компоненты frontend отвергает вместо попытки их выполнить;
+- renderer строит DOM через `createElement/textContent`, не вставляя backend/model data через `innerHTML`;
+- доступные surfaces: status, action, progress и knowledge/result collections;
+- surfaces строятся только из реальных NEXUS snapshot, Actions и Knowledge read-models;
+- Chat не получает постоянные карточки: используется закрытый по умолчанию «Структурный контекст»;
+- shelf обновляется только при изменении authoritative snapshot fingerprint;
+- навигационные действия могут только открыть доверенный NEXUS view;
+- Generative UI module в snapshot теперь `ready`, а UI contract публикует allowed components;
+- исправлено расхождение version diagnostics: status/project_version синхронизированы с релизом.
+
+Новые runtime UI-библиотеки не добавлялись: текущий TypeScript registry меньше, безопаснее и лучше подходит будущему Desktop/API boundary.
 
 ## Состояние релиза 00.00.47
 

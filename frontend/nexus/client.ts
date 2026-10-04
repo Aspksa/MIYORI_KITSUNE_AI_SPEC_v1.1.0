@@ -1,6 +1,7 @@
 import {
   NEXUS_ACTION_SCHEMA_VERSION,
   NEXUS_KNOWLEDGE_SCHEMA_VERSION,
+  NEXUS_SURFACE_SCHEMA_VERSION,
   NEXUS_EVENT_SCHEMA_VERSION,
   NEXUS_SCHEMA_VERSION,
   isNexusActionState,
@@ -8,6 +9,7 @@ import {
   isNexusOperationalState,
   type NexusActionCenter,
   type NexusKnowledgeCenter,
+  type NexusSurfacePage,
   type NexusEventPage,
   type NexusSnapshot,
 } from "./contracts.js";
@@ -147,4 +149,38 @@ export async function fetchNexusKnowledge(
     throw new Error("NEXUS knowledge API нарушил разделение источников.");
   }
   return payload as NexusKnowledgeCenter;
+}
+
+export async function fetchNexusSurfaces(
+  projectId: number,
+  options: {
+    context?: "auto" | "chat" | "actions" | "knowledge" | "system";
+    query?: string;
+    limit?: number;
+  } = {},
+): Promise<NexusSurfacePage> {
+  validateProjectId(projectId);
+  const params = new URLSearchParams();
+  params.set("context", options.context ?? "auto");
+  if (options.query?.trim()) params.set("q", options.query.trim());
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  const response = await fetch(
+    `/api/projects/${projectId}/nexus/surfaces?${params.toString()}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!response.ok) {
+    throw new Error(`NEXUS surfaces API: HTTP ${response.status}`);
+  }
+
+  const payload = (await response.json()) as Partial<NexusSurfacePage>;
+  if (
+    payload.schema_version !== NEXUS_SURFACE_SCHEMA_VERSION ||
+    !Array.isArray(payload.surfaces) ||
+    payload.registry?.model_html_allowed !== false ||
+    payload.registry?.script_allowed !== false ||
+    payload.registry?.unknown_components_rejected !== true
+  ) {
+    throw new Error("NEXUS surfaces API нарушил trusted component contract.");
+  }
+  return payload as NexusSurfacePage;
 }
