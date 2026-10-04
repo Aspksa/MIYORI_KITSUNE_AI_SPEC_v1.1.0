@@ -14,11 +14,13 @@ assert.equal(window.document.querySelector(".brand .mark"),null);
 assert.ok(!$("chatHeader").contains($("nexusBodyHost")));
 window.eval(readFileSync("static/vendor/marked.umd.js","utf8"));
 window.eval(readFileSync("static/vendor/purify.min.js","utf8"));
-window.eval(core);
+window.eval(core + '\nwindow.__testChat = {setProject(v){state.projectId=v},setApi(fn){api=fn}};');
 
 const called=[];
-window.eval("state.projectId=7");
-window.api=async(url,opts)=>{called.push({url,opts});return {question:{id:1}};};
+window.__testChat.setProject(7);
+window.__testChat.setApi(async(url,opts)=>{
+  called.push({url,opts});return {question:{id:1}};
+});
 window.addMessage("assistant","Результат",[],{
   diagnostics:{
     plan:{mode:"deep"},
