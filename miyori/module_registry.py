@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.52"
+PROJECT_VERSION = "00.00.53"
 
 MODULES = {
     "miyori_ai": {
@@ -31,7 +31,7 @@ MODULES = {
         "name": "MIYORI NEXUS",
         "version": "1.0.0",
         "status": "active",
-        "description": "NEXUS Agent Workspace: persistent DAG orchestration, parallel-ready agents, budgets, handoff и inherited Actions permissions/recovery.",
+        "description": "NEXUS Home: authenticated heartbeat evidence, explicit device identity binding, Agent Workspace и безопасные Actions/Knowledge/Voice surfaces.",
     },
     "settings": {
         "name": "Настройки",
@@ -101,15 +101,15 @@ MODULES = {
     },
     "home_network": {
         "name": "Домашняя сеть",
-        "version": "0.1.0",
+        "version": "1.0.0",
         "status": "active",
-        "description": "Домашние устройства, адреса, состояние и заметки.",
+        "description": "NEXUS Home runtime: explicit identity binding, authenticated heartbeat, TTL connectivity evidence и capability declarations без network scanning.",
     },
     "parental_control": {
         "name": "Детский контроль Miyori",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "status": "foundation",
-        "description": "Прозрачные правила для подключённого телефона: лимит времени, ночной режим и категории ограничений.",
+        "description": "Явная binding-модель parental rules к trusted Home device; server не заявляет OS-level enforcement без device-agent.",
     },
     "rag": {
         "name": "RAG Core",
@@ -144,6 +144,44 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.53",
+        "title": "NEXUS Home · authenticated device evidence",
+        "summary": "N11 отделяет inventory от реальной связности: устройства получают explicit identity binding, online/offline определяется только authenticated heartbeat по TTL, parental rules требуют явной привязки и не выдаются за применённые без device-agent.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "1.1.0",
+                "changes": [
+                    "Добавлен versioned /api/projects/{project_id}/nexus/home.",
+                    "Legacy home_devices.status больше не считается источником connectivity.",
+                    "Link/relink выдаёт one-time heartbeat credential; в SQLite сохраняется только SHA-256.",
+                    "Online/offline/never_seen вычисляются из authenticated heartbeat с server-side TTL.",
+                    "Network scanning и auto-link неизвестных устройств запрещены Home policy.",
+                    "Parental profile требует explicit binding к linked device с capability parental_policy.",
+                    "Server не заявляет OS-level parental enforcement; состояние ограничено ready_for_device_agent.",
+                    "Primary Home view показывает evidence, capabilities, binding и реальный heartbeat state без декоративной активности."
+                ],
+            },
+            {
+                "key": "home_network",
+                "version": "1.0.0",
+                "changes": [
+                    "Добавлен persistent runtime identity layer поверх существующего inventory.",
+                    "Heartbeat state отделён от административного status поля.",
+                    "Revoked identity не может продолжать heartbeat без новой привязки."
+                ],
+            },
+            {
+                "key": "parental_control",
+                "version": "0.2.0",
+                "changes": [
+                    "Добавлена explicit profile-to-device binding.",
+                    "Правила не считаются applied без внешнего device-agent enforcement."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.52",
         "title": "NEXUS Agent Workspace · DAG orchestration",
