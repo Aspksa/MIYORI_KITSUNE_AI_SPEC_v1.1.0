@@ -62,6 +62,7 @@ function renderPresence(host, presence, interaction) {
     const firstReason = presence.reasons[0];
     let view = null;
     if (presence.mode === "waiting" ||
+        presence.mode === "verifying" ||
         presence.mode === "recovery" ||
         firstReason?.kind === "action" ||
         firstReason?.kind === "workflow" ||
@@ -78,11 +79,12 @@ function renderPresence(host, presence, interaction) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "nexus-presence-action";
-        button.textContent = view === "actions"
-            ? "Действия"
-            : view === "knowledge"
-                ? "Знания"
-                : "Система";
+        button.textContent =
+            view === "actions"
+                ? "Действия"
+                : view === "knowledge"
+                    ? "Знания"
+                    : "Система";
         button.addEventListener("click", () => navigate(view));
         row.appendChild(button);
     }
