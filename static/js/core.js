@@ -77,6 +77,7 @@ function setBusy(value) {
   sendButton.disabled = value;
   input.disabled = value;
   projectSelect.disabled = value;
+  if (messages) messages.setAttribute("aria-busy", value ? "true" : "false");
   sendButton.title = value ? "Миёри отвечает…" : "Отправить сообщение";
   sendButton.setAttribute("aria-label", value ? "Миёри отвечает…" : "Отправить сообщение");
   setPulse(value ? "thinking" : "ready");
