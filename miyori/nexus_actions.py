@@ -626,7 +626,6 @@ def build_nexus_action_center(project_id: int, *, limit: int = 60) -> dict:
         reverse=True,
     )
     cards.sort(key=lambda item: priority.get(str(item.get("state")), 99))
-    cards = cards[:limit]
 
     counts = {state: 0 for state in sorted(NEXUS_ACTION_STATES)}
     for item in cards:
@@ -636,7 +635,9 @@ def build_nexus_action_center(project_id: int, *, limit: int = 60) -> dict:
         "active": counts["planned"] + counts["running"] + counts["verifying"],
         "history": counts["completed"] + counts["cancelled"],
         "total": len(cards),
+        "returned": min(len(cards), limit),
     })
+    cards = cards[:limit]
 
     return {
         "schema_version": NEXUS_ACTION_SCHEMA_VERSION,
