@@ -115,11 +115,11 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
             body = build_nexus_body(self.project_id)
 
         renderer = body["renderer"]
-        self.assertEqual(renderer["schema_version"], "1.1.0")
-        self.assertEqual(renderer["selected_adapter"], "trusted_vector_rig")
+        self.assertEqual(renderer["schema_version"], "1.2.0")
+        self.assertEqual(renderer["selected_adapter"], "trusted_character_rig")
         self.assertTrue(renderer["selected_dynamic"])
         self.assertEqual(renderer["dynamic_extension"]["status"], "installed")
-        self.assertEqual(renderer["dynamic_extension"]["adapter_id"], "trusted_vector_rig")
+        self.assertEqual(renderer["dynamic_extension"]["adapter_id"], "trusted_character_rig")
         self.assertFalse(renderer["dynamic_extension"]["may_execute_asset_javascript"])
         self.assertFalse(renderer["dynamic_extension"]["may_override_operational_state"])
         self.assertTrue(renderer["policy"]["trusted_registry_only"])
@@ -201,6 +201,9 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
         policy = body["render_policy"]
         self.assertTrue(policy["neutral_shell_until_owner_appearance_choice"])
         self.assertTrue(policy["trusted_vector_rig_installed"])
+        self.assertTrue(policy["trusted_character_rig_installed"])
+        self.assertTrue(policy["character_rig_owner_choices_only"])
+        self.assertTrue(policy["unresolved_character_features_neutral"])
         self.assertFalse(policy["dynamic_renderer_may_invent_appearance"])
         self.assertFalse(policy["invent_open_appearance_choices_allowed"])
         self.assertFalse(policy["tail_count_may_be_invented"])
