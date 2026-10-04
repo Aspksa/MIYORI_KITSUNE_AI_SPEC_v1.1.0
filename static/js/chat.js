@@ -326,7 +326,6 @@ form.addEventListener("submit", async (event) => {
   input.style.height = "auto";
   setBusy(true);
   state.submissionPending = false;
-  window.miyoriChatActivity?.begin();
 
   const pending = state.pendingRequest;
   const reuse = pending &&
@@ -344,6 +343,7 @@ form.addEventListener("submit", async (event) => {
     text, readOnly, attachment_ids:[...attachment_ids],ui_context,
   };
   state.lastRequestId = requestId;
+  window.miyoriChatActivity?.begin(requestId);
 
   try {
     const response = await fetch("/api/chat", {
