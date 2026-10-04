@@ -13,11 +13,13 @@ from miyori.conversation_experience import (
     create_folder,
     create_topic,
     create_voice_note,
+    delete_voice_note,
     due_schedules,
     filter_conversation_ids,
     folder_snapshot,
     init_conversation_experience_db,
     mark_read,
+    pinned_chat_context,
     remember_message_candidate,
     reply_context,
     route_message,
@@ -28,6 +30,7 @@ from miyori.conversation_experience import (
     set_reaction,
     set_tags,
     smart_search,
+    topic_recent_messages,
     validate_topic,
     voice_note,
     voice_note_path,
@@ -79,6 +82,13 @@ class ConversationExperienceTests(unittest.TestCase):
             topic["id"],
         )
         assign_topic(self.project, self.conversation, self.user, topic["id"])
+        scoped = topic_recent_messages(
+            self.project, self.conversation, topic["id"]
+        )
+        self.assertEqual([item["content"] for item in scoped], ["Проверь договор №42"])
+        set_pin(self.project, self.conversation, self.answer, True)
+        pinned = pinned_chat_context(self.project, self.conversation)
+        self.assertEqual(pinned[0]["message_id"], self.answer)
         quote = reply_context(
             self.project, self.conversation, self.answer, "проверить сумму"
         )
@@ -178,6 +188,20 @@ class ConversationExperienceTests(unittest.TestCase):
         resolved = voice_note_path(self.project, note["id"])
         self.assertIsNotNone(resolved)
         self.assertTrue(resolved[0].exists())
+        draft = create_voice_note(
+            self.project, b"draft-voice", "audio/webm", 500
+        )
+        self.assertTrue(delete_voice_note(self.project, draft["id"]))
+        self.assertIsNone(voice_note_path(self.project, draft["id"]))
+        sent = create_voice_note(
+            self.project, b"sent-voice", "audio/webm", 900
+        )
+        add_message(
+            self.conversation, "user", "Voice",
+            metadata={"voice_note_id": sent["id"]},
+        )
+        self.assertFalse(delete_voice_note(self.project, sent["id"]))
+        self.assertIsNotNone(voice_note_path(self.project, sent["id"]))
         with self.assertRaises(ValueError):
             voice_note(self.other, note["id"])
 
