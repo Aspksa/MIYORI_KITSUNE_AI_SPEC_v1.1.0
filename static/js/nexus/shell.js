@@ -114,7 +114,7 @@ function installNavigationKeyboard() {
         return () => undefined;
     const buttons = Object.values(NAV_IDS)
         .map((id) => element(id))
-        .filter((item) => item !== null);
+        .filter((item) => item !== null && !item.hidden);
     const onKeyDown = (event) => {
         if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
             return;
