@@ -1,34 +1,190 @@
+let conversationLoadToken = 0;
+let conversationListController = null;
+let conversationOpenToken = 0;
+let conversationOpenController = null;
+
 async function loadConversations() {
   if (!state.projectId) return;
-  const data = await api("/api/projects/" + state.projectId + "/conversations");
-  conversationList.innerHTML = "";
-  if (!data.conversations.length) {
-    conversationList.innerHTML = '<div class="conversation-empty">Пока нет разговоров</div>';
+  const token = ++conversationLoadToken;
+  conversationListController?.abort();
+  const controller = new AbortController();
+  conversationListController = controller;
+  const search = el("conversationSearch")?.value?.trim() || "";
+  let data;
+  try {
+    data = await api(
+      "/api/projects/" + state.projectId + "/conversations" +
+      (search ? "?q=" + encodeURIComponent(search) : ""),
+      {signal:controller.signal}
+    );
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    throw error;
+  }
+  if (controller.signal.aborted || token !== conversationLoadToken) return;
+  conversationList.replaceChildren();
+  if (!data.conversations?.length) {
+    const empty = document.createElement("div");
+    empty.className = "conversation-empty";
+    empty.textContent = search ? "Ничего не найдено" : "Пока нет разговоров";
+    conversationList.appendChild(empty);
     return;
   }
+  let group = "";
   for (const item of data.conversations) {
+    const today = new Date();
+    const updated = new Date(item.updated_at || item.created_at);
+    const days = Math.floor(
+      (new Date(today.getFullYear(), today.getMonth(), today.getDate()) -
+       new Date(updated.getFullYear(), updated.getMonth(), updated.getDate())) / 86400000
+    );
+    const category = item.pinned ? "Закреплённые" :
+      days <= 0 ? "Сегодня" : days === 1 ? "Вчера" : days <= 7 ? "Последние 7 дней" : "Ранее";
+    if (category !== group) {
+      group = category;
+      const heading = document.createElement("div");
+      heading.className = "conversation-date-heading";
+      heading.textContent = group;
+      conversationList.appendChild(heading);
+    }
+    const row = document.createElement("div");
+    row.className = "conversation-history-row";
     const button = document.createElement("button");
     button.type = "button";
     button.className = "conversation-item" + (item.id === state.conversationId ? " active" : "");
-    button.innerHTML = "<span>" + escapeHtml(item.title) + "</span><small>" + item.message_count + " сообщ.</small>";
-    button.onclick = () => openConversation(item.id, item.title);
-    conversationList.appendChild(button);
+    const name = document.createElement("span");
+    name.textContent = item.title;
+    const count = document.createElement("small");
+    count.textContent = item.message_count + " сообщ.";
+    button.append(name, count);
+    button.onclick = () => openConversation(item.id);
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "history-row-button";
+    pin.dataset.conversationPin = String(item.id);
+    pin.dataset.pinned = item.pinned ? "1" : "0";
+    pin.textContent = item.pinned ? "★" : "☆";
+    pin.title = item.pinned ? "Открепить" : "Закрепить";
+    pin.setAttribute("aria-label", pin.title);
+    const rename = document.createElement("button");
+    rename.type = "button";
+    rename.className = "history-row-button";
+    rename.dataset.conversationRename = String(item.id);
+    rename.dataset.title = item.title;
+    rename.textContent = "✎";
+    rename.title = "Переименовать";
+    rename.setAttribute("aria-label", "Переименовать");
+    row.append(button, pin, rename);
+    conversationList.appendChild(row);
   }
 }
 
-async function openConversation(id, title) {
+const chatWindow = {hasMore: false, beforeId: null, loading: false};
+
+function messageFromRecord(item) {
+  return addMessage(item.role, item.content, item.metadata?.sources || [], {
+    id: item.id,
+    bookmarked: Boolean(item.bookmarked),
+    attachments: (item.metadata?.attachments || []).map(id => ({id})),
+    suppressEvent: true,
+    suppressScroll: true
+  });
+}
+
+function renderOlderControl() {
+  messages.querySelector(".older-messages-button")?.remove();
+  if (!chatWindow.hasMore) return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "older-messages-button";
+  button.textContent = "↑ Показать предыдущие сообщения";
+  button.onclick = loadOlderMessages;
+  messages.prepend(button);
+}
+
+async function openConversation(id, targetId = null) {
+  if (!state.projectId) return;
+  const token = ++conversationOpenToken;
+  const projectAtStart = Number(state.projectId);
+  conversationOpenController?.abort();
+  const controller = new AbortController();
+  conversationOpenController = controller;
   showError("");
-  const data = await api("/api/projects/" + state.projectId + "/conversations/" + id);
-  state.conversationId = id;
-  messages.innerHTML = "";
-  for (const item of data.messages) {
-    if (item.role === "user" || item.role === "assistant") {
-      addMessage(item.role, item.content, item.metadata?.sources || []);
-    }
+  const url = "/api/projects/" + state.projectId + "/conversations/" + id +
+    (targetId ? "?before_id=" + (Number(targetId) + 1) + "&limit=80" : "?limit=80");
+  let data;
+  try {
+    data = await api(url, {signal:controller.signal});
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    showError(error.message);
+    return;
   }
+  if (controller.signal.aborted || token !== conversationOpenToken || projectAtStart !== Number(state.projectId)) return;
+  window.miyoriDrafts?.save();
+  window.miyoriChatAttachments?.clear();
+  state.conversationId = id;
+  messages.replaceChildren();
+  for (const item of data.messages) {
+    if (item.role === "user" || item.role === "assistant") messageFromRecord(item);
+  }
+  chatWindow.hasMore = Boolean(data.has_more);
+  chatWindow.beforeId = data.before_id;
+  renderOlderControl();
   conversationTitle.textContent = "Миёри";
   await loadConversations();
+  if (token !== conversationOpenToken) return;
+  window.miyoriDrafts?.restore();
+  if (targetId) {
+    const found = messages.querySelector('[data-message-id="' + Number(targetId) + '"]');
+    found?.scrollIntoView({block:"center"});
+    found?.classList.add("search-hit");
+  } else messages.scrollTop = messages.scrollHeight;
   input.focus();
+}
+
+async function loadOlderMessages() {
+  if (chatWindow.loading || !chatWindow.hasMore || !state.conversationId) return;
+  chatWindow.loading = true;
+  const before = chatWindow.beforeId;
+  const conversationAtStart = state.conversationId;
+  const top = messages.scrollTop;
+  const height = messages.scrollHeight;
+  try {
+    const data = await api(
+      "/api/projects/" + state.projectId + "/conversations/" +
+      state.conversationId + "?before_id=" + before + "&limit=80"
+    );
+    if (state.conversationId !== conversationAtStart) return;
+    const existing = messages.querySelector(".message");
+    for (const item of data.messages) {
+      if (item.role !== "user" && item.role !== "assistant") continue;
+      const row = messageFromRecord(item);
+      if (existing) messages.insertBefore(row, existing);
+      else messages.appendChild(row);
+    }
+    chatWindow.hasMore = Boolean(data.has_more);
+    chatWindow.beforeId = data.before_id;
+    renderOlderControl();
+    const rows = messages.querySelectorAll(".message:not(.welcome-message)");
+    // 200 DOM rows at most. Older history remains in SQLite and is reloadable.
+    if (rows.length > 200) {
+      for (let i = 200; i < rows.length; i++) rows[i].remove();
+      if (!messages.querySelector(".latest-messages-button")) {
+        const latest = document.createElement("button");
+        latest.className = "latest-messages-button";
+        latest.type = "button";
+        latest.textContent = "Вернуться к последним ↓";
+        latest.onclick = () => openConversation(state.conversationId);
+        messages.appendChild(latest);
+      }
+    }
+    messages.scrollTop = top + messages.scrollHeight - height;
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    chatWindow.loading = false;
+  }
 }
 
 function memoryActions(fact, card) {
@@ -111,9 +267,12 @@ async function loadMemory() {
 }
 
 function startNewChat() {
+  window.miyoriDrafts?.save();
+  window.miyoriChatAttachments?.clear();
   state.conversationId = null;
   showError("");
   showWelcome();
+  window.miyoriDrafts?.restore();
   brainPlan.innerHTML = '<span class="empty-copy">План появится после запроса.</span>';
   agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
   agentBudget.textContent = "0/5";
@@ -123,17 +282,37 @@ function startNewChat() {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (state.busy || !state.projectId) return;
+  if (state.busy || state.submissionPending || !state.projectId) return;
   const text = input.value.trim();
   if (!text) return;
-
+  state.submissionPending = true;
+  const attachmentStore = window.miyoriChatAttachments;
+  let attachedFiles = [];
+  try {
+    attachedFiles = attachmentStore ? await attachmentStore.ready() : [];
+  } catch (error) {
+    state.submissionPending = false;
+    showError(error.message || "Не удалось загрузить документ.");
+    return;
+  }
+  if (attachedFiles.length && attachedFiles.some(file => file.failed)) {
+    state.submissionPending = false;
+    showError("Исправьте ошибки загрузки вложений перед отправкой.");
+    return;
+  }
+  const attachment_ids = attachedFiles.map(file => Number(file.id));
   showError("");
   const uploadStatus = el("composerUploadStatus");
   if (uploadStatus) uploadStatus.textContent = "";
-  addMessage("user", text);
+  const userRow = addMessage("user", text, [], {
+    attachments: attachedFiles,
+  });
   input.value = "";
+  window.miyoriDrafts?.save();
   input.style.height = "auto";
   setBusy(true);
+  state.submissionPending = false;
+  window.miyoriChatActivity?.begin();
 
   const requestId = (window.crypto?.randomUUID?.() || (
     Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
@@ -148,7 +327,8 @@ form.addEventListener("submit", async (event) => {
         message: text,
         project_id: state.projectId,
         conversation_id: state.conversationId,
-        request_id: requestId
+        request_id: requestId,
+        attachment_ids
       })
     });
     const data = await response.json();
@@ -159,7 +339,10 @@ form.addEventListener("submit", async (event) => {
     }
 
     state.conversationId = data.conversation_id;
-    addMessage("assistant", data.answer, data.sources || []);
+    if (data.user_message_id) userRow.dataset.messageId = String(data.user_message_id);
+    addMessage("assistant", data.answer, data.sources || [], {id:data.assistant_message_id});
+    attachmentStore?.clear();
+    window.dispatchEvent(new CustomEvent("miyori:chat-response", {detail: data}));
 
     // Технические данные обновляются внутри системы, но не добавляются в пользовательский чат.
     if (data.brain) {
@@ -212,16 +395,22 @@ form.addEventListener("submit", async (event) => {
     showError(error.message || "Не удалось получить ответ.");
     await loadConversations();
   } finally {
+    window.miyoriChatActivity?.complete();
     setBusy(false);
     input.focus();
   }
 });
 
 projectSelect.addEventListener("change", async () => {
+  ++conversationOpenToken;
+  conversationOpenController?.abort();
+  window.miyoriDrafts?.save();
+  window.miyoriChatAttachments?.clear();
   state.projectId = Number(projectSelect.value);
   state.conversationId = null;
   updateProjectLabel();
   showWelcome();
+  window.miyoriDrafts?.restore();
   await Promise.all([
     loadConversations(), loadMemory(), loadDocuments(),
     loadTools(), loadPermissions(), loadAudit(), loadTasks(), loadDevelopment(), loadNexus()

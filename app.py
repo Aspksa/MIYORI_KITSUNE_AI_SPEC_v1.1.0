@@ -15,6 +15,17 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from miyori.conversation_ui import (
+    attached_document_context,
+    chat_message_page,
+    fork_conversation_before_message,
+    init_conversation_ui_db,
+    list_chat_conversations,
+    set_message_bookmark,
+    update_chat_conversation,
+    list_bookmarked_messages,
+    search_conversation_messages,
+)
 from miyori.config import settings
 from miyori.appearance import (
     get_appearance_profile,
@@ -261,6 +272,7 @@ def _sync_project_drive(project_id: int) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    init_conversation_ui_db()
     init_document_intelligence_db()
     init_document_questions_db()
     init_agent_workspace_db()
@@ -284,7 +296,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.60", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.61", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -303,6 +315,20 @@ class ChatRequest(BaseModel):
     project_id: int
     conversation_id: int | None = None
     request_id: str | None = Field(default=None, min_length=8, max_length=128)
+    attachment_ids: list[int] = Field(default_factory=list, max_length=5)
+
+
+class ConversationUiPatch(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=100)
+    pinned: bool | None = None
+
+
+class MessageBookmarkRequest(BaseModel):
+    bookmarked: bool
+
+
+class ConversationForkRequest(BaseModel):
+    pass
 
 
 class ProjectCreateRequest(BaseModel):
@@ -530,7 +556,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.60",
+        "version": "00.00.61",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -828,7 +854,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.60",
+        "project_version": "00.00.61",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1233,26 +1259,83 @@ def project_employee_delete(project_id: int, employee_id: int) -> dict:
 
 
 @app.get("/api/projects/{project_id}/conversations")
-def conversations(project_id: int) -> dict:
+def conversations(project_id: int, q: str = "") -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
-    return {"conversations": list_conversations(project_id)}
+    return {"conversations": list_chat_conversations(project_id, q)}
+
+
+@app.patch("/api/projects/{project_id}/conversations/{conversation_id}")
+def conversation_update(project_id: int, conversation_id: int, payload: ConversationUiPatch) -> dict:
+    try:
+        updated = update_chat_conversation(
+            project_id, conversation_id, title=payload.title, pinned=payload.pinned
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"conversation": updated}
 
 
 @app.get("/api/projects/{project_id}/conversations/{conversation_id}")
-def conversation(project_id: int, conversation_id: int) -> dict:
+def conversation(
+    project_id: int, conversation_id: int,
+    before_id: int | None = None, limit: int = 80,
+) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
-
-    items = conversation_messages(conversation_id, project_id)
-    if not items:
-        raise HTTPException(status_code=404, detail="Разговор не найден.")
-
+    try:
+        page = chat_message_page(
+            project_id, conversation_id, before_id=before_id, limit=limit
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {
         "conversation_id": conversation_id,
         "project_id": project_id,
-        "messages": items,
+        **page,
     }
+
+
+@app.get("/api/projects/{project_id}/bookmarks")
+def chat_bookmarks(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"bookmarks": list_bookmarked_messages(project_id)}
+
+
+@app.get("/api/projects/{project_id}/conversations/{conversation_id}/search")
+def conversation_search(project_id: int, conversation_id: int, q: str = "") -> dict:
+    try:
+        return {
+            "matches": search_conversation_messages(project_id, conversation_id, q)
+        }
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.put("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/bookmark")
+def message_bookmark(
+    project_id: int, conversation_id: int, message_id: int,
+    payload: MessageBookmarkRequest,
+) -> dict:
+    try:
+        return set_message_bookmark(
+            project_id, conversation_id, message_id, payload.bookmarked
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/fork")
+def message_fork(project_id: int, conversation_id: int, message_id: int) -> dict:
+    try:
+        return fork_conversation_before_message(project_id, conversation_id, message_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/memory")
@@ -2045,6 +2128,8 @@ async def _build_agent_response(
     captured_memory: dict | None = None,
     captured_claims: list[dict] | None = None,
     request_id: str | None = None,
+    attachment_ids: list[int] | None = None,
+    user_message_id: int | None = None,
 ) -> dict:
     workflow_state = get_agent_workflow(agent.workflow_id, project_id) or {}
     current_step = int(workflow_state.get("current_step") or 0)
@@ -2098,11 +2183,19 @@ async def _build_agent_response(
         rag_payload,
         agent.tool_context,
     )
+    attachment_context, attachment_sources = attached_document_context(
+        project_id, attachment_ids or []
+    )
+    source_ids = {s.get("document_id") for s in sources}
+    for attachment in attachment_sources:
+        if attachment["document_id"] not in source_ids:
+            sources.append(attachment)
+            source_ids.add(attachment["document_id"])
 
     answer = await chat(
         context,
         memory_context=None,
-        document_context=None,
+        document_context=attachment_context or None,
         brain_plan=brain.plan,
         tool_context=agent.tool_context,
         epistemic_context=epistemic,
@@ -2110,7 +2203,7 @@ async def _build_agent_response(
         answer_sources=sources,
     )
 
-    add_message(
+    assistant_message_id = add_message(
         conversation_id,
         "assistant",
         answer,
@@ -2135,10 +2228,13 @@ async def _build_agent_response(
     response = {
         "conversation_id": conversation_id,
         "project_id": project_id,
+        "user_message_id": user_message_id,
+        "assistant_message_id": assistant_message_id,
         "request_id": request_id,
         "response_key": response_key,
         "answer": answer,
         "sources": sources,
+        "attachments": attachment_sources,
         "workflow": {
             "id": agent.workflow_id,
             "status": agent.workflow_status,
@@ -2566,13 +2662,23 @@ async def send_message(request: ChatRequest) -> dict:
     if not get_project(request.project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
 
+    # Validated before the agent starts, with strict project ownership.
+    attachment_ids = request.attachment_ids or []
+    try:
+        attached_document_context(request.project_id, attachment_ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     existing_message = (
         get_message_by_client_request_id(request.project_id, request.request_id)
         if request.request_id else None
     )
 
     if existing_message:
-        if existing_message["content"] != text:
+        if (
+            existing_message["content"] != text
+            or (existing_message.get("metadata") or {}).get("attachments", []) != attachment_ids
+        ):
             raise HTTPException(
                 status_code=409,
                 detail="Этот request_id уже использован для другого сообщения.",
@@ -2612,6 +2718,7 @@ async def send_message(request: ChatRequest) -> dict:
             "user",
             text,
             client_request_id=request.request_id,
+            metadata={"attachments": attachment_ids},
         )
         is_new_message = True
         request_key = (
@@ -2633,6 +2740,7 @@ async def send_message(request: ChatRequest) -> dict:
             details={
                 "request_id": request.request_id,
                 "message_preview": text[:500],
+                "attachment_count": len(attachment_ids),
             },
         )
         captured_memory = maybe_capture_user_memory(
@@ -2656,6 +2764,9 @@ async def send_message(request: ChatRequest) -> dict:
         if existing_workflow else
         route_context(text)
     )
+    if attachment_ids and not route.use_documents:
+        from dataclasses import replace
+        route = replace(route, use_documents=True)
     context = recent_messages(conversation_id)
 
     agent = await run_agent(
@@ -2677,6 +2788,8 @@ async def send_message(request: ChatRequest) -> dict:
             captured_memory=captured_memory,
             captured_claims=captured_claims,
             request_id=request.request_id,
+            attachment_ids=attachment_ids,
+            user_message_id=user_message_id,
         )
     except ProviderError as exc:
         raise HTTPException(
