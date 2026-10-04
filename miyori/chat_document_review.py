@@ -21,7 +21,7 @@ _PATTERNS = {
     "ИНН": re.compile(r"\bИНН[\s:№\-]*([0-9]{10}|[0-9]{12})\b", re.I),
     "НДС": re.compile(r"\bНДС[\s:№\-]*(\d{1,2}(?:[.,]\d+)?)\s*%", re.I),
     "Сумма": re.compile(
-        r"(?<!\w)((?:\d{1,3}(?:[ \u00a0]\d{3})+|\d+)(?:[.,]\d{2})?)\s*(?:₽|руб\.?|рублей|рубля)\b", re.I
+        r"(?<!\w)((?:\d{1,3}(?:[ \u00a0]\d{3})+|\d+)(?:[.,]\d{2})?)\s*(?:₽|руб\.?|рублей|рубля)(?!\w)", re.I
     ),
     "Дата": re.compile(r"\b(\d{1,2}\.\d{1,2}\.(?:19|20)\d{2})\b"),
     "Госномер": re.compile(r"\b([АВЕКМНОРСТУХ]\s*\d{3}\s*[АВЕКМНОРСТУХ]{2}\s*\d{2,3})\b", re.I),
@@ -135,6 +135,8 @@ def compare_project_documents(project_id: int, document_ids: list[int]) -> dict:
             "source_extraction_coverage":coverage,
             "requires_ocr":total==0,
             "observations":observations,
+            "observation_limit_per_field":MAX_OBSERVATIONS_PER_FIELD,
+            "exhaustive_value_extraction":False,
         })
 
     differences=[]
