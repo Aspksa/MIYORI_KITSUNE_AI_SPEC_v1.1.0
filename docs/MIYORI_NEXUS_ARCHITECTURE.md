@@ -27,7 +27,7 @@ Documents, Home, Voice и будущий Desktop-клиент.
 | Background work | Persistent tasks, cancel, recovery | Реализовано/частично | Добавить budget/resource layer и события в общий state fabric |
 | Nervous system | workflow/task/audit events существуют раздельно | Частично | Ввести единый versioned event envelope без переписывания существующих таблиц |
 | Attention | Context Router и приоритет активного запроса | Частично | Отделить attention policy от retrieval policy |
-| Digital body | Persona canon + Presence/Voice state-driven runtime | Реализовано/частично | Подключить выбранный владельцем appearance profile/asset без изменения state contract |
+| Digital body | Persona canon + Presence/Voice runtime + owner-global Appearance Profile | Реализовано/частично | После явного выбора владельца подключить dynamic rig adapter; static portrait не симулирует pose/expression |
 | Home | Inventory + authenticated heartbeat + explicit parental binding | Реализовано/частично | Подключить реальные device-agents/OS adapters позже; не симулировать enforcement |
 | Voice / ears / tongue | Нет STT/TTS runtime | Не реализовано | Capability boundary + permission-visible microphone state |
 | Desktop | `Miyori.bat`, browser auto-open | Не реализовано как shell | Desktop shell только после стабилизации API/events |
@@ -61,7 +61,8 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **N10 / 00.00.50 — завершён.** Proactive Miyori: canonical attention engine, state fingerprinting, persistent snooze/dismiss, initiative-aware chat shelf, channel ownership и запрет автоматического write/chat interruption.
 - **N11 / 00.00.53 — завершён.** Home: explicit device identity, one-time heartbeat credential, TTL connectivity evidence, capability allowlist, parental binding и отдельная evidence-first Home surface. Legacy status не является connectivity; network scanning и fake OS enforcement запрещены.
 - **N12 / 00.00.54 — Digital Body Runtime завершён.** Persona canon связан с Presence/Voice/interaction state; fake liveness и sentiment inference запрещены. Финальный portrait asset намеренно остаётся не настроенным до выбора владельцем цвета волос, цвета глаз, точного числа хвостов и основного наряда.
-- **N6 Desktop Runtime остаётся отложен по решению владельца проекта. Следующий визуальный шаг — N12.1 Appearance Profile & Asset Pipeline после выбора открытых деталей внешности.**
+- **N12.1 / 00.00.55 — завершён.** Owner-global Appearance Profile хранит четыре открытых выбора без системных дефолтов; static portrait adapter отделён от account avatar и честно объявляет отсутствие dynamic pose/expression.
+- **N6 Desktop Runtime остаётся отложен по решению владельца проекта. Следующий визуальный шаг зависит от явного выбора внешности: N12.2 Dynamic Rig Adapter не должен придумывать эти параметры самостоятельно.**
 
 ## Поэтапный план
 
@@ -160,7 +161,9 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - нейтральная оболочка не фиксирует цвет волос, глаз, число хвостов или наряд;
 - pose/expression/gesture отображают конкретные runtime states;
 - random liveness, timer idle animation, sentiment→emotion и model-authored motion запрещены;
-- финальный appearance asset подключается отдельно и не меняет operational state contract.
+- owner-global Appearance Profile хранит открытые выборы отдельно от Persona Pack и project state;
+- static portrait adapter не заявляет dynamic pose/expression;
+- финальный dynamic asset/rig подключается отдельно и не меняет operational state contract.
 
 ## Gate после каждого этапа
 
