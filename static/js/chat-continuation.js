@@ -30,7 +30,7 @@
     if(!outstanding.length){
       details.hidden=true;
       details.open=false;
-      if(!window.state?.busy &&
+      if(!state.busy &&
          !$("chatActivityEvents")?.childElementCount)
         host.hidden=true;
       return;
@@ -66,7 +66,7 @@
     };
   }
   async function refresh(){
-    const pid=Number(window.state?.projectId||0);
+    const pid=Number(state.projectId||0);
     if(!pid)return;
     const token=++generation;
     try{
@@ -74,7 +74,7 @@
         "/api/projects/"+pid+"/nexus/actions?limit=80"
       );
       if(token!==generation ||
-         Number(window.state?.projectId||0)!==pid)return;
+         Number(state.projectId||0)!==pid)return;
       const actions=Array.isArray(response.actions)?
         response.actions.filter(a=>a.project_id===pid):[];
       actions.sort((a,b)=>(stateRank[a.state]??99)-(stateRank[b.state]??99));
