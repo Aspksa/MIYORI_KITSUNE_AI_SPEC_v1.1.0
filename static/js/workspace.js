@@ -1169,7 +1169,7 @@ async function renderNexusKnowledgeWorkspace() {
     '<section class="nexus-knowledge">' +
       '<header class="knowledge-head">' +
         '<div><h3>Карта знаний проекта</h3>' +
-          '<p>Сначала краткая картина. Provenance, evidence и технические детали раскрываются только по запросу.</p></div>' +
+          '<p>Память, документы и проверенные знания показаны рядом, но не смешиваются. Детали источников раскрываются по запросу.</p></div>' +
         '<button id="knowledgeOpenDrive" class="secondary-sheet-button" type="button">Открыть файлы</button>' +
       '</header>' +
       '<form id="knowledgeSearchForm" class="knowledge-search" role="search">' +
