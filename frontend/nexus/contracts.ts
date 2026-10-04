@@ -348,60 +348,67 @@ export interface NexusPresence {
   generated_at: string;
 }
 
-export type NexusProactivePriority = "high" | "normal" | "low";
+export type NexusProactiveSeverity = "high" | "normal" | "low";
+export type NexusProactiveDestination = "actions" | "knowledge" | "system";
+export type NexusProactiveChannelOwner = "presence" | "attention_shelf";
 
 export interface NexusProactiveSignal {
   id: string;
   signal_key: string;
-  category: "action" | "knowledge" | string;
-  priority: NexusProactivePriority;
+  fingerprint: string;
+  kind: string;
+  severity: NexusProactiveSeverity;
+  priority: number;
   title: string;
   detail: string;
+  destination: NexusProactiveDestination;
+  channel_owner: NexusProactiveChannelOwner;
   source: Record<string, unknown>;
-  action: {
-    type: "navigate";
-    target: "actions" | "knowledge" | "system";
-    label: string;
-  };
   controls: {
-    can_snooze: boolean;
-    can_dismiss: boolean;
+    open: boolean;
+    dismiss: boolean;
+    snooze: boolean;
+    snooze_options_minutes: number[];
   };
-  policy: {
-    auto_execute_allowed: false;
-    write_tools_allowed: false;
-    chat_interruption_allowed: false;
-    creates_chat_message: false;
-    requires_explicit_user_action: true;
+  safety: {
+    executes_action: false;
+    changes_domain_state: false;
+    requires_existing_permission_flow: true;
   };
 }
 
 export interface NexusProactivePage {
   schema_version: typeof NEXUS_PROACTIVE_SCHEMA_VERSION;
   project: NexusProjectRef;
-  enabled: boolean;
-  initiative_level: "low" | "medium" | "high";
   signals: NexusProactiveSignal[];
-  counts: {
-    candidates: number;
-    visible: number;
-    snoozed: number;
-    dismissed: number;
-    budget_suppressed: number;
+  display: {
+    chat_shelf_ids: string[];
+    presence_owned_ids: string[];
   };
   budget: {
-    max_visible: number;
-    max_low: number;
-    effective_max_visible: number;
-    used: number;
+    initiative_level: "low" | "medium" | "high";
+    suggest_next_steps: boolean;
+    max_contract_signals: number;
+    max_chat_shelf: number;
+    active_candidates: number;
+    suppressed_candidates: number;
+    selected_chat_shelf: number;
   };
+  suppressed: Array<{
+    id: string;
+    reason: "dismissed" | "snoozed" | string;
+    signal_key: string;
+    until?: string;
+  }>;
+  next_wakeup_at: string | null;
   policy: {
-    chat_interruption_allowed: false;
     auto_execute_allowed: false;
-    write_tools_allowed: false;
-    creates_chat_messages: false;
-    persistent_dismiss_snooze: true;
-    derived_from_authoritative_state: true;
+    write_action_allowed: false;
+    chat_message_injection_allowed: false;
+    interrupt_user_allowed: false;
+    os_notification_allowed: false;
+    operational_blockers_owned_by_presence: true;
+    decisions_change_signal_visibility_only: true;
   };
   generated_at: string;
 }
