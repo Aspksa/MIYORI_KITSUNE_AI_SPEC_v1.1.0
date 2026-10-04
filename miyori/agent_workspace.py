@@ -12,6 +12,7 @@ from .db import (
     create_task,
     get_agent_workflow,
     get_project,
+    list_tasks,
     record_audit_event,
     utc_now,
 )
@@ -648,6 +649,16 @@ def enqueue_agent_workspace(project_id: int, workspace_id: int) -> dict:
         raise ValueError("Agent Workspace не найден.")
     if workspace["status"] in {"completed", "cancelled"}:
         raise ValueError("Этот Agent Workspace уже завершён.")
+
+    for task in list_tasks(project_id):
+        payload = task.get("payload") or {}
+        if (
+            task.get("task_type") == "agent_workspace"
+            and task.get("status") in {"queued", "running"}
+            and int(payload.get("workspace_id") or 0) == workspace_id
+        ):
+            return task
+
     return create_task(
         project_id,
         "agent_workspace",
@@ -662,13 +673,19 @@ def cancel_agent_workspace(project_id: int, workspace_id: int) -> dict:
     if workspace["status"] == "cancelled":
         return workspace
 
+    recovery_blocked = False
     for node in workspace["nodes"]:
         workflow_id = node.get("workflow_id")
         if workflow_id and node["status"] not in {"completed", "failed", "cancelled"}:
             try:
                 asyncio.run(cancel_agent_workflow(project_id, int(workflow_id)))
             except RuntimeError:
-                # Recovery workflow remains authoritative; workspace marks it as recovery.
+                recovery_blocked = True
+                _update_node(
+                    int(node["id"]),
+                    status="recovery",
+                    error={"code": "cancel_deferred_until_recovery"},
+                )
                 continue
         if node["status"] not in {"completed", "failed", "cancelled"}:
             _update_node(
@@ -677,6 +694,26 @@ def cancel_agent_workspace(project_id: int, workspace_id: int) -> dict:
                 result={"outcome": "workspace_cancelled"},
                 mark_finished=True,
             )
+
+    if recovery_blocked:
+        with connect() as conn:
+            conn.execute(
+                """
+                UPDATE agent_workspaces
+                SET status = 'recovery', updated_at = ?
+                WHERE id = ? AND project_id = ?
+                """,
+                (utc_now(), workspace_id, project_id),
+            )
+        record_audit_event(
+            project_id,
+            "system",
+            "agent_workspace.cancel_deferred",
+            "Отмена Agent Workspace отложена до завершения recovery дочернего workflow.",
+            entity_type="agent_workspace",
+            entity_id=workspace_id,
+        )
+        return get_agent_workspace(project_id, workspace_id) or workspace
 
     with connect() as conn:
         conn.execute(
