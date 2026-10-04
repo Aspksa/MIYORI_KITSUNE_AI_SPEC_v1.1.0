@@ -56,10 +56,10 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **N5 / 00.00.51 — завершён.** Voice Core: versioned state/safety protocol, explicit microphone permission, optional browser STT, transcript/confidence, opt-in TTS, interruption/barge-in и Living Presence integration.
 - **N6 — запланирован.** Desktop Runtime: native shell поверх существующего API.
 - **N7 / 00.00.48 — завершён.** Generative UI: trusted component registry, versioned surface specs, safe renderer без model-authored HTML/JS и quiet surface shelf.
-- **N8 — запланирован.** Agent Workspace: delegation, parallel work, dependency graph, approvals и budgets.
+- **N8 / 00.00.52 — завершён.** Agent Workspace: persistent DAG coordinator поверх Workflow Engine, parallel-ready execution, per-node/total budgets, dependency handoff, approvals/recovery inheritance и отдельная Actions surface.
 - **N9 / 00.00.49 — завершён.** Living Presence: versioned presence contract выводит ready/working/waiting/attention/recovery/degraded только из NEXUS snapshot, Actions, Events и реального локального chat-request state; idle остаётся визуально тихим.
 - **N10 / 00.00.50 — завершён.** Proactive Miyori: canonical attention engine, state fingerprinting, persistent snooze/dismiss, initiative-aware chat shelf, channel ownership и запрет автоматического write/chat interruption.
-- **N6 Desktop Runtime отложен по решению владельца проекта. Следующий выбранный этап — N8 Agent Workspace, затем N11 Home и N12 Digital Body.**
+- **N6 Desktop Runtime отложен по решению владельца проекта. Следующий выбранный этап — N11 Home, затем N12 Digital Body.**
 
 ## Поэтапный план
 
