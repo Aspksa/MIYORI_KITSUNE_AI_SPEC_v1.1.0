@@ -2334,6 +2334,7 @@ async def _build_agent_response(
         history_context=(history_matches or [{"status":"not_found"}])
                         if wants_history(text) else None,
         feedback_context=user_corrections or None,
+        screen_context=ui_context or None,
         brain_plan=brain.plan,
         tool_context=agent.tool_context,
         epistemic_context=epistemic,
