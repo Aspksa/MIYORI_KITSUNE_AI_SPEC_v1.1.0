@@ -16,6 +16,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from miyori.config import settings
+from miyori.appearance import (
+    get_appearance_profile,
+    init_appearance_db,
+    portrait_asset_path,
+    remove_portrait_asset,
+    save_portrait_asset,
+    update_appearance_profile,
+)
 from miyori.db import (
     add_message,
     conversation_messages,
@@ -257,6 +265,7 @@ async def lifespan(app: FastAPI):
     init_document_questions_db()
     init_agent_workspace_db()
     init_nexus_home_db()
+    init_appearance_db()
     recovery_marked = mark_interrupted_runtime_for_recovery()
     recovery_checked = reconcile_recoverable_operations(allow_retry=False)
     init_epistemic_db()
@@ -473,6 +482,13 @@ class AccountProfileRequest(BaseModel):
     profile_kind: str = Field(default="personal", pattern="^(personal|work)$")
 
 
+class MiyoriAppearanceRequest(BaseModel):
+    hair_color: str | None = Field(default=None, max_length=80)
+    eye_color: str | None = Field(default=None, max_length=80)
+    tail_count: int | None = Field(default=None, ge=1)
+    main_outfit: str | None = Field(default=None, max_length=500)
+
+
 class CloudRuProfileRequest(BaseModel):
     api_key: str | None = Field(default=None, max_length=500)
     base_url: str | None = Field(default=None, max_length=500)
@@ -536,6 +552,62 @@ def _touch_current_device() -> dict:
         device_name=host,
         platform_name=platform_name,
         session_kind="desktop",
+    )
+
+
+@app.get("/api/miyori/appearance")
+def miyori_appearance_get(request: Request) -> dict:
+    _require_local_admin(request)
+    return {"appearance": get_appearance_profile()}
+
+
+@app.put("/api/miyori/appearance")
+def miyori_appearance_update(
+    request: MiyoriAppearanceRequest,
+    http_request: Request,
+) -> dict:
+    _require_local_admin(http_request)
+    try:
+        appearance = update_appearance_profile(
+            hair_color=request.hair_color,
+            eye_color=request.eye_color,
+            tail_count=request.tail_count,
+            main_outfit=request.main_outfit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"appearance": appearance}
+
+
+@app.post("/api/miyori/appearance/portrait")
+async def miyori_appearance_portrait_upload(
+    request: Request,
+    file: UploadFile = File(...),
+) -> dict:
+    _require_local_admin(request)
+    data = await file.read()
+    try:
+        appearance = save_portrait_asset(data, file.content_type or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"appearance": appearance}
+
+
+@app.delete("/api/miyori/appearance/portrait")
+def miyori_appearance_portrait_delete(request: Request) -> dict:
+    _require_local_admin(request)
+    return {"appearance": remove_portrait_asset()}
+
+
+@app.get("/api/miyori/appearance/portrait")
+def miyori_appearance_portrait(request: Request) -> FileResponse:
+    _require_local_admin(request)
+    path = portrait_asset_path()
+    if not path:
+        raise HTTPException(status_code=404, detail="Портрет Миёри не задан.")
+    return FileResponse(
+        path,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
 
 
