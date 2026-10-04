@@ -25,6 +25,24 @@ N9 добавляет спокойный presence layer, который не с�
 
 Такой контракт готов к будущим Voice/Desktop/Avatar: визуальное или голосовое поведение сможет подписываться на те же состояния, не изобретая собственную «эмоцию».
 
+## Состояние релиза 00.00.49
+
+`00.00.49` — **NEXUS Living Presence · живое состояние без симуляции жизни**.
+
+N9 делает состояние Miyori заметным только тогда, когда это действительно полезно:
+
+- `/api/projects/{id}/nexus/presence` выводит presence из NEXUS snapshot, Actions и Event Fabric;
+- реальные режимы: ready / working / verifying / waiting / recovery / attention / degraded;
+- Chat публикует локальный interaction-state только во время фактически отправленного запроса;
+- ready-state визуально скрыт: интерфейс не занимает место, когда ничего не происходит;
+- Knowledge attention учитывается в activity/reasons, но не перехватывает primary presence;
+- waiting/recovery/error имеют приоритет над обычной работой;
+- verifying является отдельным состоянием только когда tool operation реально находится в verifying;
+- случайная анимация, timer-driven «жизнь» и декоративная активность запрещены контрактом;
+- Presence показывается только в Chat; Actions/Knowledge/System остаются рабочими поверхностями;
+- high-attention состояние может раскрыть последнее подтверждённое событие;
+- UI не использует keyframe-анимаций.
+
 ## Состояние релиза 00.00.48
 
 `00.00.48` — **NEXUS Generative UI · trusted surfaces без шума в чате**.
