@@ -8,8 +8,8 @@ export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0";
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0";
 export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0";
 export const NEXUS_HOME_SCHEMA_VERSION = "1.0.0";
-export const NEXUS_BODY_SCHEMA_VERSION = "1.3.0";
-export const BODY_RENDERER_SCHEMA_VERSION = "1.1.0";
+export const NEXUS_BODY_SCHEMA_VERSION = "1.4.0";
+export const BODY_RENDERER_SCHEMA_VERSION = "1.2.0";
 export const MIYORI_APPEARANCE_SCHEMA_VERSION = "1.0.0";
 export function isNexusOperationalState(value) {
     return [
