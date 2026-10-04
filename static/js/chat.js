@@ -10,11 +10,15 @@ async function loadConversations() {
   const controller = new AbortController();
   conversationListController = controller;
   const search = el("conversationSearch")?.value?.trim() || "";
+  const folder = window.miyoriConversationUX?.folderQuery?.() || "all";
+  const params = new URLSearchParams();
+  if (search) params.set("q", search);
+  if (folder && folder !== "all") params.set("folder", folder);
   let data;
   try {
     data = await api(
       "/api/projects/" + state.projectId + "/conversations" +
-      (search ? "?q=" + encodeURIComponent(search) : ""),
+      (params.size ? "?" + params.toString() : ""),
       {signal:controller.signal}
     );
   } catch (error) {
@@ -49,6 +53,7 @@ async function loadConversations() {
     }
     const row = document.createElement("div");
     row.className = "conversation-history-row";
+    row.dataset.conversationId = String(item.id);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "conversation-item" + (item.id === state.conversationId ? " active" : "");
@@ -82,7 +87,7 @@ async function loadConversations() {
 const chatWindow = {hasMore: false, beforeId: null, loading: false};
 
 function messageFromRecord(item) {
-  return addMessage(item.role, item.content, item.metadata?.sources || [], {
+  const row = addMessage(item.role, item.content, item.metadata?.sources || [], {
     id: item.id,
     bookmarked: Boolean(item.bookmarked),
     diagnostics: item.metadata?.diagnostics,
@@ -96,6 +101,8 @@ function messageFromRecord(item) {
     suppressEvent: true,
     suppressScroll: true
   });
+  row._miyoriMeta = item.metadata || {};
+  return row;
 }
 
 function renderOlderControl() {
@@ -147,6 +154,7 @@ async function openConversation(id, targetId = null) {
     found?.scrollIntoView({block:"center"});
     found?.classList.add("search-hit");
   } else messages.scrollTop = messages.scrollHeight;
+  await window.miyoriConversationUX?.afterConversationOpen?.(data);
   input.focus();
 }
 
@@ -279,6 +287,7 @@ function startNewChat() {
   state.pendingRequest = null;
   window.miyoriDrafts?.save();
   window.miyoriChatAttachments?.clear();
+  window.miyoriConversationUX?.resetConversation?.();
   state.conversationId = null;
   showError("");
   showWelcome();
@@ -314,6 +323,7 @@ form.addEventListener("submit", async (event) => {
   const attachment_ids = attachedFiles.map(file => Number(file.id));
   const ui_context=structuredClone(window.miyoriScreenContext ||
     {module:"chat"});
+  const ux_context = window.miyoriConversationUX?.composerContext?.() || {};
   const readOnly = Boolean(window.miyoriForkReadOnly);
   showError("");
   const uploadStatus = el("composerUploadStatus");
@@ -322,6 +332,7 @@ form.addEventListener("submit", async (event) => {
     attachments: attachedFiles,
     animate: true,
   });
+  userRow._miyoriMeta = {...ux_context, attachments:attachment_ids};
   input.value = "";
   window.miyoriDrafts?.save();
   input.style.height = "auto";
@@ -335,13 +346,15 @@ form.addEventListener("submit", async (event) => {
     pending.readOnly === readOnly &&
     pending.conversationId === state.conversationId &&
     JSON.stringify(pending.attachment_ids) === JSON.stringify(attachment_ids) &&
-    JSON.stringify(pending.ui_context) === JSON.stringify(ui_context);
+    JSON.stringify(pending.ui_context) === JSON.stringify(ui_context) &&
+    JSON.stringify(pending.ux_context || {}) === JSON.stringify(ux_context);
   const requestId = reuse ? pending.requestId :
     (window.crypto?.randomUUID?.() ||
       (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)));
   state.pendingRequest = {
     requestId, projectId:state.projectId, conversationId:state.conversationId,
     text, readOnly, attachment_ids:[...attachment_ids],ui_context,
+    ux_context:structuredClone(ux_context),
   };
   state.lastRequestId = requestId;
   window.miyoriChatActivity?.begin(requestId);
@@ -356,7 +369,11 @@ form.addEventListener("submit", async (event) => {
         conversation_id: state.conversationId,
         request_id: requestId,
         read_only: readOnly,
-        attachment_ids,ui_context
+        attachment_ids,ui_context,
+        reply_to_message_id: ux_context.reply_to_message_id ?? null,
+        quoted_text: ux_context.quoted_text || "",
+        topic_id: ux_context.topic_id ?? null,
+        voice_note_id: ux_context.voice_note_id ?? null
       })
     });
     const data = await response.json();
@@ -372,17 +389,22 @@ form.addEventListener("submit", async (event) => {
 
     state.conversationId = data.conversation_id;
     if (data.user_message_id) userRow.dataset.messageId = String(data.user_message_id);
-    addMessage("assistant", data.answer, data.sources || [], {
+    const assistantRow = addMessage("assistant", data.answer, data.sources || [], {
       id:data.assistant_message_id, diagnostics:data.diagnostics,
       comparison_offer:data.comparison_offer,
       task_goal:data.task_goal,
       workflow:data.workflow,
       animate:true
     });
+    assistantRow._miyoriMeta = {
+      topic_id:data.topic_id ?? ux_context.topic_id ?? null,
+      reply_context:data.reply_context || null,
+    };
     attachmentStore?.clear();
     state.pendingRequest = null;
     window.miyoriForkReadOnly = false;
     window.dispatchEvent(new CustomEvent("miyori:chat-response", {detail: data}));
+    await window.miyoriConversationUX?.afterSend?.(data, text);
 
     // Технические данные обновляются внутри системы, но не добавляются в пользовательский чат.
     if (data.brain) {

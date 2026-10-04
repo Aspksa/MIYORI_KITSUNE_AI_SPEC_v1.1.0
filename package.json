@@ -41,6 +41,7 @@
     "test:document-links": "node scripts/test-document-links.mjs",
     "test:screen-context": "node scripts/test-screen-context.mjs",
     "test:chat-quality": "node scripts/test-chat-quality.mjs",
-    "test:chat-progress": "node scripts/test-chat-progress.mjs"
+    "test:chat-progress": "node scripts/test-chat-progress.mjs",
+    "test:conversation-ux": "node scripts/test-conversation-ux.mjs"
   }
 }

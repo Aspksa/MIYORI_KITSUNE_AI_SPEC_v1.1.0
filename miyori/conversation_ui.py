@@ -160,12 +160,13 @@ def set_message_bookmark(project_id: int, conversation_id: int, message_id: int,
         found = conn.execute(
             """
             SELECT m.id FROM messages m JOIN conversations c ON c.id = m.conversation_id
-            WHERE m.id = ? AND m.conversation_id = ? AND c.project_id = ? AND m.role = 'assistant'
+            WHERE m.id = ? AND m.conversation_id = ? AND c.project_id = ?
+              AND m.role IN ('user','assistant')
             """,
             (message_id, conversation_id, project_id),
         ).fetchone()
         if not found:
-            raise LookupError("Ответ не найден в этом разговоре.")
+            raise LookupError("Сообщение не найдено в этом разговоре.")
         if bookmarked:
             conn.execute(
                 "INSERT OR IGNORE INTO message_bookmarks(project_id, message_id) VALUES (?, ?)",
@@ -334,10 +335,24 @@ def search_conversation_messages(
 
 def list_bookmarked_messages(project_id: int, *, limit: int = 50) -> list[dict]:
     with connect() as conn:
-        rows = conn.execute(
+        has_tags = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chat_message_tags'"
+        ).fetchone() is not None
+        tag_sql = (
             """
+            COALESCE((
+              SELECT json_group_array(t.tag)
+              FROM chat_message_tags t
+              WHERE t.project_id=b.project_id AND t.message_id=m.id
+            ), '[]') AS tags_json
+            """
+            if has_tags else "'[]' AS tags_json"
+        )
+        rows = conn.execute(
+            f"""
             SELECT m.id, m.conversation_id, substr(m.content,1,240) AS preview,
-                   c.title AS conversation_title, b.created_at
+                   c.title AS conversation_title, b.created_at,
+                   {tag_sql}
             FROM message_bookmarks b
             JOIN messages m ON m.id = b.message_id
             JOIN conversations c ON c.id = m.conversation_id
@@ -346,4 +361,13 @@ def list_bookmarked_messages(project_id: int, *, limit: int = 50) -> list[dict]:
             """,
             (project_id, project_id, min(100, max(1, limit))),
         ).fetchall()
-    return [dict(row) for row in rows]
+    result = []
+    for row in rows:
+        item = dict(row)
+        raw = item.pop("tags_json", "[]")
+        try:
+            item["tags"] = json.loads(raw or "[]")
+        except (ValueError, TypeError):
+            item["tags"] = []
+        result.append(item)
+    return result
