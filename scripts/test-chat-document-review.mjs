@@ -17,7 +17,7 @@ window.eval(readFileSync("static/vendor/purify.min.js","utf8"));
 window.eval(core);
 
 const called=[];
-window.state.projectId=7;
+window.eval("state.projectId=7");
 window.api=async(url,opts)=>{called.push({url,opts});return {question:{id:1}};};
 window.addMessage("assistant","Результат",[],{
   diagnostics:{
