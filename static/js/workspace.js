@@ -79,6 +79,8 @@ function showChatWorkspace() {
 
 function showWorkspaceShell(name, eyebrow, title, subtitle) {
   if (chatHeader) chatHeader.hidden = true;
+  const bodyHost = el("nexusBodyHost");
+  if (bodyHost) bodyHost.dataset.appearanceOpen = "false";
   if (messages) messages.hidden = true;
   if (chatComposer) chatComposer.hidden = true;
   if (workspaceView) {
