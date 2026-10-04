@@ -188,3 +188,5 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **00.00.62 — безопасные Fork / Retry.** Edit/regenerate сохраняет исходную историю без побочных эффектов: серверный `read_only` принудительно исключает инструменты, при сбое повторяет прежний idempotency key только внутри того же проекта, диалога и списка вложений. Исполненные workflow нельзя молча повторять.
 
 - **00.00.63 · Chat Intelligence.** Продолжения разговора разрешают только расширение retrieval-контекста (документы и verified memory) в пределах текущего project/conversation; не наследуют tool permissions и не меняют read-only forks. Реальные usage/latency Cloud.ru и evidence-availability записываются вместе с ответом. Отсутствующий API usage остаётся неизвестным; наличие источников не является семантической проверкой результата.
+
+- **00.00.64 — Document Reasoning.** Многодокументная проверка через уже существующий persistent Exhaustive Q&A, evidence с locator, реальный OCR/extraction coverage и запуск по явному действию пользователя в компактной карточке.
