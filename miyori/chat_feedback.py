@@ -119,7 +119,6 @@ def relevant_owner_corrections(
 
 
 def feedback_totals(project_id: int) -> dict:
-    init_chat_feedback_db()
     with connect() as db:
         rows=db.execute("""
             SELECT verdict,COUNT(*) AS events FROM chat_feedback_events
