@@ -625,6 +625,21 @@
     if (reaction === "pin") {
       await togglePin(row);
     }
+    if (reaction === "useful" && enabled && row.classList.contains("assistant")) {
+      await api(endpoint(id, "feedback"), {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({verdict:"useful",correction:""})
+      });
+      setStatus("Отмечено как полезный ответ.");
+    }
+    if (reaction === "verify" && enabled) {
+      setReply(row);
+      const prefix = "Проверь источники и фактические утверждения этого ответа. ";
+      if (!input.value.trim()) input.value = prefix;
+      input.dispatchEvent(new Event("input",{bubbles:true}));
+      input.focus();
+      setStatus("Подготовлен запрос на проверку. Отправьте его после просмотра.");
+    }
     if (reaction === "remember" && enabled) {
       const base = String(row._miyoriText || row.querySelector(".message-body")?.textContent || "").trim().slice(0,1000);
       const statement = window.prompt(
