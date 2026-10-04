@@ -120,6 +120,8 @@ function addMessage(role, text, sources = [], options = {}) {
   if (options.id != null) article.dataset.messageId = String(options.id);
   article._miyoriText = String(text ?? "");
   article._miyoriAttachments = Array.isArray(options.attachments) ? options.attachments : [];
+  article._miyoriTaskGoal = String(options.task_goal || "").trim();
+  article._miyoriWorkflow = options.workflow || null;
 
   const avatar = document.createElement("div");
   avatar.className = "avatar";
@@ -380,6 +382,15 @@ function addMessage(role, text, sources = [], options = {}) {
     : [["copy", "Копировать"], ["retry", "Повторить"],
        ["save", options.bookmarked ? "Сохранено" : "Сохранить"],
        ["correct", "Исправить"]];
+  if (role === "assistant" && article._miyoriTaskGoal) {
+    commands.push(["tasks", "В задачи"]);
+  }
+  if (role === "assistant" && Number(article._miyoriWorkflow?.id) > 0 &&
+      ["waiting_permission", "recovering", "running"].includes(
+        String(article._miyoriWorkflow?.status || "")
+      )) {
+    commands.push(["actions", "Действия"]);
+  }
   commands.forEach(([action, label]) => {
     const button = document.createElement("button");
     button.type = "button";
