@@ -138,6 +138,9 @@ jobs:
       - name: Measured chat quality contract
         run: npm run test:chat-quality
 
+      - name: Real chat request progress
+        run: npm run test:chat-progress
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
