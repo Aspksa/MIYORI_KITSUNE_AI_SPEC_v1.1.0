@@ -1355,3 +1355,19 @@
 }
 .drive-related-open:hover{text-decoration:underline}
 .drive-related-warning{color:var(--ui-muted);font-size:12px}
+
+
+.drive-vision-status{display:grid;gap:10px}
+.drive-vision-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.drive-vision-head h4{margin:0 0 4px}
+.drive-vision-head p{margin:0;color:var(--ui-muted);font-size:12px;line-height:1.45}
+.drive-vision-metrics{display:flex;flex-wrap:wrap;gap:8px}
+.drive-vision-metrics span{border:1px solid var(--ui-border);border-radius:9px;padding:5px 8px;font-size:11px;color:var(--ui-muted)}
+.drive-vision-sources{display:grid;gap:5px;max-height:220px;overflow:auto}
+.drive-vision-sources>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border-radius:8px;background:var(--ui-surface-soft)}
+.drive-vision-sources strong{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drive-vision-sources small{font-size:10px;color:var(--ui-muted);white-space:nowrap}
+@media(max-width:700px){
+  .drive-vision-head,.drive-vision-sources>div{align-items:flex-start;flex-direction:column}
+  .drive-vision-sources small{white-space:normal}
+}
