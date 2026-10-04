@@ -555,7 +555,7 @@ async function renderNexusAgentWorkspace() {
     '<section class="agent-workspace-page">' +
       '<header class="agent-workspace-intro">' +
         '<div><h3>Оркестрация задач</h3>' +
-          '<p>Независимые узлы могут работать параллельно. Любой write-tool всё равно проходит через Actions permissions.</p></div>' +
+          '<p>Независимые узлы могут работать параллельно. Зависимости, бюджеты шагов и handoff контролируются сервером; запись требует разрешения.</p></div>' +
         '<button id="agentWorkspaceBack" class="secondary-sheet-button" type="button">← Действия</button>' +
       '</header>' +
       '<form id="agentWorkspaceCreate" class="agent-workspace-create">' +
