@@ -184,8 +184,12 @@ export function installNexusShell() {
         unsubscribeStore = store.subscribe((state) => {
             if (currentGeneration !== generation)
                 return;
-            if (state.snapshot)
+            if (state.snapshot) {
                 renderSnapshot(state.snapshot);
+                window.dispatchEvent(new CustomEvent("miyori:nexus-snapshot", {
+                    detail: { snapshot: state.snapshot },
+                }));
+            }
         });
         try {
             await store.hydrate();
