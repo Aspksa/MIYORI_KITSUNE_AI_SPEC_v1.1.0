@@ -36,7 +36,6 @@ def record_chat_feedback(
     project_id: int,conversation_id: int,message_id: int,
     verdict: str,correction: str = "",
 ) -> dict:
-    init_chat_feedback_db()
     value=str(correction or "").strip()
     if verdict not in _VALID:
         raise ValueError("Недопустимый тип обратной связи.")
@@ -75,7 +74,6 @@ def relevant_owner_corrections(
         if term.casefold() not in _SKIP
     }
     if not tokens:return []
-    init_chat_feedback_db()
     with connect() as db:
         rows=db.execute("""
             SELECT f.id,f.message_id,f.conversation_id,f.correction,f.created_at,
