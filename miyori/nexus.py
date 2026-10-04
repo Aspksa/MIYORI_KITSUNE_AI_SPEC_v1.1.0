@@ -12,6 +12,7 @@ from .db import (
     list_permission_requests,
     list_tasks,
 )
+from .agent_workspace import list_agent_workspaces
 from .document_intelligence import document_intelligence_status
 from .epistemic import epistemic_snapshot
 from .tasks import worker_status
@@ -86,6 +87,7 @@ def build_nexus_snapshot(project_id: int) -> dict:
     permissions = list_permission_requests(project_id)
     tasks = list_tasks(project_id)
     workflows = list_agent_workflows(project_id, limit=200)
+    agent_workspaces = list_agent_workspaces(project_id, limit=100)
     development = development_snapshot(project_id)
     document_status = document_intelligence_status(project_id)
     epistemic = epistemic_snapshot(project_id)
@@ -102,6 +104,11 @@ def build_nexus_snapshot(project_id: int) -> dict:
     ]
     recovering_workflows = [
         item for item in workflows if item.get("status") == "recovering"
+    ]
+    active_agent_workspaces = [
+        item
+        for item in agent_workspaces
+        if item.get("status") in {"planned", "running", "waiting_permission", "recovery"}
     ]
     waiting_workflows = [
         item for item in workflows if item.get("status") == "waiting_permission"
@@ -243,11 +250,17 @@ def build_nexus_snapshot(project_id: int) -> dict:
             "Agents",
             "degraded" if recovering_workflows else "processing" if active_workflows else "ready",
             operation=(
-                f"Активных workflow: {len(active_workflows)}"
-                if active_workflows
+                (
+                    f"Workflow: {len(active_workflows)} · Agent Workspace: "
+                    f"{len(active_agent_workspaces)}"
+                )
+                if active_workflows or active_agent_workspaces
                 else None
             ),
-            last_result=f"Workflow в recovery: {len(recovering_workflows)}",
+            last_result=(
+                f"Workspace: {len(agent_workspaces)} · recovery workflow: "
+                f"{len(recovering_workflows)}"
+            ),
             limitation="Write-действия проходят permission/preflight/verify контур.",
             updated_at=generated_at,
         ),
@@ -340,6 +353,8 @@ def build_nexus_snapshot(project_id: int) -> dict:
         "active_tasks": len(active_tasks),
         "active_workflows": len(active_workflows),
         "recovering_workflows": len(recovering_workflows),
+        "agent_workspaces": len(agent_workspaces),
+        "active_agent_workspaces": len(active_agent_workspaces),
         "active_actions": active_actions,
         "attention_actions": attention_actions,
         "knowledge_attention": knowledge_attention,
