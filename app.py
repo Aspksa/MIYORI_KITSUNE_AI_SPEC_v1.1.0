@@ -309,7 +309,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.66", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.67", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -576,7 +576,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.66",
+        "version": "00.00.67",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -874,7 +874,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.66",
+        "project_version": "00.00.67",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
