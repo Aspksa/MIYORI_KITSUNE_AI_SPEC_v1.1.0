@@ -285,6 +285,11 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
             ? '<section class="drive-intelligence-section"><h4>Целостная сводка</h4><p>' +
               escapeHtml(profile.summary_long || profile.summary_short) + '</p></section>'
             : '') +
+          '<details id="driveRelatedDocuments" class="drive-intelligence-section drive-related-documents">' +
+            '<summary>Возможные связи с другими документами</summary>' +
+            '<p class="drive-intelligence-help">Сопоставляются только явно указанные номера документов, VIN и госномера. Результат не считается подтверждённой связью.</p>' +
+            '<div id="driveRelatedResults">Нажмите, чтобы найти совпадения.</div>' +
+          '</details>' +
           '<section class="drive-intelligence-section drive-exhaustive-question">' +
             '<h4>Спросить по всему документу</h4>' +
             '<p class="drive-intelligence-help">Этот режим проверяет весь извлечённый текст от начала до конца, а не только найденные RAG-фрагменты.</p>' +
@@ -392,6 +397,59 @@ async function renderDocumentsWorkspace(initialFolderId = null) {
           '</div>' +
         '</section>';
 
+      const relatedPanel=el("driveRelatedDocuments");
+      if (relatedPanel) {
+        let relatedLoaded=false;
+        relatedPanel.addEventListener("toggle",async()=>{
+          if(!relatedPanel.open || relatedLoaded)return;
+          relatedLoaded=true;
+          const project=Number(state.projectId);
+          const host=el("driveRelatedResults");
+          if(!host)return;
+          host.textContent="Ищу совпадения по извлечённым реквизитам…";
+          try{
+            const response=await api(
+              "/api/projects/"+project+"/documents/"+documentId+"/related?limit=8"
+            );
+            if(Number(state.projectId)!==project || !host.isConnected)return;
+            host.replaceChildren();
+            if(response.scan_truncated){
+              const warning=document.createElement("p");
+              warning.className="drive-related-warning";
+              warning.textContent="Поиск ограничен первыми доступными фрагментами; список может быть неполным.";
+              host.append(warning);
+            }
+            if(!response.candidates?.length){
+              const empty=document.createElement("p");
+              empty.textContent="Точных совпадений пока нет.";
+              host.append(empty);
+            }
+            for(const item of response.candidates||[]){
+              const row=document.createElement("article");
+              row.className="drive-related-item";
+              const open=document.createElement("button");
+              open.type="button";
+              open.className="drive-related-open";
+              open.textContent=item.filename;
+              open.title="Открыть структуру этого документа";
+              open.addEventListener("click",()=>renderIntelligencePanel(item.document_id));
+              row.append(open);
+              for(const match of (item.matches||[]).slice(0,4)){
+                const info=document.createElement("p");
+                info.textContent=match.kind+": "+match.identifier+
+                  " · источник: "+(match.source?.locator||"не указано")+
+                  " · здесь: "+(match.target?.locator||"не указано");
+                row.append(info);
+              }
+              host.append(row);
+            }
+          }catch(error){
+            relatedLoaded=false;
+            if(host.isConnected)host.textContent=
+              "Не удалось найти связи: "+String(error.message||error);
+          }
+        });
+      }
       el("driveIntelligenceClose").onclick = () => {
         clearTimeout(documentQuestionPoll);
         resultNode.innerHTML = "";
