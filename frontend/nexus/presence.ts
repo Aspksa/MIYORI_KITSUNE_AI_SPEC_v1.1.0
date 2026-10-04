@@ -3,6 +3,10 @@ import type { NexusPresence, NexusSnapshot } from "./contracts.js";
 
 type LocalInteractionState = "idle" | "thinking";
 
+function currentView(): string {
+  return String(document.documentElement.dataset.nexusView || "chat");
+}
+
 function currentProjectId(): number | null {
   const select = document.getElementById("projectSelect") as HTMLSelectElement | null;
   const value = Number(select?.value);
@@ -26,6 +30,11 @@ function renderPresence(
   interaction: LocalInteractionState,
 ): void {
   host.replaceChildren();
+
+  if (currentView() !== "chat") {
+    host.hidden = true;
+    return;
+  }
 
   if (interaction === "thinking") {
     host.dataset.mode = "working";
@@ -73,6 +82,7 @@ function renderPresence(
   let view: "actions" | "knowledge" | "system" | null = null;
   if (
     presence.mode === "waiting" ||
+    presence.mode === "verifying" ||
     presence.mode === "recovery" ||
     firstReason?.kind === "action" ||
     firstReason?.kind === "workflow" ||
@@ -169,13 +179,19 @@ export function installNexusPresence(): () => void {
     if (interaction === "idle") void refresh();
   };
 
+  const onView = (): void => {
+    renderPresence(host, presence, interaction);
+  };
+
   window.addEventListener("miyori:nexus-snapshot", onSnapshot);
   window.addEventListener("miyori:interaction-state", onInteraction);
+  window.addEventListener("miyori:nexus-view", onView);
 
   return () => {
     stopped = true;
     generation += 1;
     window.removeEventListener("miyori:nexus-snapshot", onSnapshot);
     window.removeEventListener("miyori:interaction-state", onInteraction);
+    window.removeEventListener("miyori:nexus-view", onView);
   };
 }
