@@ -211,6 +211,18 @@ function addMessage(role, text, sources = [], options = {}) {
       };
       line("Режим",plan.mode==="deep"?"углублённый":"обычный");
       line("Источники",Number(evidence.source_count)||0);
+      const crosscheck=diagnostics.numeric_check || {};
+      if (crosscheck.status==="checked_numbers") {
+        line("Сверка чисел",crosscheck.matching_source+"/"+
+          crosscheck.claims_seen+" имеют совпадения в источниках");
+        if (crosscheck.missing_source > 0) {
+          const warning=document.createElement("p");
+          warning.className="chat-source-warning";
+          warning.textContent="Найдены значения без подтверждающего фрагмента: "+
+            crosscheck.missing_source+". Проверьте документы.";
+          content.appendChild(warning);
+        }
+      }
       const history=diagnostics.historical_chat || {};
       if (history.requested) {
         line("Ранние разговоры",(history.matches||0)+
