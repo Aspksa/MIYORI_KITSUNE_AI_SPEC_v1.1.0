@@ -35,6 +35,16 @@ assert.ok(
   "Actions workspace renderer is missing",
 );
 assert.ok(
+  workspace.includes("/nexus/actions?limit=80"),
+  "Actions workspace must consume the unified authoritative action contract",
+);
+assert.ok(
+  workspace.includes("Preview изменений") &&
+    workspace.includes("Evidence") &&
+    workspace.includes("История"),
+  "Actions workspace must expose preview, evidence and execution history",
+);
+assert.ok(
   workspace.includes('new CustomEvent("miyori:nexus-view"'),
   "legacy workspace must announce NEXUS view changes",
 );
@@ -45,6 +55,14 @@ assert.ok(
 assert.ok(
   shell.includes("new NexusStore"),
   "shell must be driven by the authoritative NEXUS store",
+);
+assert.ok(
+  shell.includes("snapshot.counts.active_actions"),
+  "Actions badge must use deduplicated server action counts",
+);
+assert.ok(
+  !shell.includes('state === "processing" ? "в работе" : "готово"'),
+  "Chat badge must not report ready for degraded/error/not_connected states",
 );
 assert.ok(
   shell.includes('document.documentElement.dataset.nexusView || "chat"'),
