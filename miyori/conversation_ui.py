@@ -160,12 +160,13 @@ def set_message_bookmark(project_id: int, conversation_id: int, message_id: int,
         found = conn.execute(
             """
             SELECT m.id FROM messages m JOIN conversations c ON c.id = m.conversation_id
-            WHERE m.id = ? AND m.conversation_id = ? AND c.project_id = ? AND m.role = 'assistant'
+            WHERE m.id = ? AND m.conversation_id = ? AND c.project_id = ?
+              AND m.role IN ('user','assistant')
             """,
             (message_id, conversation_id, project_id),
         ).fetchone()
         if not found:
-            raise LookupError("Ответ не найден в этом разговоре.")
+            raise LookupError("Сообщение не найдено в этом разговоре.")
         if bookmarked:
             conn.execute(
                 "INSERT OR IGNORE INTO message_bookmarks(project_id, message_id) VALUES (?, ?)",
