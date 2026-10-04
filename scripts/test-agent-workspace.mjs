@@ -53,4 +53,11 @@ assert.ok(
   "Agent Workspace visual layer must stay state-driven and animation-free",
 );
 
+assert.ok(
+  workspace.includes("openAgentWorkspaceFromChat") &&
+    workspace.includes('el("agentWorkspaceGoal")') &&
+    workspace.includes("renderNexusAgentWorkspace()"),
+  "Chat must hand off a goal to the existing Agent Workspace without a duplicate task system",
+);
+
 console.log("NEXUS Agent Workspace contract OK.");
