@@ -404,7 +404,7 @@ form.addEventListener("submit", async (event) => {
     state.pendingRequest = null;
     window.miyoriForkReadOnly = false;
     window.dispatchEvent(new CustomEvent("miyori:chat-response", {detail: data}));
-    await window.miyoriConversationUX?.afterSend?.(data);
+    await window.miyoriConversationUX?.afterSend?.(data, text);
 
     // Технические данные обновляются внутри системы, но не добавляются в пользовательский чат.
     if (data.brain) {
