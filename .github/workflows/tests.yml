@@ -114,6 +114,9 @@ jobs:
       - name: Chat continuity contract
         run: npm run test:chat-continuation
 
+      - name: Chat reliability and measured usage
+        run: npm run test:chat-reliability
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
