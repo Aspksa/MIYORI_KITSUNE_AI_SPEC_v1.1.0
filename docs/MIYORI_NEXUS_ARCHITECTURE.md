@@ -190,3 +190,5 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **00.00.63 · Chat Intelligence.** Продолжения разговора разрешают только расширение retrieval-контекста (документы и verified memory) в пределах текущего project/conversation; не наследуют tool permissions и не меняют read-only forks. Реальные usage/latency Cloud.ru и evidence-availability записываются вместе с ответом. Отсутствующий API usage остаётся неизвестным; наличие источников не является семантической проверкой результата.
 
 - **00.00.64 — Document Reasoning.** Многодокументная проверка через уже существующий persistent Exhaustive Q&A, evidence с locator, реальный OCR/extraction coverage и запуск по явному действию пользователя в компактной карточке.
+
+- **00.00.65 — Agent Continuation.** Compact persisted task status shown only on actual pending work; links into NEXUS Actions for permission/recovery. No automatic tool execution, no synthetic progress, no new memory architecture.
