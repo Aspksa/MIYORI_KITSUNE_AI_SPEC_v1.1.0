@@ -459,41 +459,45 @@
     if (event.key === "Escape") searchPanel.hidden = true;
   });
   let searchGeneration = 0;
-  searchText?.addEventListener("input", async () => {
+  let searchTimer = null;
+  searchText?.addEventListener("input", () => {
     const generation = ++searchGeneration;
     const q = searchText.value.trim();
     searchResults.replaceChildren();
+    if (searchTimer) clearTimeout(searchTimer);
     if (!q || !state.conversationId) return;
-    try {
-      const enhanced = window.miyoriConversationUX?.searchRequest?.(q);
-      if (enhanced) {
-        const data = await enhanced;
-        if (generation !== searchGeneration) return;
-        await window.miyoriConversationUX.renderUnifiedSearch(
-          data, searchResults, searchPanel
+    searchTimer = setTimeout(async () => {
+      try {
+        const enhanced = window.miyoriConversationUX?.searchRequest?.(q);
+        if (enhanced) {
+          const data = await enhanced;
+          if (generation !== searchGeneration) return;
+          await window.miyoriConversationUX.renderUnifiedSearch(
+            data, searchResults, searchPanel
+          );
+          return;
+        }
+        const data = await api(
+          "/api/projects/" + state.projectId + "/conversations/" +
+          state.conversationId + "/search?q=" + encodeURIComponent(q)
         );
-        return;
+        if (generation !== searchGeneration) return;
+        if (!data.matches.length) {
+          searchResults.appendChild(make("small", "", "Ничего не найдено"));
+        }
+        for (const match of data.matches.slice(0, 25)) {
+          const button = make("button", "chat-search-match", match.preview);
+          button.type = "button";
+          button.onclick = async () => {
+            searchPanel.hidden = true;
+            await openConversation(state.conversationId, match.id);
+          };
+          searchResults.appendChild(button);
+        }
+      } catch (error) {
+        if (generation === searchGeneration) showError(error.message);
       }
-      const data = await api(
-        "/api/projects/" + state.projectId + "/conversations/" +
-        state.conversationId + "/search?q=" + encodeURIComponent(q)
-      );
-      if (generation !== searchGeneration) return;
-      if (!data.matches.length) {
-        searchResults.appendChild(make("small", "", "Ничего не найдено"));
-      }
-      for (const match of data.matches.slice(0, 25)) {
-        const button = make("button", "chat-search-match", match.preview);
-        button.type = "button";
-        button.onclick = async () => {
-          searchPanel.hidden = true;
-          await openConversation(state.conversationId, match.id);
-        };
-        searchResults.appendChild(button);
-      }
-    } catch (error) {
-      if (generation === searchGeneration) showError(error.message);
-    }
+    }, 180);
   });
 
   // Actual, persisted NEXUS events only. No invented progress or idle animation.
