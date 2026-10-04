@@ -151,9 +151,24 @@ function addMessage(role, text, sources = [], options = {}) {
       const indexes = Array.isArray(source?.chunk_indexes)
         ? source.chunk_indexes.map((value) => Number(value) + 1).filter(Number.isFinite)
         : [];
-      const chip = document.createElement(source?.download_url ? "a" : "span");
+      const past = source?.source_type === "chat_history" &&
+        Number.isSafeInteger(Number(source.conversation_id)) &&
+        Number.isSafeInteger(Number(source.message_id));
+      const chip = document.createElement(past ? "button" :
+        (source?.download_url ? "a" : "span"));
       chip.className = "message-source-chip";
-      chip.textContent = source?.readable === false
+      if (past) {
+        chip.type = "button";
+        chip.classList.add("message-history-source");
+        chip.title = "Открыть прежнее сообщение; сведения не проверены";
+        chip.addEventListener("click", () => {
+          if (typeof openConversation === "function")
+            void openConversation(Number(source.conversation_id),
+                                  Number(source.message_id));
+        });
+      }
+      chip.textContent = past ? title + " · из переписки (непроверено)"
+        : source?.readable === false
         ? title + " · нужен OCR"
         : indexes.length
           ? title + " · фрагм. " + indexes.join(", ") + (source?.truncated ? " · часть текста" : "")
@@ -196,6 +211,11 @@ function addMessage(role, text, sources = [], options = {}) {
       };
       line("Режим",plan.mode==="deep"?"углублённый":"обычный");
       line("Источники",Number(evidence.source_count)||0);
+      const history=diagnostics.historical_chat || {};
+      if (history.requested) {
+        line("Ранние разговоры",(history.matches||0)+
+          " совпадений; сообщения не являются проверенными фактами");
+      }
       line("Покрытие",names[evidence.status]||"не определено");
       if (Number.isFinite(diagnostics.retrieval_ms))
         line("Поиск",diagnostics.retrieval_ms+" мс");
