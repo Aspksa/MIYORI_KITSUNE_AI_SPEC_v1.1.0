@@ -1,15 +1,12 @@
 import { fetchNexusVoice } from "./client.js";
-
 function projectId() {
     const select = document.getElementById("projectSelect");
     const value = Number(select?.value);
     return Number.isInteger(value) && value > 0 ? value : null;
 }
-
 function currentView() {
     return String(document.documentElement.dataset.nexusView || "chat");
 }
-
 function stateLabel(state) {
     return {
         unavailable: "Голос недоступен",
@@ -22,13 +19,11 @@ function stateLabel(state) {
         error: "Ошибка голоса",
     }[state];
 }
-
 function dispatchVoiceState(state, extra = {}) {
     window.dispatchEvent(new CustomEvent("miyori:voice-state", {
         detail: { state, label: stateLabel(state), ...extra },
     }));
 }
-
 export function installNexusVoice() {
     const button = document.getElementById("voiceButton");
     const panel = document.getElementById("voicePanel");
@@ -40,11 +35,9 @@ export function installNexusVoice() {
     const stop = document.getElementById("voiceStop");
     const input = document.getElementById("messageInput");
     const form = document.getElementById("chatForm");
-
     if (!button || !panel || !status || !transcript || !confidence || !send || !speak || !stop || !input || !form) {
         return () => undefined;
     }
-
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const hasRecognition = Boolean(Recognition);
     const hasMicrophone = Boolean(navigator.mediaDevices?.getUserMedia);
@@ -57,19 +50,23 @@ export function installNexusVoice() {
     let lastAssistantText = "";
     let submittedFromVoice = false;
     let stopped = false;
-
     const setState = (next, options = {}) => {
         panel.dataset.state = next;
         status.textContent = options.error || stateLabel(next);
         button.dataset.state = next;
         button.setAttribute("aria-pressed", next === "listening" ? "true" : "false");
-        button.title = next === "listening" ? "Остановить прослушивание" : "Голосовой ввод";
+        button.title =
+            next === "listening"
+                ? "Остановить прослушивание"
+                : "Голосовой ввод";
         if (options.transcript !== undefined) {
             transcript.textContent = options.transcript || "Скажите фразу…";
         }
         const score = options.confidence;
         confidence.textContent =
-            score === null || score === undefined ? "" : `confidence ${Math.round(score * 100)}%`;
+            score === null || score === undefined
+                ? ""
+                : `confidence ${Math.round(score * 100)}%`;
         panel.hidden = next === "idle" && !finalTranscript && !lastAssistantText;
         dispatchVoiceState(next, {
             transcript: options.transcript,
@@ -77,7 +74,6 @@ export function installNexusVoice() {
             error: options.error,
         });
     };
-
     const stopRecognition = (interrupted = false) => {
         if (!recognition)
             return;
@@ -91,7 +87,6 @@ export function installNexusVoice() {
         if (interrupted)
             setState("interrupted");
     };
-
     const cancelSpeech = (interrupted = true) => {
         if (!hasTts)
             return;
@@ -101,7 +96,6 @@ export function installNexusVoice() {
                 setState("interrupted");
         }
     };
-
     const ensureContract = async () => {
         const id = projectId();
         if (!id)
@@ -117,7 +111,6 @@ export function installNexusVoice() {
             return false;
         }
     };
-
     const requestMicrophone = async () => {
         if (!hasMicrophone)
             return false;
@@ -136,7 +129,6 @@ export function installNexusVoice() {
             return false;
         }
     };
-
     const startListening = async () => {
         if (stopped || currentView() !== "chat")
             return;
@@ -153,7 +145,6 @@ export function installNexusVoice() {
         }
         if (!(await requestMicrophone()))
             return;
-
         finalTranscript = "";
         interimTranscript = "";
         lastConfidence = null;
@@ -162,7 +153,6 @@ export function installNexusVoice() {
         recognition.continuous = false;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
-
         recognition.addEventListener("start", () => {
             listening = true;
             setState("listening", { transcript: "Слушаю…" });
@@ -176,8 +166,9 @@ export function installNexusVoice() {
                     continue;
                 if (result.isFinal) {
                     finalTranscript += alternative.transcript;
-                    if (Number.isFinite(alternative.confidence))
+                    if (Number.isFinite(alternative.confidence)) {
                         lastConfidence = alternative.confidence;
+                    }
                 }
                 else {
                     interimTranscript += alternative.transcript;
@@ -211,7 +202,6 @@ export function installNexusVoice() {
                 setState("idle");
             }
         });
-
         try {
             recognition.start();
         }
@@ -220,14 +210,12 @@ export function installNexusVoice() {
             setState("error", { error: "Не удалось запустить распознавание." });
         }
     };
-
     button.addEventListener("click", () => {
         if (listening)
             stopRecognition(true);
         else
             void startListening();
     });
-
     send.addEventListener("click", () => {
         const text = finalTranscript.trim();
         if (!text || !input.value.trim())
@@ -237,7 +225,6 @@ export function installNexusVoice() {
         send.disabled = true;
         form.requestSubmit();
     });
-
     speak.addEventListener("click", () => {
         if (!hasTts || !lastAssistantText.trim())
             return;
@@ -249,12 +236,10 @@ export function installNexusVoice() {
         utterance.addEventListener("error", () => setState("error", { error: "Не удалось озвучить ответ." }));
         window.speechSynthesis.speak(utterance);
     });
-
     stop.addEventListener("click", () => {
         stopRecognition(true);
         cancelSpeech(true);
     });
-
     const onAssistant = (event) => {
         if (!(event instanceof CustomEvent))
             return;
@@ -268,14 +253,12 @@ export function installNexusVoice() {
             setState("idle");
         }
     };
-
     const onInteraction = (event) => {
         if (!(event instanceof CustomEvent) || !submittedFromVoice)
             return;
         if (event.detail?.state === "thinking")
             setState("thinking");
     };
-
     const onView = () => {
         if (currentView() !== "chat") {
             stopRecognition(true);
@@ -283,11 +266,9 @@ export function installNexusVoice() {
             panel.hidden = true;
         }
     };
-
     window.addEventListener("miyori:assistant-message", onAssistant);
     window.addEventListener("miyori:interaction-state", onInteraction);
     window.addEventListener("miyori:nexus-view", onView);
-
     send.disabled = true;
     speak.disabled = !hasTts;
     if (!hasRecognition || !hasMicrophone) {
@@ -295,7 +276,6 @@ export function installNexusVoice() {
         button.title = "Голосовой ввод недоступен в этом браузере";
     }
     setState(hasRecognition && hasMicrophone ? "idle" : "unavailable");
-
     return () => {
         stopped = true;
         stopRecognition(false);
