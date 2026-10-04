@@ -8,6 +8,7 @@ import {
   NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION,
   NEXUS_HOME_SCHEMA_VERSION,
   NEXUS_BODY_SCHEMA_VERSION,
+  BODY_RENDERER_SCHEMA_VERSION,
   MIYORI_APPEARANCE_SCHEMA_VERSION,
   NEXUS_EVENT_SCHEMA_VERSION,
   NEXUS_SCHEMA_VERSION,
@@ -473,6 +474,7 @@ export async function fetchNexusBody(
     payload.schema_version !== NEXUS_BODY_SCHEMA_VERSION ||
     !payload.presentation ||
     !payload.appearance ||
+    !payload.renderer ||
     !Array.isArray(payload.appearance.confirmed) ||
     !Array.isArray(payload.appearance.open_for_owner_choice) ||
     payload.runtime?.source !== "nexus_presence" ||
@@ -480,6 +482,16 @@ export async function fetchNexusBody(
     payload.motion_policy?.timer_idle_animation_allowed !== false ||
     payload.motion_policy?.sentiment_to_expression_allowed !== false ||
     payload.motion_policy?.model_authored_motion_allowed !== false ||
+    payload.renderer.schema_version !== BODY_RENDERER_SCHEMA_VERSION ||
+    !Array.isArray(payload.renderer.trusted_adapters) ||
+    payload.renderer.policy?.trusted_registry_only !== true ||
+    payload.renderer.policy?.arbitrary_renderer_module_allowed !== false ||
+    payload.renderer.policy?.asset_authored_javascript_allowed !== false ||
+    payload.renderer.policy?.model_select_adapter_allowed !== false ||
+    payload.renderer.policy?.unknown_adapter_fallback !== "neutral_shell" ||
+    payload.renderer.dynamic_extension?.status !== "not_installed" ||
+    payload.renderer.dynamic_extension?.may_execute_asset_javascript !== false ||
+    payload.renderer.dynamic_extension?.may_override_operational_state !== false ||
     payload.appearance.appearance_profile_schema_version !== MIYORI_APPEARANCE_SCHEMA_VERSION ||
     !payload.appearance.selections ||
     !payload.appearance.asset ||
