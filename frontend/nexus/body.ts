@@ -1,10 +1,22 @@
-import { fetchNexusBody } from "./client.js";
+import {
+  fetchNexusBody,
+  removeMiyoriPortrait,
+  updateMiyoriAppearance,
+  uploadMiyoriPortrait,
+} from "./client.js";
 import type {
+  MiyoriAppearanceSelection,
   NexusBodyLocalState,
   NexusBodyPresentation,
   NexusDigitalBody,
   NexusSnapshot,
 } from "./contracts.js";
+
+interface BodyAppearanceActions {
+  save: (selection: MiyoriAppearanceSelection) => Promise<void>;
+  upload: (file: File) => Promise<void>;
+  remove: () => Promise<void>;
+}
 
 function currentProjectId(): number | null {
   const select = document.getElementById("projectSelect") as HTMLSelectElement | null;
@@ -57,6 +69,7 @@ function appendTextList(
 }
 
 function buildPortrait(
+  body: NexusDigitalBody,
   presentation: NexusBodyPresentation,
   effectiveState: string,
 ): HTMLElement {
@@ -68,26 +81,231 @@ function buildPortrait(
   portrait.dataset.state = effectiveState;
   portrait.setAttribute("aria-hidden", "true");
 
-  const leftEar = document.createElement("span");
-  leftEar.className = "nexus-body-ear left";
-  const rightEar = document.createElement("span");
-  rightEar.className = "nexus-body-ear right";
+  const asset = body.appearance.asset;
+  if (asset.kind === "static_portrait" && asset.url) {
+    portrait.classList.add("has-static-asset");
+    const image = document.createElement("img");
+    image.className = "nexus-body-static-portrait";
+    image.src = asset.url;
+    image.alt = "";
+    image.decoding = "async";
+    portrait.appendChild(image);
+  } else {
+    const leftEar = document.createElement("span");
+    leftEar.className = "nexus-body-ear left";
+    const rightEar = document.createElement("span");
+    rightEar.className = "nexus-body-ear right";
 
-  const face = document.createElement("span");
-  face.className = "nexus-body-face";
-  const leftEye = document.createElement("span");
-  leftEye.className = "nexus-body-eye left";
-  const rightEye = document.createElement("span");
-  rightEye.className = "nexus-body-eye right";
-  const mouth = document.createElement("span");
-  mouth.className = "nexus-body-mouth";
-  face.append(leftEye, rightEye, mouth);
+    const face = document.createElement("span");
+    face.className = "nexus-body-face";
+    const leftEye = document.createElement("span");
+    leftEye.className = "nexus-body-eye left";
+    const rightEye = document.createElement("span");
+    rightEye.className = "nexus-body-eye right";
+    const mouth = document.createElement("span");
+    mouth.className = "nexus-body-mouth";
+    face.append(leftEye, rightEye, mouth);
+    portrait.append(leftEar, rightEar, face);
+  }
 
   const stateMark = document.createElement("span");
   stateMark.className = "nexus-body-state-mark";
-
-  portrait.append(leftEar, rightEar, face, stateMark);
+  portrait.appendChild(stateMark);
   return portrait;
+}
+
+function appearanceStateText(body: NexusDigitalBody): string {
+  if (body.appearance.configuration_state === "appearance_configured") {
+    return body.appearance.asset.kind === "static_portrait"
+      ? "Внешность выбрана · статический портрет"
+      : "Внешность выбрана · портрет не загружен";
+  }
+  if (body.appearance.configuration_state === "appearance_partial") {
+    return "Внешность настроена частично";
+  }
+  return "Внешность ждёт вашего выбора";
+}
+
+function createTextField(
+  labelText: string,
+  value: string | null,
+  maxLength: number,
+): { wrapper: HTMLLabelElement; input: HTMLInputElement } {
+  const wrapper = document.createElement("label");
+  wrapper.className = "nexus-body-field";
+  const label = document.createElement("span");
+  label.textContent = labelText;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.maxLength = maxLength;
+  input.value = value ?? "";
+  input.placeholder = "Не выбрано";
+  wrapper.append(label, input);
+  return { wrapper, input };
+}
+
+function buildAppearanceEditor(
+  body: NexusDigitalBody,
+  actions: BodyAppearanceActions,
+): HTMLElement {
+  const details = document.createElement("details");
+  details.className = "nexus-body-appearance-editor";
+  const summary = document.createElement("summary");
+  summary.textContent = "Настроить внешность";
+  details.appendChild(summary);
+
+  const panel = document.createElement("div");
+  panel.className = "nexus-body-appearance-panel";
+
+  const explanation = document.createElement("p");
+  explanation.textContent =
+    "Это ваши четыре открытых параметра Persona Pack. Пустые поля остаются невыбранными; Miyori не подставляет значения автоматически.";
+  panel.appendChild(explanation);
+
+  const form = document.createElement("form");
+  form.className = "nexus-body-appearance-form";
+
+  const hair = createTextField(
+    "Цвет волос",
+    body.appearance.selections.hair_color,
+    80,
+  );
+  const eyes = createTextField(
+    "Цвет глаз",
+    body.appearance.selections.eye_color,
+    80,
+  );
+
+  const tailsWrapper = document.createElement("label");
+  tailsWrapper.className = "nexus-body-field";
+  const tailsLabel = document.createElement("span");
+  tailsLabel.textContent = "Точное число хвостов";
+  const tails = document.createElement("input");
+  tails.type = "number";
+  tails.min = "1";
+  tails.step = "1";
+  tails.inputMode = "numeric";
+  tails.value =
+    body.appearance.selections.tail_count === null
+      ? ""
+      : String(body.appearance.selections.tail_count);
+  tails.placeholder = "Не выбрано";
+  tailsWrapper.append(tailsLabel, tails);
+
+  const outfitWrapper = document.createElement("label");
+  outfitWrapper.className = "nexus-body-field wide";
+  const outfitLabel = document.createElement("span");
+  outfitLabel.textContent = "Основной наряд";
+  const outfit = document.createElement("textarea");
+  outfit.rows = 2;
+  outfit.maxLength = 500;
+  outfit.value = body.appearance.selections.main_outfit ?? "";
+  outfit.placeholder = "Не выбрано";
+  outfitWrapper.append(outfitLabel, outfit);
+
+  form.append(hair.wrapper, eyes.wrapper, tailsWrapper, outfitWrapper);
+
+  const status = document.createElement("div");
+  status.className = "nexus-body-editor-status";
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+
+  const save = document.createElement("button");
+  save.type = "submit";
+  save.className = "primary-soft";
+  save.textContent = "Сохранить выбор";
+
+  const formActions = document.createElement("div");
+  formActions.className = "nexus-body-editor-actions";
+  formActions.appendChild(save);
+  form.append(formActions, status);
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const tailText = tails.value.trim();
+    const tailCount = tailText ? Number(tailText) : null;
+    if (
+      tailCount !== null &&
+      (!Number.isInteger(tailCount) || tailCount < 1)
+    ) {
+      status.textContent = "Количество хвостов должно быть положительным целым числом.";
+      return;
+    }
+
+    const selection: MiyoriAppearanceSelection = {
+      hair_color: hair.input.value.trim() || null,
+      eye_color: eyes.input.value.trim() || null,
+      tail_count: tailCount,
+      main_outfit: outfit.value.trim() || null,
+    };
+
+    save.disabled = true;
+    status.textContent = "Сохраняю…";
+    void actions.save(selection).catch((error: unknown) => {
+      save.disabled = false;
+      status.textContent =
+        error instanceof Error ? error.message : "Не удалось сохранить внешность.";
+    });
+  });
+
+  const asset = document.createElement("div");
+  asset.className = "nexus-body-asset-editor";
+  const assetTitle = document.createElement("strong");
+  assetTitle.textContent = "Статический портрет";
+  const assetNote = document.createElement("p");
+  assetNote.textContent =
+    "PNG/JPEG/WEBP до 5 МБ. Статический портрет не изображает pose/expression; реальные состояния остаются в индикаторе и подписи.";
+  const file = document.createElement("input");
+  file.type = "file";
+  file.accept = "image/png,image/jpeg,image/webp";
+  file.setAttribute("aria-label", "Файл портрета Миёри");
+  const upload = document.createElement("button");
+  upload.type = "button";
+  upload.className = "secondary-sheet-button";
+  upload.textContent = body.appearance.asset.kind
+    ? "Заменить портрет"
+    : "Загрузить портрет";
+
+  upload.addEventListener("click", () => {
+    const selected = file.files?.[0];
+    if (!selected) {
+      status.textContent = "Сначала выберите PNG, JPEG или WEBP.";
+      return;
+    }
+    upload.disabled = true;
+    status.textContent = "Загружаю портрет…";
+    void actions.upload(selected).catch((error: unknown) => {
+      upload.disabled = false;
+      status.textContent =
+        error instanceof Error ? error.message : "Не удалось загрузить портрет.";
+    });
+  });
+
+  const assetActions = document.createElement("div");
+  assetActions.className = "nexus-body-editor-actions";
+  assetActions.append(file, upload);
+
+  if (body.appearance.asset.kind) {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "secondary-sheet-button";
+    remove.textContent = "Удалить портрет";
+    remove.addEventListener("click", () => {
+      remove.disabled = true;
+      status.textContent = "Удаляю портрет…";
+      void actions.remove().catch((error: unknown) => {
+        remove.disabled = false;
+        status.textContent =
+          error instanceof Error ? error.message : "Не удалось удалить портрет.";
+      });
+    });
+    assetActions.appendChild(remove);
+  }
+
+  asset.append(assetTitle, assetNote, assetActions);
+  panel.append(form, asset);
+  details.appendChild(panel);
+  return details;
 }
 
 function renderBody(
@@ -95,6 +313,7 @@ function renderBody(
   body: NexusDigitalBody | null,
   voiceState: NexusBodyLocalState,
   interactionState: NexusBodyLocalState,
+  actions: BodyAppearanceActions,
 ): void {
   host.replaceChildren();
 
@@ -113,7 +332,7 @@ function renderBody(
 
   const shell = document.createElement("div");
   shell.className = "nexus-body-shell";
-  shell.appendChild(buildPortrait(presentation, effectiveState));
+  shell.appendChild(buildPortrait(body, presentation, effectiveState));
 
   const copy = document.createElement("div");
   copy.className = "nexus-body-copy";
@@ -134,10 +353,7 @@ function renderBody(
 
   const appearance = document.createElement("small");
   appearance.className = "nexus-body-appearance-state";
-  appearance.textContent =
-    body.appearance.configuration_state === "appearance_unconfigured"
-      ? "Внешность ждёт вашего выбора"
-      : "Канонический образ настроен";
+  appearance.textContent = appearanceStateText(body);
 
   copy.append(identity, status, detail, appearance);
   shell.appendChild(copy);
@@ -159,8 +375,8 @@ function renderBody(
 
   const note = document.createElement("p");
   note.textContent =
-    "До выбора внешности Digital Body использует нейтральную монохромную оболочку и не придумывает цвет волос, глаз, число хвостов или наряд.";
-  bodyCanon.appendChild(note);
+    "Digital Body не придумывает цвет волос, глаз, число хвостов или наряд. Статический портрет, если вы его загрузите, не выдаётся за динамический rig.";
+  bodyCanon.append(note, buildAppearanceEditor(body, actions));
   canon.appendChild(bodyCanon);
   shell.appendChild(canon);
 
@@ -193,12 +409,27 @@ export function installNexusDigitalBody(): () => void {
   let interactionState: NexusBodyLocalState = "idle";
   let lastSnapshotFingerprint = "";
 
-  const refresh = async (): Promise<void> => {
+  const actions: BodyAppearanceActions = {
+    save: async (selection) => {
+      await updateMiyoriAppearance(selection);
+      await refresh();
+    },
+    upload: async (file) => {
+      await uploadMiyoriPortrait(file);
+      await refresh();
+    },
+    remove: async () => {
+      await removeMiyoriPortrait();
+      await refresh();
+    },
+  };
+
+  async function refresh(): Promise<void> {
     if (stopped) return;
     const projectId = currentProjectId();
     if (!projectId) {
       body = null;
-      renderBody(host, body, voiceState, interactionState);
+      renderBody(host, body, voiceState, interactionState, actions);
       return;
     }
     const currentGeneration = ++generation;
@@ -206,15 +437,15 @@ export function installNexusDigitalBody(): () => void {
       const next = await fetchNexusBody(projectId);
       if (!stopped && currentGeneration === generation) {
         body = next;
-        renderBody(host, body, voiceState, interactionState);
+        renderBody(host, body, voiceState, interactionState, actions);
       }
     } catch {
       if (currentGeneration === generation) {
         body = null;
-        renderBody(host, body, voiceState, interactionState);
+        renderBody(host, body, voiceState, interactionState, actions);
       }
     }
-  };
+  }
 
   const onSnapshot = (event: Event): void => {
     if (!(event instanceof CustomEvent)) return;
@@ -238,17 +469,17 @@ export function installNexusDigitalBody(): () => void {
     if (!(event instanceof CustomEvent)) return;
     interactionState =
       event.detail?.state === "thinking" ? "thinking" : "idle";
-    renderBody(host, body, voiceState, interactionState);
+    renderBody(host, body, voiceState, interactionState, actions);
   };
 
   const onVoice = (event: Event): void => {
     if (!(event instanceof CustomEvent)) return;
     voiceState = mapVoiceState(String(event.detail?.state || "idle"));
-    renderBody(host, body, voiceState, interactionState);
+    renderBody(host, body, voiceState, interactionState, actions);
   };
 
   const onView = (): void => {
-    renderBody(host, body, voiceState, interactionState);
+    renderBody(host, body, voiceState, interactionState, actions);
   };
 
   window.addEventListener("miyori:nexus-snapshot", onSnapshot);
