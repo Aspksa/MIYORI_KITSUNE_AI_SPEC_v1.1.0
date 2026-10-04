@@ -75,6 +75,7 @@ class NexusContractTests(unittest.TestCase):
             "epistemic",
             "presence",
             "home",
+            "digital_body",
             "voice",
             "desktop",
             "generative_ui",
@@ -86,6 +87,8 @@ class NexusContractTests(unittest.TestCase):
 
         self.assertEqual(modules["ai"]["state"], "not_connected")
         self.assertEqual(modules["home"]["state"], "disabled")
+        self.assertEqual(modules["digital_body"]["state"], "ready")
+        self.assertIn("финальный портрет", modules["digital_body"]["limitation"])
         self.assertEqual(modules["voice"]["state"], "ready")
         self.assertEqual(modules["desktop"]["state"], "disabled")
         self.assertEqual(modules["generative_ui"]["state"], "ready")

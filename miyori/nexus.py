@@ -344,6 +344,17 @@ def build_nexus_snapshot(project_id: int) -> dict:
             updated_at=generated_at,
         ),
         _module(
+            "digital_body",
+            "Digital Body",
+            "ready",
+            last_result="Body runtime contract активен; presentation выводится отдельно из Living Presence.",
+            limitation=(
+                "Runtime state-driven; финальный портрет не фиксируется, пока владелец не выберет "
+                "цвет волос, цвет глаз, точное число хвостов и основной наряд."
+            ),
+            updated_at=generated_at,
+        ),
+        _module(
             "voice",
             "Voice",
             "ready",
