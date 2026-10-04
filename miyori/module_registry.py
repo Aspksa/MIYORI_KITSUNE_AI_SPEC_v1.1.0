@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.59"
+PROJECT_VERSION = "00.00.60"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.7.0",
+        "version": "2.7.1",
         "status": "active",
-        "description": "AI Core v2.7: NEXUS Action Contract поверх persistent workflows, permission/preflight/verification/recovery, Document Intelligence и проверяемой памяти.",
+        "description": "AI Core с новым чат-интерфейсом, безопасным Markdown и удобной формой ввода; backend контракты и RAG сохранены.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "1.6.1",
+        "version": "1.6.2",
         "status": "active",
-        "description": "NEXUS Digital Body 1.4 и единый UI shell: стабильная навигация, согласованная тема и читаемая ширина рабочих областей.",
+        "description": "NEXUS Digital Body в компактном chat header и единые рабочие разделы с понятным Центром действий.",
     },
     "digital_body": {
         "name": "Digital Body Miyori",
@@ -47,9 +47,9 @@ MODULES = {
     },
     "settings": {
         "name": "Настройки",
-        "version": "0.5.0",
+        "version": "0.5.1",
         "status": "active",
-        "description": "Единый экран настроек Miyori без дублирующей навигации; общая светлая/тёмная визуальная система для всех модулей.",
+        "description": "Настройки доступны через Дополнительно; внешность Миёри редактируется отдельно от обычной ленты чата.",
     },
     "drive": {
         "name": "Документы / Облако / Miyori",
@@ -156,6 +156,43 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.60",
+        "title": "Conversation Redesign · Clear Actions & Appearance",
+        "summary": "Чат Миёри переработан по принципу современного разговорного интерфейса: широкий многострочный composer, действия снизу, форматированные и очищенные ответы; Digital Body свернут до живого аватара в заголовке, Образ Миёри и Настройки находятся в Дополнительно, Центр действий показывает понятные статусы.",
+        "modules": [
+            {
+                "key": "miyori_ai",
+                "version": "2.7.1",
+                "changes": [
+                    "Ввод с многострочным textarea и нижней панелью вложений, микрофона и отправки.",
+                    "Сохраняется отправка Enter и Shift+Enter для перевода строки; IME-композиция не отправляет сообщение.",
+                    "Новый чат и история доступны в заголовке; селектор пространства сохранён в раскрываемой истории.",
+                    "Markdown-ответы отображаются локально через Marked 8.0.0 и очищаются DOMPurify 3.2.6, без CDN и небезопасных HTML-вставок.",
+                    "Загрузка PDF/Office/текстовых файлов использует существующий документный API и показывает реальный результат."
+                ],
+            },
+            {
+                "key": "nexus",
+                "version": "1.6.2",
+                "changes": [
+                    "Digital Body и состояние показаны маленьким живым аватаром в заголовке вместо большого технического блока перед сообщениями.",
+                    "Канон и настройка внешности вынесены в отдельный экран по явному действию владельца.",
+                    "Центр действий показывает только понятные состояния и сворачивает историю по умолчанию.",
+                    "Скрытый системный NEXUS nav больше не получает фокус при клавиатурной навигации."
+                ],
+            },
+            {
+                "key": "settings",
+                "version": "0.5.1",
+                "changes": [
+                    "Настройки перенесены в Дополнительно.",
+                    "Добавлен отдельный пункт Образ Миёри, сохраняющий все ранее реализованные owner appearance choices.",
+                    "Добавлен CI-тест реального DOM, иконок, Markdown и HTML-санитизации."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.59",
         "title": "Unified Interface · Chat & Modules",
