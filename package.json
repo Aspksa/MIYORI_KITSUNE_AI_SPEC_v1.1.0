@@ -30,6 +30,7 @@
     "test:chat-experience": "node scripts/test-chat-experience.mjs",
     "test:chat-capabilities": "node scripts/test-chat-capabilities.mjs",
     "test:chat-safe-forks": "node scripts/test-chat-safe-forks.mjs",
-    "test:chat-intelligence": "node scripts/test-chat-intelligence.mjs"
+    "test:chat-intelligence": "node scripts/test-chat-intelligence.mjs",
+    "test:document-comparisons": "node scripts/test-document-comparisons.mjs"
   }
 }
