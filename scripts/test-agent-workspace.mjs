@@ -49,7 +49,7 @@ assert.ok(
 );
 assert.ok(
   css.includes("/* N8 — Agent Workspace.") &&
-    [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)].every((match) => ["nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].includes(match[1])),
+    [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)].every((match) => ["miyori-character-recover", "nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].includes(match[1])),
   "Agent Workspace visual layer must stay state-driven and animation-free",
 );
 

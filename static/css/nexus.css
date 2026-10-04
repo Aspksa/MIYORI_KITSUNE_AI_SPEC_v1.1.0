@@ -2228,7 +2228,7 @@
 }
 .nexus-body-shell {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 70px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   min-height: 58px;
@@ -2239,8 +2239,8 @@
 }
 .nexus-body-portrait {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 66px;
+  height: 72px;
   color: #706479;
 }
 .nexus-body-ear {
@@ -2437,7 +2437,7 @@
     margin-top: 6px;
   }
   .nexus-body-shell {
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: 66px minmax(0, 1fr);
   }
   .nexus-body-canon {
     grid-column: 2;
@@ -2743,6 +2743,279 @@
   .nexus-rig-eye,
   .nexus-rig-mouth,
   .nexus-rig-arm {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+
+/* N12.4 — Miyori Character Rig. Owner choices only; unresolved traits stay neutral. */
+.nexus-body-character-rig {
+  overflow: visible;
+  isolation: isolate;
+}
+.miyori-character-root,
+.miyori-character-tails,
+.miyori-character-tail,
+.miyori-character-tail-aura,
+.miyori-character-legs,
+.miyori-character-leg,
+.miyori-character-torso,
+.miyori-character-outfit,
+.miyori-character-arm,
+.miyori-character-head,
+.miyori-character-hair,
+.miyori-character-ear,
+.miyori-character-face,
+.miyori-character-eye,
+.miyori-character-mouth {
+  position: absolute;
+  box-sizing: border-box;
+}
+.miyori-character-root {
+  left: 50%;
+  bottom: 2px;
+  width: 54px;
+  height: 68px;
+  transform: translateX(-50%);
+  transform-origin: 50% 90%;
+  transition: transform 180ms ease;
+}
+.miyori-character-head {
+  z-index: 5;
+  left: 15px;
+  top: 4px;
+  width: 26px;
+  height: 28px;
+  border: 1.5px solid currentColor;
+  border-radius: 48% 48% 50% 50%;
+  background: #fff;
+  transform-origin: 50% 78%;
+  transition: transform 180ms ease;
+}
+.miyori-character-hair {
+  z-index: 6;
+  left: -2px;
+  top: -3px;
+  width: 30px;
+  height: 18px;
+  border: 1.5px solid currentColor;
+  border-bottom: 0;
+  border-radius: 52% 52% 34% 34%;
+  background: var(--owner-hair-color, #ece8ef);
+  clip-path: polygon(0 0,100% 0,100% 62%,83% 48%,72% 82%,58% 48%,47% 87%,31% 48%,18% 77%,0 58%);
+}
+.miyori-character-hair.neutral-owner-color {
+  background: repeating-linear-gradient(135deg,#f1eef3 0 4px,#e8e3eb 4px 8px);
+}
+.miyori-character-ear {
+  z-index: 4;
+  top: -7px;
+  width: 11px;
+  height: 13px;
+  border: 1.5px solid currentColor;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 3px 0 0 0;
+  background: #f8f6fa;
+  transition: transform 180ms ease;
+}
+.miyori-character-ear.left { left: 1px; transform: rotate(34deg); }
+.miyori-character-ear.right { right: 1px; transform: scaleX(-1) rotate(34deg); }
+.miyori-character-face {
+  z-index: 7;
+  inset: 0;
+}
+.miyori-character-eye {
+  top: 12px;
+  width: 4px;
+  height: 4px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: var(--owner-eye-color, #756b7c);
+  transition: width 140ms ease,height 140ms ease,transform 140ms ease;
+}
+.miyori-character-eye.neutral-owner-color {
+  background: #756b7c;
+}
+.miyori-character-eye.left { left: 6px; }
+.miyori-character-eye.right { right: 6px; }
+.miyori-character-mouth {
+  left: 50%;
+  bottom: 5px;
+  width: 7px;
+  height: 3px;
+  transform: translateX(-50%);
+  border-bottom: 1.5px solid currentColor;
+  border-radius: 0 0 50% 50%;
+  transition: width 140ms ease,height 140ms ease,border 140ms ease;
+}
+.miyori-character-torso {
+  z-index: 3;
+  left: 18px;
+  top: 31px;
+  width: 20px;
+  height: 25px;
+  border: 1.5px solid currentColor;
+  border-radius: 34% 34% 18% 18%;
+  background: #fbfafc;
+  transform-origin: 50% 90%;
+  transition: transform 180ms ease;
+}
+.miyori-character-outfit {
+  inset: 3px 2px 0;
+  border: 1px solid #b7afbd;
+  border-radius: 30% 30% 12% 12%;
+  background: repeating-linear-gradient(0deg,#f5f2f7 0 5px,#ece8f0 5px 10px);
+}
+.miyori-character-outfit.unresolved::after {
+  content: "?";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+  color: #9a909f;
+  font-size: 7px;
+  font-weight: 800;
+}
+.miyori-character-arm {
+  top: 3px;
+  width: 5px;
+  height: 21px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  background: #fff;
+  transform-origin: 50% 2px;
+  transition: transform 180ms ease;
+}
+.miyori-character-arm.left { left: -7px; transform: rotate(8deg); }
+.miyori-character-arm.right { right: -7px; transform: rotate(-8deg); }
+.miyori-character-legs {
+  z-index: 2;
+  left: 20px;
+  top: 53px;
+  width: 16px;
+  height: 14px;
+}
+.miyori-character-leg {
+  top: 0;
+  width: 5px;
+  height: 14px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  background: #fff;
+}
+.miyori-character-leg.left { left: 1px; transform: rotate(2deg); }
+.miyori-character-leg.right { right: 1px; transform: rotate(-2deg); }
+.miyori-character-tails {
+  z-index: 1;
+  left: 4px;
+  top: 26px;
+  width: 46px;
+  height: 34px;
+  transform-origin: 50% 80%;
+  transition: transform 220ms ease;
+}
+.miyori-character-tail {
+  left: 19px;
+  bottom: 1px;
+  width: 12px;
+  height: 30px;
+  border: 1.5px solid currentColor;
+  border-radius: 70% 70% 60% 60%;
+  background: #f3eff5;
+  transform-origin: 50% 100%;
+  transform: rotate(var(--tail-angle,0deg)) translateY(-1px);
+}
+.miyori-character-tail-aura {
+  inset: 4px 1px 0;
+  border: 1.5px dashed #bcb4c1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 80%,transparent 0 35%,rgba(120,108,132,.06) 36% 100%);
+}
+.miyori-character-tails.unresolved::after {
+  content: "хвосты";
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  color: #9b92a1;
+  font-size: 5px;
+  font-weight: 750;
+  letter-spacing: .02em;
+}
+
+.nexus-body-character-rig[data-pose="focus"] .miyori-character-root,
+.nexus-body-character-rig[data-pose="inspect"] .miyori-character-root {
+  transform: translateX(-50%) translateY(1px) rotate(-1deg);
+}
+.nexus-body-character-rig[data-pose="listen"] .miyori-character-head {
+  transform: rotate(6deg) translateX(1px);
+}
+.nexus-body-character-rig[data-pose="speak"] .miyori-character-head {
+  transform: translateY(-1px);
+}
+.nexus-body-character-rig[data-pose="alert"] .miyori-character-root {
+  transform: translateX(-50%) translateY(-2px);
+}
+.nexus-body-character-rig[data-pose="restrained"] .miyori-character-root {
+  transform: translateX(-50%) scale(.96);
+}
+.nexus-body-character-rig[data-expression="focused"] .miyori-character-eye {
+  height: 2px;
+  border-radius: 2px;
+}
+.nexus-body-character-rig[data-expression="attentive"] .miyori-character-eye {
+  width: 5px;
+  height: 5px;
+}
+.nexus-body-character-rig[data-expression="alert"] .miyori-character-eye {
+  width: 5px;
+  height: 2px;
+  border-radius: 2px;
+}
+.nexus-body-character-rig[data-gesture="thinking"] .miyori-character-arm.left {
+  transform: rotate(54deg) translate(2px,-2px);
+}
+.nexus-body-character-rig[data-gesture="listen"] .miyori-character-ear.left {
+  transform: rotate(27deg) translateY(-1px);
+}
+.nexus-body-character-rig[data-gesture="verify"] .miyori-character-arm.right,
+.nexus-body-character-rig[data-gesture="attention"] .miyori-character-arm.right {
+  transform: rotate(-55deg) translateY(-2px);
+}
+.nexus-body-character-rig[data-gesture="working"] .miyori-character-torso,
+.nexus-body-character-rig[data-gesture="transcribe"] .miyori-character-torso {
+  animation: nexus-rig-active 700ms ease-in-out infinite alternate;
+}
+.nexus-body-character-rig[data-gesture="working"] .miyori-character-tails,
+.nexus-body-character-rig[data-gesture="listen"] .miyori-character-tails {
+  transform: rotate(3deg);
+}
+.nexus-body-character-rig[data-gesture="speak"] .miyori-character-mouth {
+  width: 6px;
+  height: 6px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  animation: nexus-rig-speak 260ms ease-in-out infinite alternate;
+}
+.nexus-body-character-rig[data-gesture="recover"] .miyori-character-root {
+  animation: miyori-character-recover 520ms ease-in-out infinite alternate;
+}
+@keyframes miyori-character-recover {
+  from { transform: translateX(calc(-50% - 1px)); }
+  to { transform: translateX(calc(-50% + 1px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .miyori-character-root,
+  .miyori-character-tails,
+  .miyori-character-tail,
+  .miyori-character-torso,
+  .miyori-character-arm,
+  .miyori-character-head,
+  .miyori-character-ear,
+  .miyori-character-eye,
+  .miyori-character-mouth {
     transition: none !important;
     animation: none !important;
   }

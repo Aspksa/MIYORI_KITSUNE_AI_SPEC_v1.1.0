@@ -77,7 +77,7 @@ const keyframes = [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)]
   .sort();
 assert.deepEqual(
   keyframes,
-  ["nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].sort(),
+  ["miyori-character-recover", "nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].sort(),
   "NEXUS shell may only contain the explicit N12.3 state-driven rig keyframes",
 );
 assert.ok(

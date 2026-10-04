@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.57"
+PROJECT_VERSION = "00.00.58"
 
 MODULES = {
     "miyori_ai": {
@@ -29,15 +29,15 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "status": "active",
-        "description": "NEXUS Digital Body 1.3: trusted_vector_rig, Appearance Profile и реальные Presence/Voice state channels без выдуманной активности.",
+        "description": "NEXUS Digital Body 1.4: полнофигурный trusted_character_rig, owner Appearance Profile и реальные Presence/Voice state channels.",
     },
     "digital_body": {
         "name": "Digital Body Miyori",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "status": "active",
-        "description": "Body-state runtime через закрытый renderer registry; trusted_vector_rig двигается только по pose/expression/gesture/state, unknown adapters fail closed.",
+        "description": "Полнофигурный character rig с лицом, волосами, ушами, телом, одеждой и owner-driven хвостами; unresolved параметры остаются нейтральными.",
     },
     "appearance_profile": {
         "name": "Miyori Appearance Profile",
@@ -156,6 +156,33 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.58",
+        "title": "Miyori Character Rig · Final Visual Body",
+        "summary": "N12.4 заменяет нейтральный динамический силуэт полноценным trusted character rig: лицо, волосы, лисьи ушки, тело, руки, ноги, одежда и хвосты. Открытые параметры внешности берутся только из owner Appearance Profile; незаданные значения остаются нейтральными.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "1.6.0",
+                "changes": [
+                    "Digital Body contract обновлён до 1.4, renderer contract — до 1.2.",
+                    "trusted_character_rig стал основным динамическим адаптером без static portrait.",
+                    "Appearance channels явно отделены от operational presentation channels."
+                ],
+            },
+            {
+                "key": "digital_body",
+                "version": "1.4.0",
+                "changes": [
+                    "Добавлены полнофигурные части: волосы, лицо, уши, торс, руки, ноги, одежда и хвостовой слой.",
+                    "Точное число хвостов создаётся только из owner tail_count; без выбора отображается абстрактный tail aura без фиксации числа.",
+                    "Цвет волос и глаз применяется только из валидного owner-provided CSS color; иначе остаётся нейтральный визуал.",
+                    "Основной наряд не придумывается: до выбора используется neutral unresolved outfit.",
+                    "Движения продолжают потреблять только pose/expression/gesture/state и отключаются через prefers-reduced-motion."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.57",
         "title": "NEXUS Real Dynamic Renderer Integration",

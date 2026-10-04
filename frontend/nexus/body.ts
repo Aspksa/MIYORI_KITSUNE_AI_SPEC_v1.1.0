@@ -70,6 +70,17 @@ function appendTextList(
 }
 
 function appearanceStateText(body: NexusDigitalBody): string {
+  if (body.renderer.selected_adapter === "trusted_character_rig") {
+    const selected = [
+      body.appearance.selections.hair_color,
+      body.appearance.selections.eye_color,
+      body.appearance.selections.tail_count,
+      body.appearance.selections.main_outfit,
+    ].filter((value) => value !== null && value !== "").length;
+    return selected === 4
+      ? "Персонаж Миёри активен · внешность выбрана владельцем"
+      : `Персонаж Миёри активен · выбрано параметров: ${selected}/4`;
+  }
   if (body.renderer.selected_adapter === "trusted_vector_rig") {
     return body.appearance.configuration_state === "appearance_unconfigured"
       ? "Динамическое тело активно · внешность нейтральная"
