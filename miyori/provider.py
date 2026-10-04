@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 
 import httpx
 from time import perf_counter
@@ -54,6 +55,7 @@ async def chat(
     answer_sources: list[dict] | None = None,
     usage_sink: dict | None = None,
     quality_guidance: dict | None = None,
+    stream_sink: Callable[[str], Awaitable[None]] | None = None,
 ) -> str:
     if not settings.cloudru_api_key:
         raise ProviderError(
@@ -295,34 +297,92 @@ async def chat(
 
     url = f"{settings.cloudru_base_url}/chat/completions"
     started = perf_counter()
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        response = await client.post(url, headers=headers, json=payload)
-    latency_ms = round((perf_counter() - started) * 1000)
+    data: dict = {}
+    answer = ""
 
-    if response.is_error:
-        detail = response.text[:1500]
-        if response.status_code == 404:
-            try:
-                catalog = await list_cloudru_models()
-                available = [item["id"] for item in catalog.get("chat_models", [])]
-                if settings.cloudru_model_id not in available:
-                    examples = ", ".join(available[:5]) or "список пуст"
+    if stream_sink is None:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+
+        if response.is_error:
+            detail = response.text[:1500]
+            if response.status_code == 404:
+                try:
+                    catalog = await list_cloudru_models()
+                    available = [item["id"] for item in catalog.get("chat_models", [])]
+                    if settings.cloudru_model_id not in available:
+                        examples = ", ".join(available[:5]) or "список пуст"
+                        raise ProviderError(
+                            "Сохранённый Model ID не найден среди доступных чат-моделей Cloud.ru: "
+                            f"«{settings.cloudru_model_id}». Откройте Личный кабинет → Cloud.ru "
+                            f"и выберите модель из списка. Доступные примеры: {examples}."
+                        )
+                except ProviderError:
+                    raise
+                except Exception:
+                    pass
+            raise ProviderError(
+                "Cloud.ru chat/completions завершился ошибкой. "
+                f"Model ID: {settings.cloudru_model_id}; endpoint: {url}; "
+                f"HTTP {response.status_code}: {detail or 'без текста ошибки'}"
+            )
+        data = response.json()
+        try:
+            answer = str(data["choices"][0]["message"]["content"] or "").strip()
+        except (KeyError, IndexError, TypeError, AttributeError) as exc:
+            raise ProviderError("Cloud.ru вернул неожиданный формат ответа.") from exc
+    else:
+        payload = {
+            **payload,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        usage_payload: dict = {}
+        chunks: list[str] = []
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, read=None)) as client:
+            async with client.stream(
+                "POST", url, headers=headers, json=payload
+            ) as response:
+                if response.is_error:
+                    detail = (await response.aread()).decode(
+                        "utf-8", errors="replace"
+                    )[:1500]
                     raise ProviderError(
-                        "Сохранённый Model ID не найден среди доступных чат-моделей Cloud.ru: "
-                        f"«{settings.cloudru_model_id}». Откройте Личный кабинет → Cloud.ru "
-                        f"и выберите модель из списка. Доступные примеры: {examples}."
+                        "Cloud.ru streaming chat/completions завершился ошибкой. "
+                        f"Model ID: {settings.cloudru_model_id}; endpoint: {url}; "
+                        f"HTTP {response.status_code}: {detail or 'без текста ошибки'}"
                     )
-            except ProviderError:
-                raise
-            except Exception:
-                pass
-        raise ProviderError(
-            "Cloud.ru chat/completions завершился ошибкой. "
-            f"Model ID: {settings.cloudru_model_id}; endpoint: {url}; "
-            f"HTTP {response.status_code}: {detail or 'без текста ошибки'}"
-        )
+                async for line in response.aiter_lines():
+                    clean = line.strip()
+                    if not clean or clean.startswith(":"):
+                        continue
+                    if not clean.startswith("data:"):
+                        continue
+                    raw = clean[5:].strip()
+                    if raw == "[DONE]":
+                        break
+                    try:
+                        event = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(event.get("usage"), dict):
+                        usage_payload = event["usage"]
+                    choices = event.get("choices")
+                    if not isinstance(choices, list) or not choices:
+                        continue
+                    delta = choices[0].get("delta") or {}
+                    piece = delta.get("content")
+                    if isinstance(piece, str) and piece:
+                        chunks.append(piece)
+                        await stream_sink(piece)
+        answer = "".join(chunks).strip()
+        if not answer:
+            raise ProviderError(
+                "Cloud.ru завершил поток без текстового содержимого."
+            )
+        data = {"usage": usage_payload}
 
-    data = response.json()
+    latency_ms = round((perf_counter() - started) * 1000)
     if usage_sink is not None:
         usage = data.get("usage")
         usage = usage if isinstance(usage, dict) else {}
@@ -350,11 +410,9 @@ async def chat(
             "latency_ms":latency_ms,
             "estimated_cost_rub":cost,
             "billing_verified":False,
+            "streamed":stream_sink is not None,
         })
-    try:
-        return data["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, TypeError, AttributeError) as exc:
-        raise ProviderError("Cloud.ru вернул неожиданный формат ответа.") from exc
+    return answer
 
 
 def _extract_json_object(text: str) -> dict:
