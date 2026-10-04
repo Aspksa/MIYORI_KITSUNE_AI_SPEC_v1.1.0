@@ -444,6 +444,13 @@ class CloudRuTestRequest(BaseModel):
     model_id: str | None = Field(default=None, max_length=300)
 
 
+class ProactiveDecisionRequest(BaseModel):
+    signal_key: str = Field(min_length=1, max_length=240)
+    fingerprint: str = Field(min_length=8, max_length=64)
+    decision: str = Field(pattern="^(dismissed|snoozed)$")
+    snooze_minutes: int | None = Field(default=None, ge=1, le=1440)
+
+
 def _require_local_admin(request: Request) -> None:
     host = request.client.host if request.client else ""
     try:
@@ -1656,6 +1663,31 @@ def project_nexus_presence(project_id: int) -> dict:
         return build_nexus_presence(project_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/nexus/proactive")
+def project_nexus_proactive(project_id: int) -> dict:
+    try:
+        return build_nexus_proactive(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/nexus/proactive/decision")
+def project_nexus_proactive_decision(
+    project_id: int,
+    request: ProactiveDecisionRequest,
+) -> dict:
+    try:
+        return apply_proactive_decision(
+            project_id,
+            signal_key=request.signal_key,
+            fingerprint=request.fingerprint,
+            decision=request.decision,
+            snooze_minutes=request.snooze_minutes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/nexus/proactive")
