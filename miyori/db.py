@@ -440,6 +440,18 @@ def init_db() -> None:
                 FOREIGN KEY(workflow_id) REFERENCES agent_workflows(id) ON DELETE SET NULL
             );
 
+            CREATE TABLE IF NOT EXISTS proactive_signal_state (
+                project_id INTEGER NOT NULL,
+                signal_key TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                decision TEXT NOT NULL CHECK(decision IN ('dismissed','snoozed')),
+                snoozed_until TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY(project_id, signal_key, fingerprint),
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
                         CREATE INDEX IF NOT EXISTS idx_agent_workflows_project_status
                 ON agent_workflows(project_id, status, id DESC);
             CREATE INDEX IF NOT EXISTS idx_workflow_steps_workflow
@@ -448,6 +460,8 @@ def init_db() -> None:
                 ON tool_operations(project_id, status, id DESC);
             CREATE INDEX IF NOT EXISTS idx_audit_events_project
                 ON audit_events(project_id, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_proactive_signal_state_project
+                ON proactive_signal_state(project_id, updated_at DESC);
 
             CREATE TABLE IF NOT EXISTS hand_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
