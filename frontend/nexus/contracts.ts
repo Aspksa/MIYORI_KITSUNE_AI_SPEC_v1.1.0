@@ -4,6 +4,7 @@ export const NEXUS_ACTION_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_KNOWLEDGE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_SURFACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_PRESENCE_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -343,6 +344,64 @@ export interface NexusPresence {
     decorative_activity_allowed: false;
     chat_interruption_allowed: false;
     knowledge_attention_changes_primary_presence: false;
+  };
+  generated_at: string;
+}
+
+export type NexusProactivePriority = "high" | "normal" | "low";
+
+export interface NexusProactiveSignal {
+  id: string;
+  signal_key: string;
+  category: "action" | "knowledge" | string;
+  priority: NexusProactivePriority;
+  title: string;
+  detail: string;
+  source: Record<string, unknown>;
+  action: {
+    type: "navigate";
+    target: "actions" | "knowledge" | "system";
+    label: string;
+  };
+  controls: {
+    can_snooze: boolean;
+    can_dismiss: boolean;
+  };
+  policy: {
+    auto_execute_allowed: false;
+    write_tools_allowed: false;
+    chat_interruption_allowed: false;
+    creates_chat_message: false;
+    requires_explicit_user_action: true;
+  };
+}
+
+export interface NexusProactivePage {
+  schema_version: typeof NEXUS_PROACTIVE_SCHEMA_VERSION;
+  project: NexusProjectRef;
+  enabled: boolean;
+  initiative_level: "low" | "medium" | "high";
+  signals: NexusProactiveSignal[];
+  counts: {
+    candidates: number;
+    visible: number;
+    snoozed: number;
+    dismissed: number;
+    budget_suppressed: number;
+  };
+  budget: {
+    max_visible: number;
+    max_low: number;
+    effective_max_visible: number;
+    used: number;
+  };
+  policy: {
+    chat_interruption_allowed: false;
+    auto_execute_allowed: false;
+    write_tools_allowed: false;
+    creates_chat_messages: false;
+    persistent_dismiss_snooze: true;
+    derived_from_authoritative_state: true;
   };
   generated_at: string;
 }
