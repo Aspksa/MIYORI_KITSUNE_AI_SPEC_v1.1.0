@@ -52,7 +52,7 @@
         </button>
         <button id="nexusNavSystem" class="nexus-nav-button" data-nexus-view="system" type="button">
           <span class="nexus-nav-icon" aria-hidden="true">⚙</span>
-          <span class="nexus-nav-copy"><strong>Система</strong><small>Настройки · клиенты · обновления</small></span>
+          <span class="nexus-nav-copy"><strong>Настройки</strong><small>Система · клиенты · обновления</small></span>
           <span id="nexusNavSystemMeta" class="nexus-nav-meta">—</span>
         </button>
       </nav>
@@ -109,8 +109,7 @@
         </nav>
       </details>
 
-      <details class="workspace-details" hidden>
-        <summary>Проект и разговоры</summary>
+      <div class="workspace-details" hidden aria-hidden="true">
         <section class="project-card compact-project">
           <div class="project-row">
             <select id="projectSelect" aria-label="Выбор проекта"></select>
@@ -121,7 +120,7 @@
           <span>Разговоры</span>
         </div>
         <div id="conversationList" class="conversation-list"></div>
-      </details>
+      </div>
     </aside>
 
     <main class="chat-area">
