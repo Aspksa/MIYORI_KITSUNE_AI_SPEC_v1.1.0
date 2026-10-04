@@ -252,7 +252,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.46", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.47", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
