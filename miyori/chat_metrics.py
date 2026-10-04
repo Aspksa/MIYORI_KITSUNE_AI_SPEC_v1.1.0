@@ -22,18 +22,28 @@ def init_chat_metrics_db() -> None:
 
 
 def store_model_usage(project_id: int, message_id: int, measured: dict) -> None:
-    with connect() as db:
-        db.execute("""
-        INSERT OR IGNORE INTO chat_model_usage(
-            assistant_message_id,project_id,model,prompt_tokens,completion_tokens,
-            total_tokens,latency_ms,estimated_cost_rub
-        ) VALUES(?,?,?,?,?,?,?,?)
-        """,(
-            message_id,project_id,str(measured.get("model") or "unknown"),
-            measured.get("prompt_tokens"),measured.get("completion_tokens"),
-            measured.get("total_tokens"),int(measured.get("latency_ms") or 0),
-            measured.get("estimated_cost_rub")
-        ))
+    def insert() -> None:
+        with connect() as db:
+            db.execute("""
+            INSERT OR IGNORE INTO chat_model_usage(
+                assistant_message_id,project_id,model,prompt_tokens,completion_tokens,
+                total_tokens,latency_ms,estimated_cost_rub
+            ) VALUES(?,?,?,?,?,?,?,?)
+            """,(
+                message_id,project_id,str(measured.get("model") or "unknown"),
+                measured.get("prompt_tokens"),measured.get("completion_tokens"),
+                measured.get("total_tokens"),int(measured.get("latency_ms") or 0),
+                measured.get("estimated_cost_rub")
+            ))
+    try:
+        insert()
+    except sqlite3.OperationalError as exc:
+        # Some test harnesses and imported local apps call init_db() without
+        # FastAPI lifespan. This additive telemetry table may then be absent.
+        if "no such table: chat_model_usage" not in str(exc):
+            raise
+        init_chat_metrics_db()
+        insert()
 
 
 def model_usage_summary(project_id: int, days: int = 30) -> dict:
