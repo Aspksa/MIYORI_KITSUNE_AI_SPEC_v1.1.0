@@ -19,3 +19,27 @@
 }
 .chat-compare-results summary {cursor:pointer;font-size:12px}
 .chat-compare-results p{margin:7px 0;color:var(--ui-text-2);font-size:12px;line-height:1.5}
+
+/* One unobtrusive, persisted task summary — only for real pending work. */
+.chat-continuation[hidden]{display:none!important}
+.chat-continuation{padding:3px 0 7px;border-bottom:1px solid var(--ui-border)}
+.chat-continuation>summary{cursor:pointer;padding:5px 9px;color:var(--ui-text-2);font-size:12px}
+.chat-continuation-items{padding:5px 9px}
+.chat-continuation-row{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:7px 0;border-bottom:1px solid var(--ui-border);
+  color:var(--ui-text-2);font-size:12px
+}
+.chat-continuation-row strong{min-width:125px;font-size:11px;color:var(--ui-accent)}
+.chat-continuation-row span{min-width:0;overflow-wrap:anywhere}
+.chat-continuation-open{
+  margin:6px 9px 2px;padding:8px 12px;
+  border:1px solid var(--ui-border);border-radius:10px;
+  background:var(--ui-surface-soft);color:var(--ui-text);
+  font:600 12px inherit;cursor:pointer
+}
+.chat-continuation-open:hover{background:var(--ui-accent-soft)}
+@media(max-width:700px){
+ .chat-continuation-row{display:block}
+ .chat-continuation-row strong{display:block;margin-bottom:4px}
+}

@@ -111,6 +111,9 @@ jobs:
       - name: Document comparison contract
         run: npm run test:document-comparisons
 
+      - name: Chat continuity contract
+        run: npm run test:chat-continuation
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

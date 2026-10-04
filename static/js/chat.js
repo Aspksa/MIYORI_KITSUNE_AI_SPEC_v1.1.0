@@ -281,6 +281,7 @@ function startNewChat() {
   agentTrace.innerHTML = '<span class="empty-copy">Действий ещё не было.</span>';
   agentBudget.textContent = "0/5";
   Promise.all([loadConversations(), loadTools(), loadNexus()]);
+  void window.miyoriChatContinuation?.refresh();
   input.focus();
 }
 
@@ -441,6 +442,7 @@ projectSelect.addEventListener("change", async () => {
   window.miyoriChatAttachments?.clear();
   state.projectId = Number(projectSelect.value);
   state.conversationId = null;
+  void window.miyoriChatContinuation?.refresh();
   updateProjectLabel();
   showWelcome();
   window.miyoriDrafts?.restore();
@@ -448,6 +450,7 @@ projectSelect.addEventListener("change", async () => {
     loadConversations(), loadMemory(), loadDocuments(),
     loadTools(), loadPermissions(), loadAudit(), loadTasks(), loadDevelopment(), loadNexus()
   ]);
+  void window.miyoriChatContinuation?.refresh();
 });
 
 el("addProject").addEventListener("click", async () => {
@@ -461,6 +464,7 @@ el("addProject").addEventListener("click", async () => {
     });
     state.projectId = data.project.id;
     state.conversationId = null;
+    void window.miyoriChatContinuation?.refresh();
     await loadProjects();
     showWelcome();
     await loadTools();

@@ -118,6 +118,7 @@ async function boot() {
   await loadModuleVersions();
   try { await loadProjects(); } catch (error) { showError(error.message); }
   await applyStartupPreferences();
+  if (state.projectId) void window.miyoriChatContinuation?.refresh();
   input.focus();
 }
 boot();
