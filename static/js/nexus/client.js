@@ -149,12 +149,14 @@ export async function fetchNexusPresence(projectId) {
 function validateProactivePage(payload) {
     if (payload.schema_version !== NEXUS_PROACTIVE_SCHEMA_VERSION ||
         !Array.isArray(payload.signals) ||
-        payload.policy?.chat_interruption_allowed !== false ||
+        !Array.isArray(payload.display?.chat_shelf_ids) ||
         payload.policy?.auto_execute_allowed !== false ||
-        payload.policy?.write_tools_allowed !== false ||
-        payload.policy?.creates_chat_messages !== false ||
-        payload.policy?.persistent_dismiss_snooze !== true ||
-        payload.policy?.derived_from_authoritative_state !== true) {
+        payload.policy?.write_action_allowed !== false ||
+        payload.policy?.chat_message_injection_allowed !== false ||
+        payload.policy?.interrupt_user_allowed !== false ||
+        payload.policy?.os_notification_allowed !== false ||
+        payload.policy?.operational_blockers_owned_by_presence !== true ||
+        payload.policy?.decisions_change_signal_visibility_only !== true) {
         throw new Error("NEXUS proactive API нарушил attention safety contract.");
     }
     return payload;
@@ -167,28 +169,33 @@ export async function fetchNexusProactive(projectId) {
     }
     return validateProactivePage((await response.json()));
 }
-export async function dismissNexusProactive(projectId, signalId) {
+async function decideNexusProactive(projectId, signal, decision, snoozeMinutes) {
     validateProjectId(projectId);
-    const response = await fetch(`/api/projects/${projectId}/nexus/proactive/${encodeURIComponent(signalId)}/dismiss`, { method: "POST", headers: { Accept: "application/json" } });
-    if (!response.ok) {
-        throw new Error(`NEXUS proactive dismiss: HTTP ${response.status}`);
+    const body = {
+        signal_key: signal.signal_key,
+        fingerprint: signal.fingerprint,
+        decision,
+    };
+    if (decision === "snoozed") {
+        body.snooze_minutes = snoozeMinutes ?? 60;
     }
-    const payload = (await response.json());
-    return validateProactivePage(payload.proactive ?? {});
-}
-export async function snoozeNexusProactive(projectId, signalId, minutes = 60) {
-    validateProjectId(projectId);
-    const response = await fetch(`/api/projects/${projectId}/nexus/proactive/${encodeURIComponent(signalId)}/snooze`, {
+    const response = await fetch(`/api/projects/${projectId}/nexus/proactive/decision`, {
         method: "POST",
         headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ minutes }),
+        body: JSON.stringify(body),
     });
     if (!response.ok) {
-        throw new Error(`NEXUS proactive snooze: HTTP ${response.status}`);
+        throw new Error(`NEXUS proactive decision: HTTP ${response.status}`);
     }
     const payload = (await response.json());
     return validateProactivePage(payload.proactive ?? {});
+}
+export async function dismissNexusProactive(projectId, signal) {
+    return decideNexusProactive(projectId, signal, "dismissed");
+}
+export async function snoozeNexusProactive(projectId, signal, minutes = 60) {
+    return decideNexusProactive(projectId, signal, "snoozed", minutes);
 }
