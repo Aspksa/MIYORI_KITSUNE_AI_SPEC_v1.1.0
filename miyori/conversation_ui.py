@@ -62,6 +62,21 @@ def list_chat_conversations(project_id: int, query: str = "") -> list[dict]:
             (project_id, pattern),
         ).fetchall()
         match_ids = {int(row["conversation_id"]) for row in matches}
+        attached_matches = conn.execute(
+            """
+            SELECT DISTINCT m.conversation_id
+            FROM messages m JOIN conversations c ON c.id = m.conversation_id
+            JOIN json_each(
+                CASE WHEN json_valid(m.metadata_json) THEN m.metadata_json ELSE '{}' END,
+                '$.attachments'
+            ) a
+            JOIN documents d ON d.id = CAST(a.value AS INTEGER)
+              AND d.project_id = c.project_id AND d.deleted_at IS NULL
+            WHERE c.project_id = ? AND d.filename LIKE ? ESCAPE '\\'
+            """,
+            (project_id, pattern),
+        ).fetchall()
+        match_ids.update(int(row["conversation_id"]) for row in attached_matches)
         return [
             row for row in results
             if int(row["id"]) in match_ids or term.casefold() in str(row["title"]).casefold()
@@ -298,10 +313,21 @@ def search_conversation_messages(
             SELECT m.id, m.role, substr(m.content,1,280) AS preview, m.created_at
             FROM messages m JOIN conversations c ON c.id = m.conversation_id
             WHERE c.project_id = ? AND c.id = ?
-              AND m.content LIKE ? ESCAPE '\\'
+              AND (
+                m.content LIKE ? ESCAPE '\\'
+                OR EXISTS (
+                    SELECT 1 FROM json_each(
+                        CASE WHEN json_valid(m.metadata_json) THEN m.metadata_json ELSE '{}' END,
+                        '$.attachments'
+                    ) a
+                    JOIN documents d ON d.id = CAST(a.value AS INTEGER)
+                      AND d.project_id = c.project_id AND d.deleted_at IS NULL
+                    WHERE d.filename LIKE ? ESCAPE '\\'
+                )
+              )
             ORDER BY m.id DESC LIMIT ?
             """,
-            (project_id, conversation_id, pattern, min(60, max(1, limit))),
+            (project_id, conversation_id, pattern, pattern, min(60, max(1, limit))),
         ).fetchall()
     return [dict(row) for row in rows]
 
