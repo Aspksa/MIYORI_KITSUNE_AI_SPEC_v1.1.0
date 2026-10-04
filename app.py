@@ -3210,8 +3210,7 @@ def agent_trace(run_id: int) -> dict:
     return {"run": trace}
 
 
-@app.post("/api/chat")
-async def send_message(request: ChatRequest) -> dict:
+async def _process_chat_request(request: ChatRequest, stream_sink=None) -> dict:
     text = request.message.strip()
     if not text:
         raise HTTPException(status_code=422, detail="Сообщение пустое.")
@@ -3476,6 +3475,7 @@ async def send_message(request: ChatRequest) -> dict:
             attachment_ids=attachment_ids,
             user_message_id=user_message_id,
             ui_context=ui_context,
+            stream_sink=stream_sink,
         )
         if topic_id is not None and response.get("assistant_message_id"):
             assign_topic(
