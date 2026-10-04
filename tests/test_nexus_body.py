@@ -54,7 +54,8 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
         body = build_nexus_body(self.project_id)
         self.assertEqual(body["schema_version"], NEXUS_BODY_SCHEMA_VERSION)
         self.assertEqual(body["runtime"]["source"], "nexus_presence")
-        self.assertEqual(body["state"], "ready")
+        self.assertEqual(body["runtime"]["presence_mode"], "degraded")
+        self.assertEqual(body["state"], "degraded")
 
     def test_persona_canon_is_preserved_without_inventing_open_choices(self) -> None:
         with patch("miyori.nexus_body.build_nexus_presence", return_value=self._presence("ready")):
