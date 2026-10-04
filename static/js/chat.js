@@ -249,18 +249,21 @@ function startNewChat() {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (state.busy || !state.projectId) return;
+  if (state.busy || state.submissionPending || !state.projectId) return;
   const text = input.value.trim();
   if (!text) return;
+  state.submissionPending = true;
   const attachmentStore = window.miyoriChatAttachments;
   let attachedFiles = [];
   try {
     attachedFiles = attachmentStore ? await attachmentStore.ready() : [];
   } catch (error) {
+    state.submissionPending = false;
     showError(error.message || "Не удалось загрузить документ.");
     return;
   }
   if (attachedFiles.length && attachedFiles.some(file => file.failed)) {
+    state.submissionPending = false;
     showError("Исправьте ошибки загрузки вложений перед отправкой.");
     return;
   }
@@ -273,9 +276,10 @@ form.addEventListener("submit", async (event) => {
   });
   input.value = "";
   window.miyoriDrafts?.save();
-  window.miyoriChatActivity?.begin();
   input.style.height = "auto";
   setBusy(true);
+  state.submissionPending = false;
+  window.miyoriChatActivity?.begin();
 
   const requestId = (window.crypto?.randomUUID?.() || (
     Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
