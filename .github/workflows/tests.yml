@@ -81,6 +81,9 @@ jobs:
       - name: NEXUS Agent Workspace contract
         run: npm run test:agent-workspace
 
+      - name: NEXUS Home contract
+        run: npm run test:nexus-home
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
