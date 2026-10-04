@@ -324,6 +324,7 @@ export interface NexusPresence {
     recovering_actions: number;
     failed_actions: number;
     active_actions: number;
+    verifying_actions: number;
     failed_tasks: number;
     knowledge_attention: number;
   };
