@@ -634,6 +634,58 @@ def remember_message_candidate(
     )
 
 
+def topic_recent_messages(
+    project_id: int,
+    conversation_id: int,
+    topic_id: int,
+    limit: int = 30,
+) -> list[dict[str, str]]:
+    validate_topic(project_id, conversation_id, topic_id)
+    with connect() as db:
+        rows = db.execute(
+            """
+            SELECT m.role,m.content FROM messages m
+            JOIN chat_message_topics mt ON mt.message_id=m.id
+            WHERE m.conversation_id=? AND mt.topic_id=?
+              AND m.role IN ('user','assistant')
+            ORDER BY m.id DESC LIMIT ?
+            """,
+            (conversation_id, topic_id, max(1, min(60, limit))),
+        ).fetchall()
+    return [
+        {"role": row["role"], "content": row["content"]}
+        for row in reversed(rows)
+    ]
+
+
+def pinned_chat_context(
+    project_id: int,
+    conversation_id: int,
+    limit: int = 4,
+) -> list[dict]:
+    if not get_conversation(conversation_id, project_id):
+        raise LookupError("Разговор не найден.")
+    with connect() as db:
+        rows = db.execute(
+            """
+            SELECT m.id,m.role,m.content,p.created_at
+            FROM chat_message_pins p
+            JOIN messages m ON m.id=p.message_id
+            WHERE p.project_id=? AND p.conversation_id=?
+            ORDER BY p.created_at DESC LIMIT ?
+            """,
+            (project_id, conversation_id, max(1, min(8, limit))),
+        ).fetchall()
+    return [
+        {
+            "message_id": int(row["id"]),
+            "role": row["role"],
+            "text": str(row["content"])[:1200],
+        }
+        for row in rows
+    ]
+
+
 def conversation_snapshot(project_id: int, conversation_id: int) -> dict:
     init_conversation_experience_db()
     if not get_conversation(conversation_id, project_id):
