@@ -13,7 +13,11 @@ async function loadProjects() {
   // Only conversation navigation and the authoritative NEXUS snapshot block
   // chat readiness. Legacy panels populate opportunistically afterwards.
   const selectedProject=Number(state.projectId);
-  await Promise.allSettled([loadConversations(),loadNexus()]);
+  const essential=await Promise.allSettled([loadConversations(),loadNexus()]);
+  for(const result of essential){
+    if(result.status==="rejected")
+      showError(result.reason?.message || "Не удалось обновить чат.");
+  }
   setTimeout(()=>{
     if(Number(state.projectId)!==selectedProject)return;
     void Promise.allSettled([
