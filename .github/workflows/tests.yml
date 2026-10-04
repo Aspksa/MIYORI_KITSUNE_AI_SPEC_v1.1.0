@@ -93,6 +93,9 @@ jobs:
       - name: NEXUS Body Renderer Registry contract
         run: npm run test:nexus-body-renderer
 
+      - name: Unified UI contract
+        run: npm run test:ui-unification
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
