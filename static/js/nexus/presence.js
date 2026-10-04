@@ -1,4 +1,7 @@
 import { fetchNexusPresence } from "./client.js";
+function currentView() {
+    return String(document.documentElement.dataset.nexusView || "chat");
+}
 function currentProjectId() {
     const select = document.getElementById("projectSelect");
     const value = Number(select?.value);
@@ -15,6 +18,10 @@ function navigate(view) {
 }
 function renderPresence(host, presence, interaction) {
     host.replaceChildren();
+    if (currentView() !== "chat") {
+        host.hidden = true;
+        return;
+    }
     if (interaction === "thinking") {
         host.dataset.mode = "working";
         const row = document.createElement("div");
@@ -150,12 +157,17 @@ export function installNexusPresence() {
         if (interaction === "idle")
             void refresh();
     };
+    const onView = () => {
+        renderPresence(host, presence, interaction);
+    };
     window.addEventListener("miyori:nexus-snapshot", onSnapshot);
     window.addEventListener("miyori:interaction-state", onInteraction);
+    window.addEventListener("miyori:nexus-view", onView);
     return () => {
         stopped = true;
         generation += 1;
         window.removeEventListener("miyori:nexus-snapshot", onSnapshot);
         window.removeEventListener("miyori:interaction-state", onInteraction);
+        window.removeEventListener("miyori:nexus-view", onView);
     };
 }
