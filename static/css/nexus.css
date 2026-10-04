@@ -2152,3 +2152,67 @@
   .agent-workspace-card-head { grid-template-columns: 1fr; display: grid; }
   .agent-workspace-create > div { grid-template-columns: 1fr; }
 }
+
+
+/* N11 — Home Runtime. Connectivity is evidence, not decoration. */
+.nexus-home-page { display: grid; gap: 12px; }
+.nexus-home-intro,
+.nexus-home-section > header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+.nexus-home-intro h3 { margin: 4px 0; }
+.nexus-home-intro p { max-width: 720px; margin: 0; color: #7d7483; font-size: 9px; line-height: 1.55; }
+.nexus-home-credential {
+  display: grid; gap: 7px; padding: 11px; border: 1px solid #ddcfaa;
+  border-radius: 10px; background: #fffdf6;
+}
+.nexus-home-credential[hidden] { display: none; }
+.nexus-home-credential p { margin: 0; color: #7c725b; font-size: 8px; }
+.nexus-home-credential code {
+  overflow-wrap: anywhere; padding: 7px; border-radius: 7px; background: #f5f0df;
+  color: #5f5848; font-size: 8px;
+}
+.nexus-home-policy { display: flex; flex-wrap: wrap; gap: 6px; padding: 9px 10px;
+  border: 1px solid #e7e1eb; border-radius: 10px; background: #fbfafc; }
+.nexus-home-policy strong { width: 100%; color: #5f5566; font-size: 8px; }
+.nexus-home-policy span,
+.nexus-home-capabilities span,
+.nexus-home-device-meta span {
+  padding: 3px 6px; border-radius: 999px; background: #f1edf4; color: #7a7081; font-size: 7px;
+}
+.nexus-home-section { display: grid; gap: 8px; }
+.nexus-home-section > header strong,
+.nexus-home-section > header small { display: block; }
+.nexus-home-section > header small { margin-top: 2px; color: #918997; font-size: 8px; }
+.nexus-home-section > header > span { color: #8e8594; font-size: 8px; }
+.nexus-home-device-list,
+.nexus-home-parental-list { display: grid; gap: 8px; }
+.nexus-home-device,
+.nexus-home-parental {
+  padding: 11px; border: 1px solid #e7e1eb; border-radius: 11px; background: #fff;
+}
+.nexus-home-device > header,
+.nexus-home-parental > header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+}
+.nexus-home-device > header span,
+.nexus-home-parental > header span { display: block; color: #9b929f; font-size: 7px; }
+.nexus-home-device > header strong,
+.nexus-home-parental > header strong { display: block; margin-top: 2px; color: #554b5d; font-size: 10px; }
+.nexus-home-device-meta,
+.nexus-home-capabilities,
+.nexus-home-controls,
+.nexus-home-bind-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.nexus-home-evidence { margin: 8px 0 0; color: #83798a; font-size: 8px; line-height: 1.45; }
+.nexus-home-capabilities .muted,
+.nexus-home-muted { background: transparent; color: #9d95a2; }
+.nexus-home-parental p { margin: 7px 0 0; color: #766d7d; font-size: 8px; }
+.nexus-home-parental small { display: block; margin-top: 4px; color: #918997; font-size: 7px; }
+.nexus-home-bind-row select {
+  min-height: 30px; padding: 0 8px; border: 1px solid #ddd6e2; border-radius: 8px;
+  background: #fff; color: #615769; font: inherit; font-size: 8px;
+}
+@media (max-width: 620px) {
+  .nexus-home-intro,
+  .nexus-home-section > header { flex-direction: column; }
+}
