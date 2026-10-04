@@ -50,6 +50,31 @@ from miyori.conversation_ui import (
     list_bookmarked_messages,
     search_conversation_messages,
 )
+from miyori.conversation_experience import (
+    assign_topic,
+    complete_schedule,
+    conversation_snapshot,
+    create_folder,
+    create_topic,
+    create_voice_note,
+    due_schedules,
+    filter_conversation_ids,
+    folder_snapshot,
+    init_conversation_experience_db,
+    mark_read,
+    remember_message_candidate,
+    reply_context,
+    route_message,
+    save_checklist,
+    schedule_message,
+    set_conversation_folder,
+    set_pin,
+    set_reaction,
+    set_tags,
+    smart_search,
+    voice_note,
+    voice_note_path,
+)
 from miyori.config import settings
 from miyori.appearance import (
     get_appearance_profile,
@@ -297,6 +322,7 @@ def _sync_project_drive(project_id: int) -> None:
 async def lifespan(app: FastAPI):
     init_db()
     init_conversation_ui_db()
+    init_conversation_experience_db()
     init_chat_metrics_db()
     init_chat_progress_db()
     init_chat_feedback_db()
@@ -352,6 +378,61 @@ class ChatRequest(BaseModel):
     attachment_ids: list[int] = Field(default_factory=list, max_length=5)
     read_only: bool = False
     ui_context: dict = Field(default_factory=dict)
+    reply_to_message_id: int | None = None
+    quoted_text: str = Field(default="", max_length=800)
+    topic_id: int | None = None
+    voice_note_id: int | None = None
+
+
+class ChatTopicCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class ChatTagsRequest(BaseModel):
+    tags: list[str] = Field(default_factory=list, max_length=12)
+
+
+class ChatToggleRequest(BaseModel):
+    enabled: bool
+
+
+class ChatReactionRequest(BaseModel):
+    reaction: str = Field(max_length=24)
+    enabled: bool = True
+
+
+class ChatChecklistRequest(BaseModel):
+    items: list[dict] = Field(min_length=1, max_length=30)
+
+
+class ChatRouteRequest(BaseModel):
+    destination: str = Field(max_length=32)
+    detail: dict = Field(default_factory=dict)
+
+
+class ChatRememberRequest(BaseModel):
+    statement: str = Field(default="", max_length=1000)
+
+
+class ChatReadRequest(BaseModel):
+    last_read_message_id: int | None = None
+
+
+class ChatFolderCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+class ChatFolderAssignRequest(BaseModel):
+    folder_id: int
+    enabled: bool = True
+
+
+class ChatScheduleRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+    scheduled_for: str = Field(min_length=10, max_length=80)
+    repeat_mode: str = Field(default="none", max_length=12)
+    auto_send: bool = False
+    conversation_id: int | None = None
 
 
 class MessageFeedbackRequest(BaseModel):
@@ -1322,10 +1403,14 @@ def chat_progress(project_id: int, request_id: str) -> dict:
 
 
 @app.get("/api/projects/{project_id}/conversations")
-def conversations(project_id: int, q: str = "") -> dict:
+def conversations(project_id: int, q: str = "", folder: str = "all") -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
-    return {"conversations": list_chat_conversations(project_id, q)}
+    rows = list_chat_conversations(project_id, q)
+    allowed = filter_conversation_ids(project_id, folder)
+    if allowed is not None:
+        rows = [row for row in rows if int(row["id"]) in allowed]
+    return {"conversations": rows, "folder": folder}
 
 
 @app.patch("/api/projects/{project_id}/conversations/{conversation_id}")
@@ -1423,6 +1508,218 @@ def message_fork(project_id: int, conversation_id: int, message_id: int) -> dict
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/conversation-folders")
+def chat_folder_list(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return folder_snapshot(project_id)
+
+
+@app.post("/api/projects/{project_id}/conversation-folders")
+def chat_folder_create(project_id: int, request: ChatFolderCreateRequest) -> dict:
+    try:
+        return {"folder": create_folder(project_id, request.name)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.put("/api/projects/{project_id}/conversations/{conversation_id}/folder")
+def chat_folder_assign(
+    project_id: int, conversation_id: int, request: ChatFolderAssignRequest,
+) -> dict:
+    try:
+        set_conversation_folder(
+            project_id, conversation_id, request.folder_id, request.enabled
+        )
+        return {"ok": True}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/conversations/{conversation_id}/experience")
+def chat_experience(project_id: int, conversation_id: int) -> dict:
+    try:
+        return conversation_snapshot(project_id, conversation_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/conversations/{conversation_id}/topics")
+def chat_topic_create(
+    project_id: int, conversation_id: int, request: ChatTopicCreateRequest,
+) -> dict:
+    try:
+        return {"topic": create_topic(project_id, conversation_id, request.name)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.put("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/tags")
+def chat_message_tags(
+    project_id: int, conversation_id: int, message_id: int, request: ChatTagsRequest,
+) -> dict:
+    try:
+        return {"message_id": message_id, "tags": set_tags(
+            project_id, conversation_id, message_id, request.tags
+        )}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.put("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/pin")
+def chat_message_pin(
+    project_id: int, conversation_id: int, message_id: int, request: ChatToggleRequest,
+) -> dict:
+    try:
+        return set_pin(project_id, conversation_id, message_id, request.enabled)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.put("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/reaction")
+def chat_message_reaction(
+    project_id: int, conversation_id: int, message_id: int,
+    request: ChatReactionRequest,
+) -> dict:
+    try:
+        return {"message_id": message_id, "reactions": set_reaction(
+            project_id, conversation_id, message_id,
+            request.reaction, request.enabled,
+        )}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.put("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/checklist")
+def chat_message_checklist(
+    project_id: int, conversation_id: int, message_id: int,
+    request: ChatChecklistRequest,
+) -> dict:
+    try:
+        return {"message_id": message_id, "items": save_checklist(
+            project_id, conversation_id, message_id, request.items
+        )}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/route")
+def chat_message_route(
+    project_id: int, conversation_id: int, message_id: int,
+    request: ChatRouteRequest,
+) -> dict:
+    try:
+        return {"route": route_message(
+            project_id, conversation_id, message_id,
+            request.destination, request.detail,
+        )}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/remember")
+def chat_message_remember(
+    project_id: int, conversation_id: int, message_id: int,
+    request: ChatRememberRequest,
+) -> dict:
+    try:
+        return {"fact": remember_message_candidate(
+            project_id, conversation_id, message_id, request.statement
+        )}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.put("/api/projects/{project_id}/conversations/{conversation_id}/read")
+def chat_read_state(
+    project_id: int, conversation_id: int, request: ChatReadRequest,
+) -> dict:
+    try:
+        return {"read_state": mark_read(
+            project_id, conversation_id, request.last_read_message_id
+        )}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/chat/search")
+def chat_smart_search(
+    project_id: int, q: str = "", scope: str = "project",
+    conversation_id: int | None = None,
+) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return smart_search(
+        project_id, q, scope=scope, conversation_id=conversation_id
+    )
+
+
+@app.get("/api/projects/{project_id}/chat/schedules/due")
+def chat_schedule_due(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"schedules": due_schedules(project_id)}
+
+
+@app.post("/api/projects/{project_id}/chat/schedules")
+def chat_schedule_create(project_id: int, request: ChatScheduleRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        return {"schedule": schedule_message(
+            project_id, request.conversation_id, request.text,
+            request.scheduled_for, request.repeat_mode, request.auto_send,
+        )}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/chat/schedules/{schedule_id}/complete")
+def chat_schedule_complete(project_id: int, schedule_id: int) -> dict:
+    try:
+        return {"schedule": complete_schedule(project_id, schedule_id)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/voice-notes")
+async def chat_voice_note_create(
+    project_id: int,
+    file: UploadFile = File(...),
+    duration_ms: int | None = Form(default=None),
+) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    data = await file.read()
+    try:
+        return {"voice_note": create_voice_note(
+            project_id, data, file.content_type or "", duration_ms
+        )}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/voice-notes/{note_id}")
+def chat_voice_note_download(project_id: int, note_id: int):
+    resolved = voice_note_path(project_id, note_id)
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Голосовая заметка не найдена.")
+    path, mime = resolved
+    return FileResponse(path, media_type=mime, filename=path.name)
 
 
 @app.get("/api/projects/{project_id}/memory")
