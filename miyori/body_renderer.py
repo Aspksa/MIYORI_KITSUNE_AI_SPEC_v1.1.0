@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-BODY_RENDERER_SCHEMA_VERSION = "1.1.0"
+BODY_RENDERER_SCHEMA_VERSION = "1.2.0"
 
 _TRUSTED_ADAPTERS = (
     {
@@ -12,15 +12,8 @@ _TRUSTED_ADAPTERS = (
         "installed": True,
         "dynamic": False,
         "requires_asset_kind": None,
-        "supports": {
-            "pose": True,
-            "expression": True,
-            "gesture": True,
-        },
-        "semantics": (
-            "CSS-примитивы отображают только contract pose/expression/gesture "
-            "и не фиксируют открытые owner appearance choices."
-        ),
+        "supports": {"pose": True, "expression": True, "gesture": True},
+        "semantics": "Минимальная fail-closed оболочка без owner appearance choices.",
     },
     {
         "id": "static_portrait",
@@ -28,15 +21,8 @@ _TRUSTED_ADAPTERS = (
         "installed": True,
         "dynamic": False,
         "requires_asset_kind": "static_portrait",
-        "supports": {
-            "pose": False,
-            "expression": False,
-            "gesture": False,
-        },
-        "semantics": (
-            "Пользовательское изображение остаётся неподвижным; runtime state "
-            "показывается отдельным индикатором и подписью."
-        ),
+        "supports": {"pose": False, "expression": False, "gesture": False},
+        "semantics": "Пользовательское изображение остаётся неподвижным.",
     },
     {
         "id": "trusted_vector_rig",
@@ -44,15 +30,21 @@ _TRUSTED_ADAPTERS = (
         "installed": True,
         "dynamic": True,
         "requires_asset_kind": None,
-        "supports": {
-            "pose": True,
-            "expression": True,
-            "gesture": True,
-        },
+        "supports": {"pose": True, "expression": True, "gesture": True},
+        "semantics": "Нейтральный vector rig предыдущего поколения сохраняется как trusted fallback.",
+    },
+    {
+        "id": "trusted_character_rig",
+        "label": "Miyori character rig",
+        "installed": True,
+        "dynamic": True,
+        "requires_asset_kind": None,
+        "supports": {"pose": True, "expression": True, "gesture": True},
         "semantics": (
-            "Встроенный neutral vector rig двигается только из versioned "
-            "pose/expression/gesture/state channels. Он не выбирает цвет волос, "
-            "глаз, число хвостов или основной наряд владельца."
+            "Полнофигурный trusted character rig отображает подтверждённые черты "
+            "Миёри: лицо, волосы как нейтральную форму, лисьи ушки, тело, руки и "
+            "одежду как нейтральный силуэт. Точный цвет волос/глаз, число хвостов "
+            "и основной наряд применяются только из owner Appearance Profile."
         ),
     },
 )
@@ -71,7 +63,7 @@ def select_renderer_adapter(appearance: dict[str, Any]) -> str:
     if kind == "static_portrait":
         return "static_portrait"
     if kind is None:
-        return "trusted_vector_rig"
+        return "trusted_character_rig"
     return "neutral_shell"
 
 
@@ -91,11 +83,18 @@ def build_body_renderer_contract(appearance: dict[str, Any]) -> dict:
             "gesture": "body.presentation.gesture",
             "state": "body.state_or_explicit_local_runtime",
         },
+        "appearance_channels": {
+            "hair_color": "body.appearance.selections.hair_color",
+            "eye_color": "body.appearance.selections.eye_color",
+            "tail_count": "body.appearance.selections.tail_count",
+            "main_outfit": "body.appearance.selections.main_outfit",
+            "owner_values_only": True,
+        },
         "dynamic_extension": {
             "status": "installed",
-            "adapter_id": "trusted_vector_rig",
-            "engine": "trusted_dom_css_vector_v1",
-            "asset_requirement": "builtin_neutral_vector",
+            "adapter_id": "trusted_character_rig",
+            "engine": "trusted_dom_css_character_v1",
+            "asset_requirement": "owner_choice_aware_builtin_character",
             "adapter_contract_required": True,
             "must_be_trusted_registry_entry": True,
             "must_consume_existing_presentation_channels": True,
@@ -112,5 +111,7 @@ def build_body_renderer_contract(appearance: dict[str, Any]) -> dict:
             "static_portrait_is_dynamic": False,
             "dynamic_renderer_claim_requires_installed_adapter": True,
             "dynamic_motion_source": "versioned_presentation_channels_only",
+            "appearance_source": "owner_profile_only",
+            "unresolved_appearance_uses_neutral_visuals": True,
         },
     }
