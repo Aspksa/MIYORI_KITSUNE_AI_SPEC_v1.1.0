@@ -71,3 +71,31 @@ jobs:
       - name: Verify committed NEXUS build
         run: git diff --exit-code -- static/js/nexus
 
+  portable_zip:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build ZIP-like portable folder
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "miyori-portable.zip"
+          $root = Join-Path $env:RUNNER_TEMP "miyori-portable"
+          if (Test-Path $root) { Remove-Item $root -Recurse -Force }
+          git archive --format=zip --output=$zip HEAD
+          Expand-Archive -Path $zip -DestinationPath $root -Force
+          "PORTABLE_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Verify ZIP startup through Miyori.bat
+        shell: cmd
+        run: |
+          cd /d "%PORTABLE_ROOT%"
+          call Miyori.bat --check
+

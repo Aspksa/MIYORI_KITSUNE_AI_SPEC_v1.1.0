@@ -1,5 +1,12 @@
 $ErrorActionPreference = "Stop"
 
+# Windows PowerShell 5.1 may otherwise negotiate obsolete TLS defaults.
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+} catch {
+    # PowerShell 7+ / modern runtimes already use secure defaults.
+}
+
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Runtime = Join-Path $Root "runtime"
 $Temp = Join-Path $Root ".portable-setup"
@@ -58,15 +65,21 @@ try {
     }
     Set-Content -Path $Pth.FullName -Value $Updated -Encoding ASCII
 
+    $PythonExe = Join-Path $Runtime "python.exe"
+    & $PythonExe -c "import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Downloaded Python runtime is incompatible with Miyori."
+    }
+
     Write-Host "[3/4] Installing pip..."
     Invoke-WebRequest -Uri $GetPipUrl -OutFile $GetPipPath -UseBasicParsing
-    & (Join-Path $Runtime "python.exe") $GetPipPath --no-warn-script-location
+    & $PythonExe $GetPipPath --no-warn-script-location
     if ($LASTEXITCODE -ne 0) {
         throw "pip installation failed with exit code $LASTEXITCODE."
     }
 
     Write-Host "[4/4] Installing Miyori dependencies..."
-    & (Join-Path $Runtime "python.exe") -m pip install --disable-pip-version-check -q -r (Join-Path $Root "requirements.txt")
+    & $PythonExe -m pip install --disable-pip-version-check -r (Join-Path $Root "requirements.txt")
     if ($LASTEXITCODE -ne 0) {
         throw "Dependency installation failed with exit code $LASTEXITCODE."
     }

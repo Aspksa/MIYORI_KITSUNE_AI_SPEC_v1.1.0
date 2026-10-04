@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.44"
+PROJECT_VERSION = "00.00.45"
 
 MODULES = {
     "miyori_ai": {
@@ -129,6 +129,12 @@ MODULES = {
         "status": "active",
         "description": "Каноническая личность Miyori Kitsune и правила поведения.",
     },
+    "launcher": {
+        "name": "Portable Launcher",
+        "version": "1.0.0",
+        "status": "active",
+        "description": "Надёжный Windows/ZIP запуск: Python preflight, Uvicorn entrypoint, readiness/browser, startup log и CI-проверка portable-архива.",
+    },
     "updater": {
         "name": "Обновление проекта",
         "version": "1.2.1",
@@ -138,6 +144,27 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.45",
+        "title": "Portable Launch Reliability · исправление запуска ZIP",
+        "summary": "Исправлена критическая проблема portable-сценария: Miyori.bat запускал app.py, который только объявляет FastAPI-приложение и не стартует Uvicorn. Добавлен отдельный launcher, проверки Python/порта/файлов, startup log и Windows CI, который реально собирает ZIP без .git и выполняет Miyori.bat --check.",
+        "modules": [
+            {
+                "key": "launcher",
+                "version": "1.0.0",
+                "changes": [
+                    "Miyori.bat больше не запускает app.py напрямую; сервер стартует через python -m miyori.launcher.",
+                    "Launcher выполняет preflight, проверяет занятый порт и уже запущенную Miyori, стартует Uvicorn и открывает браузер только после readiness /api/status.",
+                    "Все startup-сообщения и traceback сохраняются в logs/last-startup.log.",
+                    "Miyori.bat требует Python 3.10+; несовместимые .venv/runtime автоматически пересоздаются.",
+                    "Добавлен Miyori.bat --check для воспроизводимой диагностики без запуска сервера.",
+                    "setup-portable.ps1 принудительно включает TLS 1.2 для Windows PowerShell 5.1 и валидирует загруженный Python.",
+                    "Ошибки pip больше не скрываются quiet-режимом, а окно запуска не закрывается молча при сбое.",
+                    "GitHub Actions получил Windows portable_zip job: git archive → Expand-Archive → Miyori.bat --check."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.44",
         "title": "NEXUS Shell · рабочая оболочка без декоративного футуризма",

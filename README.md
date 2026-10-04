@@ -2,8 +2,30 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.44.**  
+**Внутренняя версия приложения: 00.00.45.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.45
+
+`00.00.45` — **Portable Launch Reliability · исправление запуска ZIP**.
+
+Исправлена критическая проблема Windows ZIP-сценария: `Miyori.bat` запускал `python app.py`, но `app.py` является ASGI-модулем и не содержит `uvicorn.run(...)`. В результате процесс просто завершался, а окно могло закрыться без понятной ошибки.
+
+Теперь запуск устроен иначе:
+
+- `Miyori.bat` вызывает `python -m miyori.launcher`;
+- launcher проверяет Python 3.10+, обязательные файлы и занятость порта;
+- если Miyori уже запущена, второй сервер не создаётся;
+- Uvicorn запускается через отдельный entrypoint;
+- браузер открывается только после успешного ответа `/api/status`;
+- диагностика и traceback сохраняются в `logs/last-startup.log`;
+- при ошибке окно запуска не закрывается молча;
+- несовместимые `.venv` или `runtime` пересоздаются;
+- `setup-portable.ps1` принудительно включает TLS 1.2 для старого Windows PowerShell;
+- добавлен `Miyori.bat --check` для проверки установки без запуска сервера;
+- CI на `windows-latest` теперь собирает архив через `git archive`, распаковывает его без `.git` и реально выполняет `Miyori.bat --check`.
+
+Это означает, что portable ZIP теперь тестируется как отдельный продуктовый сценарий, а не косвенно через Linux backend tests.
 
 ## Состояние релиза 00.00.44
 
@@ -259,6 +281,7 @@ data/
 - `miyori/persona.py` — Persona Pack;
 - `miyori/tasks.py` / `background.py` — фоновые задачи;
 - `miyori/system_settings.py` — настройки и диагностика;
+- `miyori/launcher.py` — Windows/ZIP launcher, preflight, Uvicorn startup, readiness/browser и startup diagnostics;
 - `miyori/updater.py` / `portable_updater.py` — обновление;
 - `miyori/module_registry.py` — версии модулей и changelog.
 
@@ -330,7 +353,27 @@ Workflow Engine специально не привязан к одному ти�
 Miyori.bat
 ```
 
-Launcher использует bundled runtime при наличии, иначе системный Python / локальную `.venv`; при необходимости portable Python подготавливается через `setup-portable.ps1`. Затем выполняются updater, подготовка `.env`, установка зависимостей и запуск `app.py`.
+Поддерживается Python **3.10+**. Launcher использует совместимый bundled runtime, затем локальную `.venv`, затем системный Python; если подходящего Python нет, portable Python подготавливается через `setup-portable.ps1`.
+
+Фактический серверный entrypoint:
+
+```bat
+python -m miyori.launcher
+```
+
+Для диагностики без запуска сервера:
+
+```bat
+Miyori.bat --check
+```
+
+При проблеме запуска смотрите:
+
+```text
+logs\last-startup.log
+```
+
+Launcher проверяет обязательные файлы, порт, существующий процесс Miyori и импорт ASGI-приложения. Uvicorn запускается только после успешного preflight, а браузер открывается только после готовности `/api/status`.
 
 ## Конфигурация
 
@@ -347,6 +390,13 @@ CLOUDRU_MODEL_ID=deepseek-ai/DeepSeek-V4-Flash
 ## Тесты
 
 GitHub Actions запускает полный `unittest`-контур на push/PR.
+
+Отдельный `portable_zip` job на Windows:
+
+- создаёт ZIP через `git archive` без `.git`;
+- распаковывает архив в чистую временную папку;
+- запускает `Miyori.bat --check`;
+- проверяет реальный Windows bootstrap, создание `.venv`, зависимости и launcher preflight.
 
 Отдельный frontend job выполняет:
 
@@ -396,6 +446,7 @@ Document Intelligence дополнительно проверяет:
 - `00.00.41` — Extraction Integrity: source extraction coverage + Office/PDF completeness manifest + truthful exhaustive coverage;
 - `00.00.42` — NEXUS Foundation: versioned state contract + TypeScript island + typed Generative UI boundary + accessibility/frontend CI;
 - `00.00.43` — NEXUS State & Event Fabric: unified read-only event envelope + cursor/tail + client store + authoritative snapshot resync;
-- `00.00.44` — NEXUS Shell: Chat / Actions / Knowledge / Home / System + operational Actions workspace + state-driven badges + keyboard/mobile navigation.
+- `00.00.44` — NEXUS Shell: Chat / Actions / Knowledge / Home / System + operational Actions workspace + state-driven badges + keyboard/mobile navigation;
+- `00.00.45` — Portable Launch Reliability: real Uvicorn launcher + Python preflight + startup log + Windows ZIP CI.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.
