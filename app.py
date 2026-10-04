@@ -26,6 +26,7 @@ from miyori.chat_feedback import (
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
+from miyori.document_links import related_documents
 from miyori.document_comparisons import (
     init_document_comparisons_db,
     enqueue_document_comparison,
@@ -1667,6 +1668,16 @@ def document_intelligence_project_status(project_id: int) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
     return document_intelligence_status(project_id)
+
+
+@app.get("/api/projects/{project_id}/documents/{document_id}/related")
+def document_related(project_id: int, document_id: int, limit: int = 8) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    try:
+        return related_documents(project_id,document_id,limit=limit)
+    except LookupError as exc:
+        raise HTTPException(status_code=404,detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/documents/{document_id}/intelligence")
