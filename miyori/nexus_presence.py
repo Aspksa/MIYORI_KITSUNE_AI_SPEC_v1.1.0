@@ -11,6 +11,7 @@ NEXUS_PRESENCE_SCHEMA_VERSION = "1.0.0"
 NEXUS_PRESENCE_MODES = {
     "ready",
     "working",
+    "verifying",
     "waiting",
     "attention",
     "recovery",
@@ -100,7 +101,7 @@ def build_nexus_presence(project_id: int) -> dict:
             _reason(
                 "knowledge",
                 f"Элементов знаний для проверки: {knowledge_attention}",
-                state="attention",
+                state="background_attention",
             )
         )
     if active:
@@ -130,18 +131,16 @@ def build_nexus_presence(project_id: int) -> dict:
         detail = "Есть действие, которое не продолжится без явного разрешения."
         attention = "normal"
     elif active:
-        mode = "working"
-        headline = "Работаю"
+        active_item = active[0]
+        active_state = str(active_item.get("state") or "running")
+        mode = "verifying" if active_state == "verifying" else "working"
+        headline = "Проверяю" if mode == "verifying" else "Работаю"
         detail = str(
-            (active[0].get("progress") or {}).get("label")
-            or active[0].get("state_label")
+            (active_item.get("progress") or {}).get("label")
+            or active_item.get("title")
+            or active_item.get("state_label")
             or "Выполняется реальная задача."
         )
-        attention = "low"
-    elif knowledge_attention:
-        mode = "attention"
-        headline = "Есть что проверить"
-        detail = "В Knowledge обнаружены спорные или ограниченно извлечённые данные."
         attention = "low"
     elif overall in {"degraded", "not_connected"}:
         mode = "degraded"
