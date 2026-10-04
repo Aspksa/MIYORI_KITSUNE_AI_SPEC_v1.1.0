@@ -335,3 +335,32 @@
  .nexus-actions-overview{flex-direction:column}
  .message-body,.message-body p{font-size:14px!important}
 }
+
+
+/* 00.00.77 — new-message delivery motion.
+ * Motion marks content that has actually arrived; it never simulates model progress. */
+@keyframes miyori-chat-message-arrive {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes miyori-chat-content-arrive {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.message.message-arriving .bubble {
+  animation: miyori-chat-message-arrive 210ms cubic-bezier(.2,.72,.25,1) both;
+}
+.message.assistant.message-arriving .message-body > * {
+  animation: miyori-chat-content-arrive 230ms ease-out both;
+  animation-delay: var(--chat-reveal-delay, 0ms);
+}
+.messages[data-unread-reply="true"] {
+  box-shadow: inset 0 -2px 0 var(--ui-accent-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .message.message-arriving .bubble,
+  .message.assistant.message-arriving .message-body > * {
+    animation: none !important;
+    transform: none !important;
+  }
+}
