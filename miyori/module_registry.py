@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.63"
+PROJECT_VERSION = "00.00.64"
 
 MODULES = {
     "miyori_ai": {
@@ -59,9 +59,9 @@ MODULES = {
     },
     "document_intelligence": {
         "name": "Document Intelligence",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "status": "active",
-        "description": "Структурное понимание, extraction integrity и exhaustive Q&A: отдельное покрытие оригинала и AI, evidence, recovery и synthesis.",
+        "description": "Exhaustive Q&A и групповой запуск проверок 2–5 документов с подтверждаемыми источниками, покрытием OCR и сохранёнными задачами.",
     },
     "projects": {
         "name": "Проекты",
@@ -156,6 +156,24 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.64",
+        "title": "Document Reasoning · Grounded Multi-Document Comparison",
+        "summary": "Сравнение 2–5 вложенных документов выполняется существующим Exhaustive Q&A в фоновых задачах, результаты сохраняются с привязкой к файлам и locator. Запуск только по явному запросу владельца из компактной секции ответа; неполный OCR обозначается честно.",
+        "modules": [
+            {
+                "key": "document_intelligence",
+                "version": "1.3.0",
+                "changes": [
+                    "Сравнение 2–5 документов одного проекта без дублирования Document Intelligence.",
+                    "Для каждого документа создаётся или переиспользуется сохраняемый exhaustive question с восстановлением.",
+                    "Групповой статус показывает реальное покрытие текста, ссылки на первоисточники, evidence и ошибки.",
+                    "Полнота чтения оригинала и семантическая проверка модели никогда не заявляются без доказательств.",
+                    "Никаких дополнительных панелей: только одна кнопка в раскрывающемся блоке ответа."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.63",
         "title": "Intelligent Chat · Safe Followups and Model Diagnostics",
