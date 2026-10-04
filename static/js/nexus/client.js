@@ -281,7 +281,6 @@ export async function cancelNexusAgentWorkspace(projectId, workspaceId) {
     const payload = (await response.json());
     return validateAgentWorkspace(payload.workspace);
 }
-
 export async function fetchNexusHome(projectId) {
     validateProjectId(projectId);
     const response = await fetch(`/api/projects/${projectId}/nexus/home`, {
