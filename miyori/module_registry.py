@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.54"
+PROJECT_VERSION = "00.00.55"
 
 MODULES = {
     "miyori_ai": {
@@ -29,15 +29,21 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "status": "active",
-        "description": "NEXUS Digital Body Runtime поверх Presence/Voice/Actions/Home: state-driven presentation без fake liveness и без выдумывания незаданных деталей внешности.",
+        "description": "NEXUS Digital Body 1.1 с owner-global Appearance Profile, статическим portrait adapter и реальными Presence/Voice runtime states.",
     },
     "digital_body": {
         "name": "Digital Body Miyori",
+        "version": "1.1.0",
+        "status": "active",
+        "description": "Body-state runtime + explicit owner appearance choices; статический портрет не выдаётся за dynamic pose/expression rig.",
+    },
+    "appearance_profile": {
+        "name": "Miyori Appearance Profile",
         "version": "1.0.0",
         "status": "active",
-        "description": "Канонический body-state contract: нейтральная оболочка, runtime pose/expression/gesture и owner-open appearance choices из Persona Pack.",
+        "description": "Отдельный owner-global профиль цвета волос, глаз, точного числа хвостов и основного наряда без системных дефолтов.",
     },
     "settings": {
         "name": "Настройки",
@@ -150,6 +156,41 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.55",
+        "title": "NEXUS Appearance Profile · owner choices + static asset",
+        "summary": "N12.1 добавляет отдельный owner-global профиль внешности Миёри и безопасный static portrait adapter. Все четыре открытых параметра Persona Pack остаются пустыми до явного выбора владельца; аккаунт-аватар владельца не переиспользуется.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "1.3.0",
+                "changes": [
+                    "Digital Body contract обновлён до 1.1 и включает explicit appearance selections/revision/asset metadata.",
+                    "Chat Digital Body получил редактор внешности без предложенных системой значений.",
+                    "Статический portrait asset отображается отдельно от runtime pose/expression semantics."
+                ],
+            },
+            {
+                "key": "digital_body",
+                "version": "1.1.0",
+                "changes": [
+                    "Поддерживаются appearance_unconfigured / appearance_partial / appearance_configured.",
+                    "Static portrait не меняется от pose/expression и сохраняет только реальный state indicator.",
+                    "Neutral shell остаётся fallback до загрузки portrait asset."
+                ],
+            },
+            {
+                "key": "appearance_profile",
+                "version": "1.0.0",
+                "changes": [
+                    "Singleton owner-global profile хранит только hair_color / eye_color / tail_count / main_outfit.",
+                    "Пустые поля сохраняются как NULL; system/model defaults запрещены contract-ом.",
+                    "PNG/JPEG/WEBP портрет до 5 МБ проверяется по реальной file signature.",
+                    "Asset хранится отдельно от account_profile.avatar и помечен supports_dynamic_pose=false."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.54",
         "title": "NEXUS Digital Body Runtime · canon + real state",

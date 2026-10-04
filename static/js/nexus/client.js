@@ -1,4 +1,4 @@
-import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_VOICE_SCHEMA_VERSION, NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION, NEXUS_HOME_SCHEMA_VERSION, NEXUS_BODY_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
+import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_VOICE_SCHEMA_VERSION, NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION, NEXUS_HOME_SCHEMA_VERSION, NEXUS_BODY_SCHEMA_VERSION, MIYORI_APPEARANCE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
 function validateProjectId(projectId) {
     if (!Number.isInteger(projectId) || projectId <= 0) {
         throw new Error("Некорректный projectId для MIYORI NEXUS.");
@@ -322,9 +322,83 @@ export async function fetchNexusBody(projectId) {
         payload.motion_policy?.timer_idle_animation_allowed !== false ||
         payload.motion_policy?.sentiment_to_expression_allowed !== false ||
         payload.motion_policy?.model_authored_motion_allowed !== false ||
+        payload.appearance.appearance_profile_schema_version !== MIYORI_APPEARANCE_SCHEMA_VERSION ||
+        !payload.appearance.selections ||
+        !payload.appearance.asset ||
+        payload.appearance.asset.supports_dynamic_pose !== false ||
+        payload.appearance.asset.supports_expression !== false ||
+        payload.render_policy?.owner_global_appearance_profile !== true ||
+        payload.render_policy?.static_portrait_is_non_dynamic !== true ||
         payload.render_policy?.invent_open_appearance_choices_allowed !== false ||
         payload.render_policy?.body_state_source !== "presence_plus_explicit_local_runtime") {
         throw new Error("NEXUS Digital Body API нарушил runtime truth contract.");
     }
     return payload;
+}
+function validateMiyoriAppearance(value) {
+    const profile = value;
+    if (!profile ||
+        profile.schema_version !== MIYORI_APPEARANCE_SCHEMA_VERSION ||
+        !profile.selection ||
+        !profile.asset ||
+        !Array.isArray(profile.persona_open_choices) ||
+        profile.policy?.system_defaults_allowed !== false ||
+        profile.policy?.model_may_choose_owner_fields !== false ||
+        profile.policy?.static_portrait_may_claim_dynamic_pose !== false ||
+        profile.asset.supports_dynamic_pose !== false ||
+        profile.asset.supports_expression !== false) {
+        throw new Error("Miyori appearance API нарушил owner-choice contract.");
+    }
+    return profile;
+}
+export async function fetchMiyoriAppearance() {
+    const response = await fetch("/api/miyori/appearance", {
+        headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+        throw new Error(`Miyori appearance API: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    return validateMiyoriAppearance(payload.appearance);
+}
+export async function updateMiyoriAppearance(selection) {
+    const response = await fetch("/api/miyori/appearance", {
+        method: "PUT",
+        headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(selection),
+    });
+    if (!response.ok) {
+        const payload = (await response.json().catch(() => ({})));
+        throw new Error(payload.detail || `Miyori appearance update: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    return validateMiyoriAppearance(payload.appearance);
+}
+export async function uploadMiyoriPortrait(file) {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch("/api/miyori/appearance/portrait", {
+        method: "POST",
+        body: form,
+    });
+    if (!response.ok) {
+        const payload = (await response.json().catch(() => ({})));
+        throw new Error(payload.detail || `Miyori portrait upload: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    return validateMiyoriAppearance(payload.appearance);
+}
+export async function removeMiyoriPortrait() {
+    const response = await fetch("/api/miyori/appearance/portrait", {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+        throw new Error(`Miyori portrait delete: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    return validateMiyoriAppearance(payload.appearance);
 }

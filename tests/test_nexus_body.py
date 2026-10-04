@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from miyori.appearance import save_portrait_asset, update_appearance_profile
 from miyori.config import settings
 from miyori.db import create_project, init_db
 from miyori.document_intelligence import init_document_intelligence_db
@@ -75,6 +76,36 @@ class NexusDigitalBodyContractTests(unittest.TestCase):
         )
         self.assertEqual(appearance["configuration_state"], "appearance_unconfigured")
         self.assertIsNone(appearance["final_portrait_asset"])
+
+    def test_explicit_appearance_profile_is_reflected_without_fake_asset_capabilities(self) -> None:
+        update_appearance_profile(
+            hair_color="серебристые",
+            eye_color="янтарные",
+            tail_count=3,
+            main_outfit="тёмный костюм",
+        )
+        png = b"\x89PNG\r\n\x1a\n" + b"portrait"
+        save_portrait_asset(png, "image/png")
+
+        with patch(
+            "miyori.nexus_body.build_nexus_presence",
+            return_value=self._presence("ready"),
+        ):
+            body = build_nexus_body(self.project_id)
+
+        appearance = body["appearance"]
+        self.assertEqual(appearance["configuration_state"], "appearance_configured")
+        self.assertEqual(appearance["selections"]["hair_color"], "серебристые")
+        self.assertEqual(appearance["selections"]["tail_count"], 3)
+        self.assertEqual(
+            appearance["final_portrait_asset"],
+            "/api/miyori/appearance/portrait",
+        )
+        self.assertEqual(appearance["asset"]["kind"], "static_portrait")
+        self.assertFalse(appearance["asset"]["supports_dynamic_pose"])
+        self.assertFalse(appearance["asset"]["supports_expression"])
+        self.assertTrue(body["render_policy"]["owner_global_appearance_profile"])
+        self.assertTrue(body["render_policy"]["static_portrait_is_non_dynamic"])
 
     def test_server_body_state_is_derived_from_presence(self) -> None:
         cases = {

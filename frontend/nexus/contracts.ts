@@ -8,7 +8,8 @@ export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_HOME_SCHEMA_VERSION = "1.0.0" as const;
-export const NEXUS_BODY_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_BODY_SCHEMA_VERSION = "1.1.0" as const;
+export const MIYORI_APPEARANCE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -532,6 +533,56 @@ export interface NexusBodyPresentation {
   label: string;
 }
 
+export type MiyoriAppearanceState =
+  | "appearance_unconfigured"
+  | "appearance_partial"
+  | "appearance_configured";
+
+export interface MiyoriAppearanceSelection {
+  hair_color: string | null;
+  eye_color: string | null;
+  tail_count: number | null;
+  main_outfit: string | null;
+}
+
+export interface MiyoriAppearanceAsset {
+  kind: "static_portrait" | null;
+  url: string | null;
+  mime: string | null;
+  sha256: string | null;
+  size_bytes: number;
+  supports_dynamic_pose: false;
+  supports_expression: false;
+}
+
+export interface MiyoriAppearanceProfile {
+  schema_version: typeof MIYORI_APPEARANCE_SCHEMA_VERSION;
+  state: MiyoriAppearanceState;
+  selection: MiyoriAppearanceSelection;
+  completion: {
+    selected: number;
+    total: 4;
+    complete: boolean;
+  };
+  fields: Array<{
+    key: keyof MiyoriAppearanceSelection;
+    label: string;
+    owner_choice: true;
+    selected: boolean;
+  }>;
+  persona_open_choices: string[];
+  asset: MiyoriAppearanceAsset;
+  policy: {
+    system_defaults_allowed: false;
+    model_may_choose_owner_fields: false;
+    partial_configuration_allowed: true;
+    asset_changes_persona_identity: false;
+    static_portrait_may_claim_dynamic_pose: false;
+  };
+  revision: number;
+  updated_at: string | null;
+}
+
 export interface NexusDigitalBody {
   schema_version: typeof NEXUS_BODY_SCHEMA_VERSION;
   project: NexusProjectRef;
@@ -546,8 +597,12 @@ export interface NexusDigitalBody {
     species: string;
     confirmed: string[];
     open_for_owner_choice: string[];
-    configuration_state: "appearance_unconfigured" | "canonical_complete";
+    configuration_state: MiyoriAppearanceState;
     final_portrait_asset: null | string;
+    selections: MiyoriAppearanceSelection;
+    asset: MiyoriAppearanceAsset;
+    appearance_profile_schema_version: typeof MIYORI_APPEARANCE_SCHEMA_VERSION;
+    appearance_revision: number;
   };
   runtime: {
     presence_mode: string;
@@ -573,6 +628,8 @@ export interface NexusDigitalBody {
   };
   render_policy: {
     neutral_shell_until_owner_appearance_choice: true;
+    owner_global_appearance_profile: true;
+    static_portrait_is_non_dynamic: true;
     invent_open_appearance_choices_allowed: false;
     tail_count_may_be_invented: false;
     hair_color_may_be_invented: false;

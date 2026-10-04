@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from .appearance import get_appearance_profile
 from .nexus_presence import build_nexus_presence
 from .persona import load_persona_corpus
 
 
-NEXUS_BODY_SCHEMA_VERSION = "1.0.0"
+NEXUS_BODY_SCHEMA_VERSION = "1.1.0"
 NEXUS_BODY_STATES = (
     "ready",
     "working",
@@ -129,6 +130,7 @@ def _persona_appearance() -> dict:
         for value in (identity.get("appearance_open_for_user_choice") or [])
         if str(value).strip()
     ]
+    profile = get_appearance_profile()
     return {
         "persona_version": str(corpus.get("content_version") or ""),
         "name": str(identity.get("name") or "Миёри"),
@@ -138,8 +140,12 @@ def _persona_appearance() -> dict:
         "species": str(identity.get("species") or ""),
         "confirmed": confirmed,
         "open_for_owner_choice": open_choices,
-        "configuration_state": "appearance_unconfigured" if open_choices else "canonical_complete",
-        "final_portrait_asset": None,
+        "configuration_state": profile["state"],
+        "final_portrait_asset": profile["asset"]["url"],
+        "selections": profile["selection"],
+        "asset": profile["asset"],
+        "appearance_profile_schema_version": profile["schema_version"],
+        "appearance_revision": profile["revision"],
     }
 
 
@@ -190,6 +196,8 @@ def build_nexus_body(project_id: int) -> dict:
         },
         "render_policy": {
             "neutral_shell_until_owner_appearance_choice": True,
+            "owner_global_appearance_profile": True,
+            "static_portrait_is_non_dynamic": True,
             "invent_open_appearance_choices_allowed": False,
             "tail_count_may_be_invented": False,
             "hair_color_may_be_invented": False,
