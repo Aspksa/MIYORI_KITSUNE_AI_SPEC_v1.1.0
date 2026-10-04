@@ -298,6 +298,7 @@ export interface NexusKnowledgeCenter {
 export type NexusPresenceMode =
   | "ready"
   | "working"
+  | "verifying"
   | "waiting"
   | "attention"
   | "recovery"
@@ -339,6 +340,8 @@ export interface NexusPresence {
     sources: string[];
     random_liveness_allowed: false;
     decorative_activity_allowed: false;
+    chat_interruption_allowed: false;
+    knowledge_attention_changes_primary_presence: false;
   };
   generated_at: string;
 }
