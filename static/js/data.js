@@ -74,6 +74,8 @@ async function searchDocuments() {
 
 async function uploadDocument(file) {
   if (!file || !state.projectId) return;
+  const uploadStatus = el("composerUploadStatus");
+  if (uploadStatus) uploadStatus.textContent = "Загружаю документ…";
   const formData = new FormData();
   formData.append("file", file);
   showError("");
@@ -88,7 +90,9 @@ async function uploadDocument(file) {
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
     await loadDocuments();
+    if (uploadStatus) uploadStatus.textContent = "Документ добавлен в знания проекта: " + file.name;
   } catch (error) {
+    if (uploadStatus) uploadStatus.textContent = "";
     showError(error.message);
   } finally {
     documentInput.value = "";
