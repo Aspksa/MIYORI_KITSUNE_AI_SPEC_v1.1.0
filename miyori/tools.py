@@ -1224,8 +1224,7 @@ def _execute_write_operation(
             error=None,
             mark_started=True,
         )
-        verification = _verify_operation(spec, operation)
-        record_audit_event(
+        try:\n            verification = _verify_operation(spec, operation)\n        except Exception as exc:\n            update_tool_operation(\n                int(operation["id"]),\n                status="recovery_required",\n                error={\n                    "type": exc.__class__.__name__,\n                    "message": str(exc),\n                    "phase": "verification",\n                },\n            )\n            record_audit_event(\n                project_id,\n                "system",\n                "tool.verification_failed",\n                f"Ошибка проверки состояния перед выполнением {spec.name}.",\n                conversation_id=conversation_id,\n                workflow_id=operation.get("workflow_id"),\n                entity_type="tool_operation",\n                entity_id=operation["id"],\n                details={"tool": spec.name, "error": str(exc)},\n            )\n            raise RuntimeError(\n                "Не удалось безопасно проверить состояние операции; требуется recovery."\n            ) from exc\n        record_audit_event(
             project_id,
             "miyori",
             "tool.verification",
