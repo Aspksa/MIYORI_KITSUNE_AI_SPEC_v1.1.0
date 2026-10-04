@@ -334,15 +334,22 @@ def search_conversation_messages(
 
 def list_bookmarked_messages(project_id: int, *, limit: int = 50) -> list[dict]:
     with connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT m.id, m.conversation_id, substr(m.content,1,240) AS preview,
-                   c.title AS conversation_title, b.created_at,
-                   COALESCE((
+        has_tags = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chat_message_tags'"
+        ).fetchone() is not None
+        tag_select = (
+            """COALESCE((
                      SELECT json_group_array(t.tag)
                      FROM chat_message_tags t
                      WHERE t.project_id=b.project_id AND t.message_id=m.id
-                   ), '[]') AS tags_json
+                   ), '[]') AS tags_json"""
+            if has_tags else "'[]' AS tags_json"
+        )
+        rows = conn.execute(
+            f"""
+            SELECT m.id, m.conversation_id, substr(m.content,1,240) AS preview,
+                   c.title AS conversation_title, b.created_at,
+                   {tag_select}
             FROM message_bookmarks b
             JOIN messages m ON m.id = b.message_id
             JOIN conversations c ON c.id = m.conversation_id
