@@ -208,6 +208,11 @@ from miyori.documents import (
     save_original,
     sha256_bytes,
 )
+from miyori.document_vision import (
+    document_vision_status,
+    init_document_vision_db,
+)
+
 from miyori.document_intelligence import (
     build_local_document_intelligence,
     document_context_packet,
@@ -333,6 +338,7 @@ async def lifespan(app: FastAPI):
     init_chat_progress_db()
     init_chat_feedback_db()
     init_document_intelligence_db()
+    init_document_vision_db()
     init_document_questions_db()
     init_document_comparisons_db()
     init_agent_workspace_db()
@@ -485,7 +491,7 @@ class ToolExecuteRequest(BaseModel):
 
 class TaskCreateRequest(BaseModel):
     task_type: str = Field(
-        pattern="^(self_check|memory_consolidation|epistemic_review|document_intelligence|document_question)$"
+        pattern="^(self_check|memory_consolidation|epistemic_review|document_intelligence|document_vision|document_question)$"
     )
     payload: dict = Field(default_factory=dict)
 
@@ -508,6 +514,12 @@ class AgentWorkspaceCreateRequest(BaseModel):
 
 class DocumentAnalysisRequest(BaseModel):
     force: bool = False
+
+
+class DocumentVisionRequest(BaseModel):
+    force: bool = False
+    max_items: int = Field(default=12, ge=1, le=24)
+    include_text_pages: bool = False
 
 
 class DocumentQuestionRequest(BaseModel):
