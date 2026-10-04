@@ -118,7 +118,7 @@ function createTextField(
 function buildAppearanceEditor(
   body: NexusDigitalBody,
   actions: BodyAppearanceActions,
-): HTMLElement {
+): HTMLDetailsElement {
   const details = document.createElement("details");
   details.className = "nexus-body-appearance-editor";
   const summary = document.createElement("summary");
