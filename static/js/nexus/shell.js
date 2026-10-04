@@ -75,7 +75,13 @@ function renderSnapshot(snapshot) {
     const knowledgeAttention = Number(snapshot.counts.knowledge_attention ?? 0);
     setText("nexusNavKnowledgeMeta", knowledgeAttention > 0 ? `${knowledgeAttention} проверить` : documents ? String(documents) : "0");
     const home = moduleById(snapshot, "home");
-    setText("nexusNavHomeMeta", home ? STATE_LABELS[home.state].toLowerCase() : "—");
+    const homeLinked = Number(snapshot.counts.home_linked ?? 0);
+    const homeOnline = Number(snapshot.counts.home_online ?? 0);
+    setText("nexusNavHomeMeta", home?.state === "disabled"
+        ? "отключено"
+        : homeLinked > 0
+            ? `${homeOnline}/${homeLinked} online`
+            : "нет связей");
     setText("nexusNavSystemMeta", label.toLowerCase());
     setText("nexusNavChatMeta", label.toLowerCase());
 }
