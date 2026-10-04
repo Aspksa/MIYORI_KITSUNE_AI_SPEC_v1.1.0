@@ -61,6 +61,10 @@ assert.ok(
   "Actions badge must use deduplicated server action counts",
 );
 assert.ok(
+  shell.includes("snapshot.counts.knowledge_attention"),
+  "Knowledge badge must use server-derived attention instead of client heuristics",
+);
+assert.ok(
   !shell.includes('state === "processing" ? "в работе" : "готово"'),
   "Chat badge must not report ready for degraded/error/not_connected states",
 );
