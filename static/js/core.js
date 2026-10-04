@@ -153,9 +153,11 @@ function addMessage(role, text, sources = [], options = {}) {
         : [];
       const chip = document.createElement(source?.download_url ? "a" : "span");
       chip.className = "message-source-chip";
-      chip.textContent = indexes.length
-        ? title + " · фрагм. " + indexes.join(", ")
-        : title;
+      chip.textContent = source?.readable === false
+        ? title + " · нужен OCR"
+        : indexes.length
+          ? title + " · фрагм. " + indexes.join(", ") + (source?.truncated ? " · часть текста" : "")
+          : title;
 
       if (source?.download_url && String(source.download_url).startsWith("/api/projects/")) {
         chip.href = source.download_url;
