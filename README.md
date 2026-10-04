@@ -2,8 +2,28 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.53.**  
+**Внутренняя версия приложения: 00.00.54.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.54
+
+`00.00.54` — **NEXUS Digital Body Runtime · канон + реальные состояния**.
+
+N12 добавляет цифровое тело Миёри как визуальный runtime-интерфейс, а не как декоративный аватар:
+
+- `/api/projects/{id}/nexus/body` возвращает versioned body-state contract;
+- server state наследуется из Living Presence: ready / working / verifying / waiting / recovery / attention / degraded;
+- локальные Voice/interaction events могут временно задавать thinking / listening / transcribing / speaking / interrupted / voice_error;
+- idle всегда возвращается к authoritative server state;
+- pose / expression / gesture меняются только при реальном runtime event;
+- `Math.random`, idle timers, keyframe-liveness, model-authored motion и sentiment→emotion запрещены;
+- renderer строит trusted DOM через `createElement/textContent`;
+- Persona Pack задаёт подтверждённую основу: взрослая героиня-кицунэ, лисьи ушки, пушистые хвосты, выразительный взгляд;
+- цвет волос, цвет глаз, точное число хвостов и основной наряд **не выдумываются** — они остаются вашим выбором;
+- до настройки внешности используется нейтральная монохромная оболочка без фиксации открытых параметров;
+- Living Presence остаётся отдельным operational layer и появляется только при реальной активности.
+
+Итог: Миёри получила реальное state-driven цифровое присутствие, но финальный визуальный образ остаётся под контролем владельца.
 
 ## Состояние релиза 00.00.53
 
