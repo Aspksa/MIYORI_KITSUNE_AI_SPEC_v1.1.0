@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from time import perf_counter
 from miyori.chat_intelligence import plan_chat_query,enhance_context_route
+from miyori.chat_history_recall import relevant_history,wants_history
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
@@ -2241,6 +2242,18 @@ async def _build_agent_response(
         project_id, attachment_ids or []
     )
     retrieval_ms = round((perf_counter() - started_retrieval) * 1000)
+    history_matches = relevant_history(
+        project_id,text,active_conversation_id=conversation_id
+    )
+    if wants_history(text):
+        for prior in history_matches:
+            sources.append({
+                "source_type":"chat_history",
+                "title":"Ранее: "+prior["title"],
+                "conversation_id":prior["conversation_id"],
+                "message_id":prior["message_id"],
+                "unverified":True,
+            })
     source_ids = {s.get("document_id") for s in sources}
     for attachment in attachment_sources:
         if attachment["document_id"] not in source_ids:
@@ -2252,6 +2265,8 @@ async def _build_agent_response(
         context,
         memory_context=None,
         document_context=attachment_context or None,
+        history_context=(history_matches or [{"status":"not_found"}])
+                        if wants_history(text) else None,
         brain_plan=brain.plan,
         tool_context=agent.tool_context,
         epistemic_context=epistemic,
@@ -2290,6 +2305,11 @@ async def _build_agent_response(
         },
         "model_usage":actual_usage,
         "retrieval_ms":retrieval_ms,
+        "historical_chat":{
+            "requested":wants_history(text),
+            "matches":len(history_matches),
+            "verified_facts":False,
+        },
     }
 
     assistant_message_id = add_message(
