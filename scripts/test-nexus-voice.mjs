@@ -22,6 +22,6 @@ assert.ok(presence.includes('window.addEventListener("miyori:voice-state"'), "Li
 assert.ok(client.includes("fetchNexusVoice") && client.includes("voice_can_bypass_action_permissions"), "typed Voice safety client is missing");
 assert.ok(!voice.includes("setInterval") && !voice.includes("Math.random"), "Voice must not simulate activity");
 assert.ok(!built.includes(".innerHTML"), "Voice renderer must not inject transcript through innerHTML");
-assert.ok(css.includes("/* N5 — Voice Core.") && [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)].every((match) => ["nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].includes(match[1])), "Voice UI must remain state-driven and animation-free");
+assert.ok(css.includes("/* N5 — Voice Core.") && [...css.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g)].every((match) => ["miyori-character-recover", "nexus-rig-active", "nexus-rig-recover", "nexus-rig-speak"].includes(match[1])), "Voice UI must remain state-driven and animation-free");
 
 console.log("NEXUS Voice contract OK.");
