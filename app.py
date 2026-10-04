@@ -27,6 +27,9 @@ from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
     chat_quality_summary,
 )
+from miyori.chat_progress import (
+    get_chat_progress, init_chat_progress_db, set_chat_progress,
+)
 from miyori.document_links import related_documents
 from miyori.screen_context import (
     normalize_screen_context,resolve_screen_document,
@@ -295,6 +298,7 @@ async def lifespan(app: FastAPI):
     init_db()
     init_conversation_ui_db()
     init_chat_metrics_db()
+    init_chat_progress_db()
     init_chat_feedback_db()
     init_document_intelligence_db()
     init_document_questions_db()
@@ -1307,6 +1311,14 @@ def chat_quality(project_id: int, days: int = 30) -> dict:
     if not get_project(project_id):
         raise HTTPException(status_code=404,detail="Проект не найден.")
     return chat_quality_summary(project_id, days=days)
+
+
+@app.get("/api/projects/{project_id}/chat/progress/{request_id}")
+def chat_progress(project_id: int, request_id: str) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404,detail="Проект не найден.")
+    progress = get_chat_progress(project_id, request_id)
+    return {"progress": progress}
 
 
 @app.get("/api/projects/{project_id}/conversations")
@@ -2335,6 +2347,14 @@ async def _build_agent_response(
         })
 
     actual_usage: dict = {}
+    set_chat_progress(
+        project_id,
+        request_id,
+        "generating",
+        "Формирую ответ по найденному контексту.",
+        conversation_id=conversation_id,
+        user_message_id=user_message_id,
+    )
     answer = await chat(
         context,
         memory_context=None,
@@ -2352,6 +2372,14 @@ async def _build_agent_response(
         quality_guidance=query_plan.public_summary(),
     )
 
+    set_chat_progress(
+        project_id,
+        request_id,
+        "verifying",
+        "Проверяю источники и числовые утверждения.",
+        conversation_id=conversation_id,
+        user_message_id=user_message_id,
+    )
     numeric_check = check_numeric_support(
         answer,
         rag_items=rag_payload.get("items",[]),
@@ -2494,6 +2522,14 @@ async def _build_agent_response(
     update_agent_workflow(
         agent.workflow_id,
         result={"last_response": response},
+    )
+    set_chat_progress(
+        project_id,
+        request_id,
+        "completed",
+        "Ответ готов.",
+        conversation_id=conversation_id,
+        user_message_id=user_message_id,
     )
     return response
 
@@ -2922,6 +2958,14 @@ async def send_message(request: ChatRequest) -> dict:
             ((existing_workflow or {}).get("result") or {}).get("last_response")
         )
         if cached_response:
+            set_chat_progress(
+                request.project_id,
+                request.request_id,
+                "completed",
+                "Ответ уже был сохранён для этого request_id.",
+                conversation_id=conversation_id,
+                user_message_id=user_message_id,
+            )
             return cached_response
     else:
         try:
@@ -3000,6 +3044,15 @@ async def send_message(request: ChatRequest) -> dict:
         route = replace_route(route, use_documents=True)
     context = recent_messages(conversation_id)
 
+    set_chat_progress(
+        request.project_id,
+        request.request_id,
+        "agent",
+        "Проверяю план и допустимые действия.",
+        conversation_id=conversation_id,
+        user_message_id=user_message_id,
+    )
+
     agent = await run_agent(
         request.project_id,
         conversation_id,
@@ -3010,6 +3063,14 @@ async def send_message(request: ChatRequest) -> dict:
     )
 
     try:
+        set_chat_progress(
+            request.project_id,
+            request.request_id,
+            "retrieving",
+            "Ищу подтверждённый контекст и источники.",
+            conversation_id=conversation_id,
+            user_message_id=user_message_id,
+        )
         return await _build_agent_response(
             project_id=request.project_id,
             conversation_id=conversation_id,
@@ -3024,6 +3085,14 @@ async def send_message(request: ChatRequest) -> dict:
             ui_context=ui_context,
         )
     except ProviderError as exc:
+        set_chat_progress(
+            request.project_id,
+            request.request_id,
+            "error",
+            str(exc),
+            conversation_id=conversation_id,
+            user_message_id=user_message_id,
+        )
         raise HTTPException(
             status_code=503,
             detail={
