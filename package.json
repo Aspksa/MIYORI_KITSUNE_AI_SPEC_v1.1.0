@@ -39,6 +39,7 @@
     "test:chat-feedback": "node scripts/test-chat-feedback.mjs",
     "test:chat-performance": "node scripts/test-chat-performance.mjs",
     "test:document-links": "node scripts/test-document-links.mjs",
-    "test:screen-context": "node scripts/test-screen-context.mjs"
+    "test:screen-context": "node scripts/test-screen-context.mjs",
+    "test:chat-quality": "node scripts/test-chat-quality.mjs"
   }
 }
