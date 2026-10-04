@@ -2861,7 +2861,8 @@ WORKFLOW_STEP_STATUSES = {
 }
 
 TOOL_OPERATION_STATUSES = {
-    "planned", "running", "recovery_required", "executed", "failed", "cancelled",
+    "planned", "running", "verifying", "recovery_required",
+    "executed", "failed", "cancelled",
 }
 
 
