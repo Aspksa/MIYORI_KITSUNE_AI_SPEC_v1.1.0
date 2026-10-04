@@ -8,6 +8,7 @@ export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_HOME_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_BODY_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -501,6 +502,83 @@ export interface NexusHomeCenter {
     parental_rules_require_explicit_binding: true;
     parental_rules_applied_by_server: false;
     device_commands_enabled: false;
+  };
+  generated_at: string;
+}
+
+
+export type NexusBodyState =
+  | "ready"
+  | "working"
+  | "verifying"
+  | "waiting"
+  | "recovery"
+  | "attention"
+  | "degraded";
+
+export type NexusBodyLocalState =
+  | "idle"
+  | "thinking"
+  | "listening"
+  | "transcribing"
+  | "speaking"
+  | "interrupted"
+  | "voice_error";
+
+export interface NexusBodyPresentation {
+  pose: string;
+  expression: string;
+  gesture: string;
+  label: string;
+}
+
+export interface NexusDigitalBody {
+  schema_version: typeof NEXUS_BODY_SCHEMA_VERSION;
+  project: NexusProjectRef;
+  state: NexusBodyState;
+  presentation: NexusBodyPresentation;
+  appearance: {
+    persona_version: string;
+    name: string;
+    nickname: string;
+    age_years: number;
+    is_adult: true;
+    species: string;
+    confirmed: string[];
+    open_for_owner_choice: string[];
+    configuration_state: "appearance_unconfigured" | "canonical_complete";
+    final_portrait_asset: null | string;
+  };
+  runtime: {
+    presence_mode: string;
+    presence_attention: string;
+    headline: string;
+    detail: string;
+    source: "nexus_presence";
+  };
+  local_override_contract: {
+    allowed_states: NexusBodyLocalState[];
+    presentations: Record<string, NexusBodyPresentation>;
+    idle_returns_to_server_state: true;
+    voice_state_source: "miyori:voice-state";
+    thinking_state_source: "miyori:interaction-state";
+  };
+  motion_policy: {
+    random_liveness_allowed: false;
+    timer_idle_animation_allowed: false;
+    sentiment_to_expression_allowed: false;
+    model_authored_motion_allowed: false;
+    state_transition_motion_allowed: true;
+    reduced_motion_must_be_respected: true;
+  };
+  render_policy: {
+    neutral_shell_until_owner_appearance_choice: true;
+    invent_open_appearance_choices_allowed: false;
+    tail_count_may_be_invented: false;
+    hair_color_may_be_invented: false;
+    eye_color_may_be_invented: false;
+    outfit_may_be_invented: false;
+    body_state_source: "presence_plus_explicit_local_runtime";
   };
   generated_at: string;
 }
