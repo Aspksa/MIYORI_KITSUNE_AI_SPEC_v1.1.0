@@ -53,4 +53,18 @@ assert.ok(
   "chat delegation must prefill the existing Agent Workspace without auto-creating or running it",
 );
 
+assert.ok(
+  chat.includes("animate: true") &&
+    core.includes("function chatNearBottom()") &&
+    core.includes('"message-arriving"') &&
+    core.includes('messages.dataset.unreadReply = "true"') &&
+    css.includes("@keyframes miyori-chat-message-arrive") &&
+    css.includes("@media (prefers-reduced-motion: reduce)"),
+  "newly delivered messages must animate quietly, respect reduced motion and preserve reading position",
+);
+assert.ok(
+  !chat.match(/messageFromRecord[\s\S]{0,800}animate\s*:\s*true/),
+  "history hydration must not replay arrival animations",
+);
+
 console.log("Chat composition, offline Markdown and DOMPurify safety OK.");
