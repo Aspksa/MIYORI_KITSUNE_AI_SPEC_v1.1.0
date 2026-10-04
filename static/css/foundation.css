@@ -41,7 +41,7 @@ button { color: inherit; }
 .app-shell {
   height: 100vh;
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr) 360px;
+  grid-template-columns: 272px minmax(0, 1fr);
   background: rgba(9, 11, 16, .84);
 }
 
@@ -629,7 +629,7 @@ body.inspector-hidden .app-shell { grid-template-columns: 272px minmax(0,1fr); }
 body.inspector-hidden .inspector { display: none; }
 
 @media (max-width: 1120px) {
-  .app-shell { grid-template-columns: 240px minmax(0,1fr) 320px; }
+  .app-shell { grid-template-columns: 240px minmax(0,1fr); }
 }
 
 @media (max-width: 920px) {

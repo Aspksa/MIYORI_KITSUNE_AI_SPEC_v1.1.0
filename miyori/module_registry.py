@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.43"
+PROJECT_VERSION = "00.00.44"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "status": "active",
-        "description": "Versioned state/event fabric: реальные состояния, unified event envelope, cursor/resync store, typed UI boundary и accessibility foundation.",
+        "description": "NEXUS Shell: пять стабильных разделов, state-driven navigation, Actions workspace, keyboard/mobile accessibility и совместимость с legacy renderers.",
     },
     "settings": {
         "name": "Настройки",
@@ -138,6 +138,27 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.44",
+        "title": "NEXUS Shell · рабочая оболочка без декоративного футуризма",
+        "summary": "Первый видимый слой MIYORI NEXUS построен поверх уже проверенных state/event contracts: пять стабильных разделов Chat / Actions / Knowledge / Home / System, операционный Actions workspace, реальные status badges, keyboard navigation и responsive shell. Legacy renderers сохранены и используются через совместимый bridge.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.3.0",
+                "changes": [
+                    "Primary navigation сокращена до пяти устойчивых разделов вместо набора равнозначных технических пунктов.",
+                    "Добавлен Actions workspace для pending permissions, active/recovering workflows, фоновых задач и последних NEXUS events.",
+                    "Badges и глобальный status читаются из NexusStore/NEXUS snapshot, а не вычисляются декоративно на клиенте.",
+                    "Старые Documents, Home, Settings, Account, Mobile и Update renderers не переписаны; shell вызывает их через совместимый bridge.",
+                    "Secondary функции перенесены в progressive disclosure «Дополнительно», без удаления старых DOM ids и обработчиков.",
+                    "Добавлена keyboard navigation Arrow/Home/End и mobile horizontal primary nav.",
+                    "NEXUS shell CSS не содержит keyframe-анимаций; состояния передаются текстом, цветом и реальными счётчиками.",
+                    "Frontend CI дополнен отдельным NEXUS shell contract test."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.43",
         "title": "NEXUS State & Event Fabric · единый нервный контур",

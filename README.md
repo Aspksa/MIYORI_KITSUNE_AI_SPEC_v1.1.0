@@ -2,8 +2,38 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.43.**  
+**Внутренняя версия приложения: 00.00.44.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.44
+
+`00.00.44` — **NEXUS Shell · рабочая оболочка без декоративного футуризма**.
+
+После N0/N1 у NEXUS появились стабильные state/event contracts. N2 использует их для первой видимой оболочки, не переписывая рабочие экраны.
+
+Primary navigation теперь состоит из пяти разделов:
+
+- **Чат** — диалог и текущая задача;
+- **Действия** — pending permissions, workflow/recovery, фоновые задачи и event stream;
+- **Знания** — Documents/Drive и рабочие проекты;
+- **Дом** — домашние проекты и Home foundation;
+- **Система** — настройки и системные функции.
+
+Старые экраны Miyori AI, Mobile, Account, Update и другие служебные точки не удалены: они находятся в progressive disclosure **«Дополнительно»** и используют прежние DOM ids/renderer-функции.
+
+Actions workspace не является декоративным dashboard. Он читает реальные `permissions / workflows / tasks / nexus/events`, а кнопки подтверждения, восстановления и отмены используют существующие API и permission/recovery contracts.
+
+Дополнительно:
+
+- глобальный NEXUS status и navigation badges обновляются из `NexusStore`;
+- project switch автоматически переподключает store;
+- при новых событиях authoritative state пересинхронизируется с NEXUS snapshot;
+- primary navigation поддерживает Arrow keys, Home/End и корректный `aria-current`;
+- на мобильном primary navigation становится компактной горизонтальной группой;
+- NEXUS CSS не содержит `@keyframes`: shell не изображает «работу», если runtime её не подтверждает;
+- исправлены буквальные escaped-newline артефакты в HTML-шаблоне;
+- удалена историческая третья колонка базового layout, оставшаяся после переноса inspector в chat console;
+- frontend CI получил отдельный shell contract.
 
 ## Состояние релиза 00.00.43
 
@@ -259,7 +289,7 @@ CSS загружается в фиксированном cascade-порядке:
 
 С `00.00.42` рядом с legacy runtime существует отдельный NEXUS island:
 
-- `frontend/nexus/*.ts` — TypeScript contracts, API client, accessibility runtime и state store;
+- `frontend/nexus/*.ts` — TypeScript contracts, API client, accessibility runtime, state store и shell controller;
 - `static/js/nexus/*.js` — собранные browser ES modules;
 - `static/css/nexus.css` — только функциональный accessibility/motion layer;
 - `tsconfig.nexus.json` — strict TypeScript contract;
@@ -324,6 +354,7 @@ GitHub Actions запускает полный `unittest`-контур на push
 - сборку NEXUS ES modules;
 - accessibility contract;
 - исполняемый NEXUS state-store contract;
+- NEXUS shell contract: пять разделов, live-status semantics, progressive disclosure, keyboard contract и запрет decorative keyframes;
 - синтаксическую проверку classic JS и NEXUS modules;
 - `git diff --exit-code -- static/js/nexus`, чтобы committed build не расходился с TypeScript source.
 
@@ -364,6 +395,7 @@ Document Intelligence дополнительно проверяет:
 - `00.00.40` — Exhaustive Document Q&A: all-window verification + evidence/locators + question coverage + fingerprint recovery;
 - `00.00.41` — Extraction Integrity: source extraction coverage + Office/PDF completeness manifest + truthful exhaustive coverage;
 - `00.00.42` — NEXUS Foundation: versioned state contract + TypeScript island + typed Generative UI boundary + accessibility/frontend CI;
-- `00.00.43` — NEXUS State & Event Fabric: unified read-only event envelope + cursor/tail + client store + authoritative snapshot resync.
+- `00.00.43` — NEXUS State & Event Fabric: unified read-only event envelope + cursor/tail + client store + authoritative snapshot resync;
+- `00.00.44` — NEXUS Shell: Chat / Actions / Knowledge / Home / System + operational Actions workspace + state-driven badges + keyboard/mobile navigation.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

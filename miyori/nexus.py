@@ -288,6 +288,8 @@ def build_nexus_snapshot(project_id: int) -> dict:
         "verified_memory": len(verified_memory),
         "pending_permissions": len(pending_permissions),
         "active_tasks": len(active_tasks),
+        "active_workflows": len(active_workflows),
+        "recovering_workflows": len(recovering_workflows),
         "failed_tasks": len(failed_tasks),
         "checks_passed": development.get("checks_passed", 0),
         "checks_total": development.get("checks_total", 0),

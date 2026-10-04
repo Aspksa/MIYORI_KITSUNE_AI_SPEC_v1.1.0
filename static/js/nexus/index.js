@@ -1,9 +1,11 @@
 import { installDialogAccessibility, installDisclosureAccessibility } from "./a11y.js";
-const NEXUS_FRONTEND_VERSION = "0.1.0";
+import { installNexusShell } from "./shell.js";
+const NEXUS_FRONTEND_VERSION = "0.3.0";
 function boot() {
     document.documentElement.dataset.nexus = "ready";
     installDialogAccessibility();
     installDisclosureAccessibility();
+    installNexusShell();
     window.dispatchEvent(new CustomEvent("miyori:nexus-ready", {
         detail: { version: NEXUS_FRONTEND_VERSION },
     }));

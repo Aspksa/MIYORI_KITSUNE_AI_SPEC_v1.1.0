@@ -60,6 +60,9 @@ jobs:
       - name: NEXUS state store contract
         run: npm run test:nexus-state
 
+      - name: NEXUS shell contract
+        run: npm run test:nexus-shell
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

@@ -49,7 +49,8 @@ Documents, Home, Voice и будущий Desktop-клиент.
 
 - **N0 / 00.00.42 — завершён.** Versioned snapshot, operational states, TypeScript island, typed UI boundary, accessibility runtime и frontend CI опубликованы без замены legacy UI.
 - **N1 / 00.00.43 — завершён.** Existing audit/workflow/task journals объединены read-only event adapter-ом; добавлены cursor/tail, project isolation и TypeScript NexusStore с authoritative snapshot resync.
-- **N2 — следующий этап.** NEXUS Shell должен использовать уже готовые state/event contracts; до этого визуальные компоненты не получают отдельной локальной модели истины.
+- **N2 / 00.00.44 — завершён.** Введён совместимый NEXUS Shell с пятью primary-разделами, state-driven badges, Actions workspace, keyboard/mobile navigation и progressive disclosure legacy-функций.
+- **N3 — следующий этап.** Agents & Actions: typed previews/results, permission-aware action center, более детальные progress/evidence surfaces без дублирования workflow state.
 
 ## Поэтапный план
 
