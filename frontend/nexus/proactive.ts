@@ -150,6 +150,7 @@ export function renderNexusProactivePage(
         try {
           const next = await snoozeNexusProactive(projectId, signal, 60);
           renderNexusProactivePage(host, next);
+          window.dispatchEvent(new CustomEvent("miyori:proactive-decision"));
         } catch {
           later.disabled = false;
         }
@@ -169,6 +170,7 @@ export function renderNexusProactivePage(
         try {
           const next = await dismissNexusProactive(projectId, signal);
           renderNexusProactivePage(host, next);
+          window.dispatchEvent(new CustomEvent("miyori:proactive-decision"));
         } catch {
           dismiss.disabled = false;
         }
@@ -192,6 +194,22 @@ export function installNexusProactive(): () => void {
   let stopped = false;
   let generation = 0;
   let lastFingerprint = "";
+  let wakeTimer: number | null = null;
+
+  const scheduleWakeup = (page: NexusProactivePage): void => {
+    if (wakeTimer !== null) {
+      window.clearTimeout(wakeTimer);
+      wakeTimer = null;
+    }
+    if (!page.next_wakeup_at) return;
+    const wakeAt = Date.parse(page.next_wakeup_at);
+    if (!Number.isFinite(wakeAt)) return;
+    const delay = Math.max(0, wakeAt - Date.now());
+    wakeTimer = window.setTimeout(() => {
+      wakeTimer = null;
+      void refresh();
+    }, Math.min(delay, 2_147_483_647));
+  };
 
   const refresh = async (): Promise<void> => {
     if (stopped) return;
@@ -207,6 +225,7 @@ export function installNexusProactive(): () => void {
       const page = await fetchNexusProactive(projectId);
       if (!stopped && currentGeneration === generation) {
         renderNexusProactivePage(host, page);
+        scheduleWakeup(page);
       }
     } catch {
       if (currentGeneration === generation) {
@@ -238,14 +257,21 @@ export function installNexusProactive(): () => void {
     void refresh();
   };
 
+  const onDecision = (): void => {
+    void refresh();
+  };
+
   window.addEventListener("miyori:nexus-snapshot", onSnapshot);
   window.addEventListener("miyori:nexus-view", onView);
+  window.addEventListener("miyori:proactive-decision", onDecision);
 
   return () => {
     stopped = true;
     generation += 1;
+    if (wakeTimer !== null) window.clearTimeout(wakeTimer);
     setVisibilityState(false);
     window.removeEventListener("miyori:nexus-snapshot", onSnapshot);
     window.removeEventListener("miyori:nexus-view", onView);
+    window.removeEventListener("miyori:proactive-decision", onDecision);
   };
 }
