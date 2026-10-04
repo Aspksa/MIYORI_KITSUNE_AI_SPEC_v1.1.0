@@ -417,8 +417,10 @@ def record_home_heartbeat(
             "SELECT * FROM home_device_runtime WHERE device_id = ?",
             (device_id,),
         ).fetchone()
-    if not row or row["link_status"] != "linked" or not row["identity_hash"]:
-        raise ValueError("Устройство не имеет активной Home-привязки.")
+    if not row:
+        raise ValueError("Устройство ещё не имеет Home identity.")
+    if row["link_status"] != "linked" or not row["identity_hash"]:
+        raise PermissionError("Home identity устройства отозвана; требуется новая привязка.")
     if not secrets.compare_digest(str(row["identity_hash"]), _credential_hash(credential)):
         raise PermissionError("Heartbeat credential не соответствует устройству.")
 
