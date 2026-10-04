@@ -553,13 +553,15 @@ function nexusKnowledgeMemoryMarkup(item) {
   if (item.actions?.verify) {
     actions.push(
       '<button type="button" class="knowledge-action-button" data-knowledge-memory="' +
-      item.id + '" data-memory-status="verified">Подтвердить</button>'
+      item.id + '" data-memory-project="' + Number(item.actions?.project_id || 0) +
+      '" data-memory-status="verified">Подтвердить</button>'
     );
   }
   if (item.actions?.dispute) {
     actions.push(
       '<button type="button" class="knowledge-action-button quiet" data-knowledge-memory="' +
-      item.id + '" data-memory-status="disputed">Оспорить</button>'
+      item.id + '" data-memory-project="' + Number(item.actions?.project_id || 0) +
+      '" data-memory-status="disputed">Оспорить</button>'
     );
   }
 
@@ -853,7 +855,8 @@ async function renderNexusKnowledgeWorkspace() {
         button.disabled = true;
         try {
           await api(
-            "/api/projects/" + state.projectId + "/memory/" + button.dataset.knowledgeMemory,
+            "/api/projects/" + Number(button.dataset.memoryProject || state.projectId) +
+              "/memory/" + button.dataset.knowledgeMemory,
             {
               method: "PATCH",
               headers: {"Content-Type": "application/json"},
