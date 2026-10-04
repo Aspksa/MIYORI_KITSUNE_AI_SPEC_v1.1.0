@@ -59,7 +59,9 @@ export function installNexusVoice() {
         button.title =
             next === "listening"
                 ? "Остановить прослушивание"
-                : "Голосовой ввод";
+                : next === "speaking"
+                    ? "Прервать ответ и говорить"
+                    : "Голосовой ввод";
         if (options.transcript !== undefined) {
             transcript.textContent = options.transcript || "Скажите фразу…";
         }
