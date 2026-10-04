@@ -401,6 +401,7 @@ function mapVoiceState(value: string): NexusBodyLocalState {
 export function installNexusDigitalBody(): () => void {
   const host = document.getElementById("nexusBodyHost");
   if (!host) return () => undefined;
+  const bodyHost: HTMLElement = host;
 
   let stopped = false;
   let generation = 0;
@@ -429,7 +430,7 @@ export function installNexusDigitalBody(): () => void {
     const projectId = currentProjectId();
     if (!projectId) {
       body = null;
-      renderBody(host, body, voiceState, interactionState, actions);
+      renderBody(bodyHost, body, voiceState, interactionState, actions);
       return;
     }
     const currentGeneration = ++generation;
@@ -437,12 +438,12 @@ export function installNexusDigitalBody(): () => void {
       const next = await fetchNexusBody(projectId);
       if (!stopped && currentGeneration === generation) {
         body = next;
-        renderBody(host, body, voiceState, interactionState, actions);
+        renderBody(bodyHost, body, voiceState, interactionState, actions);
       }
     } catch {
       if (currentGeneration === generation) {
         body = null;
-        renderBody(host, body, voiceState, interactionState, actions);
+        renderBody(bodyHost, body, voiceState, interactionState, actions);
       }
     }
   }
@@ -469,17 +470,17 @@ export function installNexusDigitalBody(): () => void {
     if (!(event instanceof CustomEvent)) return;
     interactionState =
       event.detail?.state === "thinking" ? "thinking" : "idle";
-    renderBody(host, body, voiceState, interactionState, actions);
+    renderBody(bodyHost, body, voiceState, interactionState, actions);
   };
 
   const onVoice = (event: Event): void => {
     if (!(event instanceof CustomEvent)) return;
     voiceState = mapVoiceState(String(event.detail?.state || "idle"));
-    renderBody(host, body, voiceState, interactionState, actions);
+    renderBody(bodyHost, body, voiceState, interactionState, actions);
   };
 
   const onView = (): void => {
-    renderBody(host, body, voiceState, interactionState, actions);
+    renderBody(bodyHost, body, voiceState, interactionState, actions);
   };
 
   window.addEventListener("miyori:nexus-snapshot", onSnapshot);
