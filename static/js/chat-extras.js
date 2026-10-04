@@ -395,7 +395,13 @@
         list.appendChild(make("p", "conversation-empty", "Сохранённых ответов пока нет"));
       }
       for (const item of data.bookmarks || []) {
-        const button = make("button", "saved-answer-row", item.conversation_title + " · " + item.preview);
+        const tagText = Array.isArray(item.tags) && item.tags.length
+          ? " · " + item.tags.map(tag => "#" + tag).join(" ")
+          : "";
+        const button = make(
+          "button", "saved-answer-row",
+          item.conversation_title + " · " + item.preview + tagText
+        );
         button.type = "button";
         button.onclick = () => openConversation(item.conversation_id, item.id);
         list.appendChild(button);
