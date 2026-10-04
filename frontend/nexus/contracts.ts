@@ -8,7 +8,8 @@ export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_HOME_SCHEMA_VERSION = "1.0.0" as const;
-export const NEXUS_BODY_SCHEMA_VERSION = "1.1.0" as const;
+export const NEXUS_BODY_SCHEMA_VERSION = "1.2.0" as const;
+export const BODY_RENDERER_SCHEMA_VERSION = "1.0.0" as const;
 export const MIYORI_APPEARANCE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
@@ -583,6 +584,55 @@ export interface MiyoriAppearanceProfile {
   updated_at: string | null;
 }
 
+export type NexusBodyRendererAdapterId =
+  | "neutral_shell"
+  | "static_portrait";
+
+export interface NexusBodyRendererAdapter {
+  id: NexusBodyRendererAdapterId;
+  label: string;
+  installed: true;
+  dynamic: false;
+  requires_asset_kind: "static_portrait" | null;
+  supports: {
+    pose: boolean;
+    expression: boolean;
+    gesture: boolean;
+  };
+  semantics: string;
+}
+
+export interface NexusBodyRendererContract {
+  schema_version: typeof BODY_RENDERER_SCHEMA_VERSION;
+  selected_adapter: NexusBodyRendererAdapterId;
+  selected_dynamic: false;
+  trusted_adapters: NexusBodyRendererAdapter[];
+  presentation_channels: {
+    pose: "body.presentation.pose";
+    expression: "body.presentation.expression";
+    gesture: "body.presentation.gesture";
+    state: "body.state_or_explicit_local_runtime";
+  };
+  dynamic_extension: {
+    status: "not_installed";
+    adapter_contract_required: true;
+    must_be_trusted_registry_entry: true;
+    must_consume_existing_presentation_channels: true;
+    may_invent_owner_appearance_choices: false;
+    may_execute_asset_javascript: false;
+    may_override_operational_state: false;
+  };
+  policy: {
+    trusted_registry_only: true;
+    arbitrary_renderer_module_allowed: false;
+    asset_authored_javascript_allowed: false;
+    model_select_adapter_allowed: false;
+    unknown_adapter_fallback: "neutral_shell";
+    static_portrait_is_dynamic: false;
+    dynamic_renderer_claim_requires_installed_adapter: true;
+  };
+}
+
 export interface NexusDigitalBody {
   schema_version: typeof NEXUS_BODY_SCHEMA_VERSION;
   project: NexusProjectRef;
@@ -604,6 +654,7 @@ export interface NexusDigitalBody {
     appearance_profile_schema_version: typeof MIYORI_APPEARANCE_SCHEMA_VERSION;
     appearance_revision: number;
   };
+  renderer: NexusBodyRendererContract;
   runtime: {
     presence_mode: string;
     presence_attention: string;
