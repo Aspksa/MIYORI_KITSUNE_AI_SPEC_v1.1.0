@@ -1,7 +1,7 @@
 {
   "name": "miyori-nexus-frontend",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -16,6 +16,7 @@
     "test:nexus-state": "node scripts/test-nexus-state.mjs",
     "test:nexus-shell": "node scripts/test-nexus-shell.mjs",
     "test:nexus-knowledge": "node scripts/test-nexus-knowledge.mjs",
-    "test:nexus-surfaces": "node scripts/test-nexus-surfaces.mjs"
+    "test:nexus-surfaces": "node scripts/test-nexus-surfaces.mjs",
+    "test:nexus-presence": "node scripts/test-nexus-presence.mjs"
   }
 }

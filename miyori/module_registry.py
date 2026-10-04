@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.48"
+PROJECT_VERSION = "00.00.49"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.6.0",
+        "version": "0.7.0",
         "status": "active",
-        "description": "NEXUS Generative UI: trusted versioned surfaces, закрытый component registry, safe DOM renderer и quiet contextual shelf поверх Actions/Knowledge.",
+        "description": "NEXUS Living Presence: authoritative runtime presence поверх Actions/Knowledge/Event Fabric и реального chat interaction state; idle остаётся тихим.",
     },
     "settings": {
         "name": "Настройки",
@@ -144,6 +144,44 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.49",
+        "title": "NEXUS Living Presence · реальное состояние без симуляции",
+        "summary": "N9 добавляет versioned Living Presence поверх snapshot/actions/events и реального chat request state. Idle скрыт, activity не симулируется, а waiting/verifying/recovery/error показываются только из фактических runtime states.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.7.0",
+                "changes": [
+                    "Добавлен /api/projects/{project_id}/nexus/presence.",
+                    "Presence различает working, verifying, waiting, recovery, attention и degraded по реальному runtime state.",
+                    "Chat request lifecycle публикует interaction-state вместо декоративного thinking timer.",
+                    "Ready Presence скрывается и не создаёт постоянный визуальный шум.",
+                    "Knowledge attention не меняет primary Presence, а остаётся фоновым сигналом.",
+                    "Случайная/таймерная анимация запрещена source contract и UI contract tests."
+                ],
+            },
+        ],
+    },
+    {
+        "version": "00.00.49",
+        "title": "NEXUS Living Presence · реальная активность без имитации",
+        "summary": "N9 вводит versioned presence contract и компактный event-driven UI: Miyori показывает работу, ожидание, recovery или attention только при наличии реального runtime/event source.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.7.0",
+                "changes": [
+                    "Добавлен /api/projects/{project_id}/nexus/presence с authoritative source contract.",
+                    "Presence modes derived из Actions, Knowledge, failed tasks и Event Fabric.",
+                    "Chat публикует thinking только пока фактически выполняется отправленный запрос.",
+                    "Ready/idle полностью скрывается, чтобы не создавать постоянный визуальный шум.",
+                    "Presence navigation ведёт в Actions/Knowledge/System по типу реальной причины.",
+                    "Random liveness, timer animation и декоративная симуляция активности запрещены."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.48",
         "title": "NEXUS Generative UI · trusted surfaces",

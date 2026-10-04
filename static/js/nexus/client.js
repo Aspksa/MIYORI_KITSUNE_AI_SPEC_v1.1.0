@@ -1,4 +1,4 @@
-import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
+import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
 function validateProjectId(projectId) {
     if (!Number.isInteger(projectId) || projectId <= 0) {
         throw new Error("Некорректный projectId для MIYORI NEXUS.");
@@ -128,6 +128,21 @@ export async function fetchNexusSurfaces(projectId, options = {}) {
         payload.registry?.script_allowed !== false ||
         payload.registry?.unknown_components_rejected !== true) {
         throw new Error("NEXUS surfaces API нарушил trusted component contract.");
+    }
+    return payload;
+}
+export async function fetchNexusPresence(projectId) {
+    validateProjectId(projectId);
+    const response = await fetch(`/api/projects/${projectId}/nexus/presence`, { headers: { Accept: "application/json" } });
+    if (!response.ok) {
+        throw new Error(`NEXUS presence API: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    if (payload.schema_version !== NEXUS_PRESENCE_SCHEMA_VERSION ||
+        payload.source_contract?.authoritative !== true ||
+        payload.source_contract?.random_liveness_allowed !== false ||
+        payload.source_contract?.decorative_activity_allowed !== false) {
+        throw new Error("NEXUS presence API нарушил authoritative state contract.");
     }
     return payload;
 }

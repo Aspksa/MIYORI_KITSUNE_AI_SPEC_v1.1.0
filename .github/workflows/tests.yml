@@ -69,6 +69,9 @@ jobs:
       - name: NEXUS Generative UI contract
         run: npm run test:nexus-surfaces
 
+      - name: NEXUS Living Presence contract
+        run: npm run test:nexus-presence
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

@@ -2,8 +2,46 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.48.**  
+**Внутренняя версия приложения: 00.00.49.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.49
+
+`00.00.49` — **NEXUS Living Presence · жизнь только из реального состояния**.
+
+N9 добавляет спокойный presence layer, который не симулирует «характер» случайными эффектами:
+
+- `/api/projects/{id}/nexus/presence` формирует versioned authoritative presence contract;
+- режимы ограничены `ready / working / waiting / attention / recovery / degraded`;
+- приоритет recovery/waiting/error определяется реальным Actions state;
+- knowledge attention и failed tasks участвуют как реальные причины состояния;
+- last event берётся из существующего NEXUS Event Fabric;
+- frontend получает реальный локальный `miyori:interaction-state` только на время фактически отправленного chat-request;
+- idle/ready не занимает экран: presence host скрыт;
+- нет `Math.random`, timer-driven «дыхания», `setInterval` или keyframe-анимации;
+- высокий attention может раскрыть последнее подтверждённое событие;
+- contextual button ведёт в Actions, Knowledge или System в зависимости от фактической причины;
+- Presence capability опубликован в NEXUS snapshot с запретом random liveness.
+
+Такой контракт готов к будущим Voice/Desktop/Avatar: визуальное или голосовое поведение сможет подписываться на те же состояния, не изобретая собственную «эмоцию».
+
+## Состояние релиза 00.00.49
+
+`00.00.49` — **NEXUS Living Presence · живое состояние без симуляции жизни**.
+
+N9 делает состояние Miyori заметным только тогда, когда это действительно полезно:
+
+- `/api/projects/{id}/nexus/presence` выводит presence из NEXUS snapshot, Actions и Event Fabric;
+- реальные режимы: ready / working / verifying / waiting / recovery / attention / degraded;
+- Chat публикует локальный interaction-state только во время фактически отправленного запроса;
+- ready-state визуально скрыт: интерфейс не занимает место, когда ничего не происходит;
+- Knowledge attention учитывается в activity/reasons, но не перехватывает primary presence;
+- waiting/recovery/error имеют приоритет над обычной работой;
+- verifying является отдельным состоянием только когда tool operation реально находится в verifying;
+- случайная анимация, timer-driven «жизнь» и декоративная активность запрещены контрактом;
+- Presence показывается только в Chat; Actions/Knowledge/System остаются рабочими поверхностями;
+- high-attention состояние может раскрыть последнее подтверждённое событие;
+- UI не использует keyframe-анимаций.
 
 ## Состояние релиза 00.00.48
 
