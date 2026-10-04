@@ -322,13 +322,14 @@ form.addEventListener("submit", async (event) => {
     pending.projectId === state.projectId &&
     pending.text === text &&
     pending.readOnly === readOnly &&
+    pending.conversationId === state.conversationId &&
     JSON.stringify(pending.attachment_ids) === JSON.stringify(attachment_ids);
   const requestId = reuse ? pending.requestId :
     (window.crypto?.randomUUID?.() ||
       (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)));
   state.pendingRequest = {
-    requestId, projectId:state.projectId, text, readOnly,
-    attachment_ids:[...attachment_ids],
+    requestId, projectId:state.projectId, conversationId:state.conversationId,
+    text, readOnly, attachment_ids:[...attachment_ids],
   };
   state.lastRequestId = requestId;
 
@@ -347,7 +348,11 @@ form.addEventListener("submit", async (event) => {
     });
     const data = await response.json();
     if (!response.ok) {
-      if (data?.detail?.conversation_id) state.conversationId = data.detail.conversation_id;
+      if (data?.detail?.conversation_id) {
+        state.conversationId = data.detail.conversation_id;
+        if (state.pendingRequest)
+          state.pendingRequest.conversationId = state.conversationId;
+      }
       const detail = data?.detail?.message || data?.detail || "Ошибка запроса.";
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
