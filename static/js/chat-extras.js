@@ -254,6 +254,83 @@
     }
   }
 
+  function showCorrectionEditor(row) {
+    const bubble=row.querySelector(".bubble");
+    const messageId=Number(row.dataset.messageId);
+    const projectId=Number(state.projectId);
+    const conversationId=Number(state.conversationId);
+    if(!bubble || !messageId || !projectId || !conversationId || state.busy) {
+      showError("Дождитесь сохранения ответа перед исправлением.");
+      return;
+    }
+    let editor=bubble.querySelector(".chat-correction-editor");
+    if(editor) {
+      editor.hidden=!editor.hidden;
+      if(!editor.hidden)editor.querySelector("textarea")?.focus();
+      return;
+    }
+    editor=document.createElement("form");
+    editor.className="chat-correction-editor";
+    editor.setAttribute("aria-label","Уточнить ответ Миёри");
+    const label=document.createElement("label");
+    label.textContent="Как правильно? Миёри учтёт поправку в этом проекте.";
+    const textarea=document.createElement("textarea");
+    textarea.rows=3;
+    textarea.required=true;
+    textarea.maxLength=2000;
+    textarea.placeholder="Укажите ошибку и верные сведения…";
+    const buttons=document.createElement("div");
+    buttons.className="chat-correction-actions";
+    const cancel=document.createElement("button");
+    cancel.type="button";cancel.textContent="Отмена";
+    cancel.onclick=()=>{editor.hidden=true;};
+    const save=document.createElement("button");
+    save.type="submit";save.textContent="Сохранить исправление";
+    buttons.append(cancel,save);
+    editor.append(label,textarea,buttons);
+    bubble.appendChild(editor);
+    textarea.focus();
+    editor.addEventListener("keydown",e=>{
+      if(e.key==="Escape") {
+        e.stopPropagation();
+        editor.hidden=true;
+      }
+    });
+    editor.addEventListener("submit",async e=>{
+      e.preventDefault();
+      const correction=textarea.value.trim();
+      if(!correction)return;
+      if(Number(state.projectId)!==projectId ||
+         Number(state.conversationId)!==conversationId) {
+        showError("Проект или разговор изменился. Откройте ответ ещё раз.");
+        return;
+      }
+      save.disabled=true;
+      try{
+        await api("/api/projects/"+projectId+"/conversations/"+
+          conversationId+"/messages/"+messageId+"/feedback",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({verdict:"corrected",correction})
+        });
+        editor.hidden=true;
+        let note=bubble.querySelector(".chat-correction-note");
+        if(!note) {
+          note=document.createElement("p");
+          note.className="chat-correction-note";
+          note.setAttribute("role","status");
+          bubble.appendChild(note);
+        }
+        note.textContent="Поправка сохранена для этого проекта. Сведения ещё не проверены по независимым источникам.";
+        textarea.value="";
+      }catch(error) {
+        showError(error.message);
+      }finally{
+        save.disabled=false;
+      }
+    });
+  }
+
   $("messages")?.addEventListener("click", async event => {
     const button = event.target.closest("[data-chat-action]");
     if (!button) return;
@@ -276,6 +353,8 @@
       await forkMessage(row, true);
     } else if (action === "retry") {
       await forkMessage(row, false);
+    } else if (action === "correct") {
+      showCorrectionEditor(row);
     }
   });
 
