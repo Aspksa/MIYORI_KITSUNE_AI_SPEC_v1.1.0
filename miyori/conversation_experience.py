@@ -701,6 +701,11 @@ def pinned_chat_context(
     if not get_conversation(conversation_id, project_id):
         raise LookupError("Разговор не найден.")
     with connect() as db:
+        has_pins = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chat_message_pins'"
+        ).fetchone() is not None
+        if not has_pins:
+            return []
         rows = db.execute(
             """
             SELECT m.id,m.role,m.content,p.created_at
