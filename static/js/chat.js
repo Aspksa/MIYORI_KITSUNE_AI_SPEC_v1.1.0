@@ -442,6 +442,7 @@ projectSelect.addEventListener("change", async () => {
   window.miyoriChatAttachments?.clear();
   state.projectId = Number(projectSelect.value);
   state.conversationId = null;
+  void window.miyoriChatContinuation?.refresh();
   updateProjectLabel();
   showWelcome();
   window.miyoriDrafts?.restore();
@@ -463,6 +464,7 @@ el("addProject").addEventListener("click", async () => {
     });
     state.projectId = data.project.id;
     state.conversationId = null;
+    void window.miyoriChatContinuation?.refresh();
     await loadProjects();
     showWelcome();
     await loadTools();
