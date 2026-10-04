@@ -246,6 +246,18 @@ def voice_note_path(project_id: int, note_id: int) -> tuple[Path, str] | None:
 def delete_voice_note(project_id: int, note_id: int) -> bool:
     init_conversation_experience_db()
     with connect() as db:
+        referenced = db.execute(
+            """
+            SELECT 1 FROM messages m
+            JOIN conversations c ON c.id=m.conversation_id
+            WHERE c.project_id=? AND json_valid(m.metadata_json)
+              AND CAST(json_extract(m.metadata_json,'$.voice_note_id') AS INTEGER)=?
+            LIMIT 1
+            """,
+            (project_id, note_id),
+        ).fetchone()
+        if referenced:
+            return False
         row = db.execute(
             "SELECT stored_path FROM chat_voice_notes WHERE id=? AND project_id=?",
             (note_id, project_id),
