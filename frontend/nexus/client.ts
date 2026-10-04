@@ -423,3 +423,30 @@ export async function cancelNexusAgentWorkspace(
   const payload = (await response.json()) as { workspace?: NexusAgentWorkspace };
   return validateAgentWorkspace(payload.workspace);
 }
+
+export async function fetchNexusHome(
+  projectId: number,
+): Promise<NexusHomeCenter> {
+  validateProjectId(projectId);
+  const response = await fetch(`/api/projects/${projectId}/nexus/home`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`NEXUS Home API: HTTP ${response.status}`);
+  }
+  const payload = (await response.json()) as Partial<NexusHomeCenter>;
+  if (
+    payload.schema_version !== NEXUS_HOME_SCHEMA_VERSION ||
+    !Array.isArray(payload.devices) ||
+    !Array.isArray(payload.parental_profiles) ||
+    payload.policy?.connectivity_source !== "authenticated_heartbeat" ||
+    payload.policy?.legacy_status_is_connectivity_source !== false ||
+    payload.policy?.network_scanning_enabled !== false ||
+    payload.policy?.parental_rules_require_explicit_binding !== true ||
+    payload.policy?.parental_rules_applied_by_server !== false ||
+    payload.policy?.device_commands_enabled !== false
+  ) {
+    throw new Error("NEXUS Home API нарушил device evidence contract.");
+  }
+  return payload as NexusHomeCenter;
+}
