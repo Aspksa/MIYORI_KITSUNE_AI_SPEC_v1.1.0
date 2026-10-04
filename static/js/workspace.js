@@ -78,6 +78,8 @@ function showChatWorkspace() {
 }
 
 function showWorkspaceShell(name, eyebrow, title, subtitle) {
+  // Minimal last-viewed-screen hint, not document content or authorization.
+  window.miyoriScreenContext={module:String(name || "chat")};
   if (chatHeader) chatHeader.hidden = true;
   const bodyHost = el("nexusBodyHost");
   if (bodyHost) bodyHost.dataset.appearanceOpen = "false";

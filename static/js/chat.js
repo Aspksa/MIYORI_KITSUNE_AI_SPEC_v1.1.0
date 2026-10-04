@@ -269,6 +269,7 @@ async function loadMemory() {
 }
 
 function startNewChat() {
+  window.miyoriScreenContext={module:"chat"};
   window.miyoriForkReadOnly = false;
   state.pendingRequest = null;
   window.miyoriDrafts?.save();
@@ -306,6 +307,8 @@ form.addEventListener("submit", async (event) => {
     return;
   }
   const attachment_ids = attachedFiles.map(file => Number(file.id));
+  const ui_context=structuredClone(window.miyoriScreenContext ||
+    {module:"chat"});
   const readOnly = Boolean(window.miyoriForkReadOnly);
   showError("");
   const uploadStatus = el("composerUploadStatus");
@@ -326,13 +329,14 @@ form.addEventListener("submit", async (event) => {
     pending.text === text &&
     pending.readOnly === readOnly &&
     pending.conversationId === state.conversationId &&
-    JSON.stringify(pending.attachment_ids) === JSON.stringify(attachment_ids);
+    JSON.stringify(pending.attachment_ids) === JSON.stringify(attachment_ids) &&
+    JSON.stringify(pending.ui_context) === JSON.stringify(ui_context);
   const requestId = reuse ? pending.requestId :
     (window.crypto?.randomUUID?.() ||
       (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)));
   state.pendingRequest = {
     requestId, projectId:state.projectId, conversationId:state.conversationId,
-    text, readOnly, attachment_ids:[...attachment_ids],
+    text, readOnly, attachment_ids:[...attachment_ids],ui_context,
   };
   state.lastRequestId = requestId;
 
@@ -346,7 +350,7 @@ form.addEventListener("submit", async (event) => {
         conversation_id: state.conversationId,
         request_id: requestId,
         read_only: readOnly,
-        attachment_ids
+        attachment_ids,ui_context
       })
     });
     const data = await response.json();
@@ -454,6 +458,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 projectSelect.addEventListener("change", async () => {
+  window.miyoriScreenContext={module:"chat"};
   window.miyoriForkReadOnly = false;
   state.pendingRequest = null;
   ++conversationOpenToken;

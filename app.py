@@ -27,6 +27,9 @@ from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
 from miyori.document_links import related_documents
+from miyori.screen_context import (
+    normalize_screen_context,resolve_screen_document,
+)
 from miyori.document_comparisons import (
     init_document_comparisons_db,
     enqueue_document_comparison,
@@ -316,7 +319,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.71", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.72", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -343,6 +346,7 @@ class ChatRequest(BaseModel):
     request_id: str | None = Field(default=None, min_length=8, max_length=128)
     attachment_ids: list[int] = Field(default_factory=list, max_length=5)
     read_only: bool = False
+    ui_context: dict = Field(default_factory=dict)
 
 
 class MessageFeedbackRequest(BaseModel):
@@ -588,7 +592,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.71",
+        "version": "00.00.72",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -886,7 +890,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.71",
+        "project_version": "00.00.72",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -2226,6 +2230,7 @@ async def _build_agent_response(
     request_id: str | None = None,
     attachment_ids: list[int] | None = None,
     user_message_id: int | None = None,
+    ui_context: dict | None = None,
 ) -> dict:
     workflow_state = get_agent_workflow(agent.workflow_id, project_id) or {}
     current_step = int(workflow_state.get("current_step") or 0)
@@ -2287,6 +2292,11 @@ async def _build_agent_response(
     attachment_context, attachment_sources = attached_document_context(
         project_id, attachment_ids or []
     )
+    screen_fragments,screen_sources=resolve_screen_document(
+        project_id,text,ui_context or {},
+    )
+    attachment_context.extend(screen_fragments)
+    attachment_sources.extend(screen_sources)
     retrieval_ms = round((perf_counter() - started_retrieval) * 1000)
     history_matches = relevant_history(
         project_id,text,active_conversation_id=conversation_id
@@ -2324,6 +2334,7 @@ async def _build_agent_response(
         history_context=(history_matches or [{"status":"not_found"}])
                         if wants_history(text) else None,
         feedback_context=user_corrections or None,
+        screen_context=ui_context or None,
         brain_plan=brain.plan,
         tool_context=agent.tool_context,
         epistemic_context=epistemic,
@@ -2370,6 +2381,10 @@ async def _build_agent_response(
         "retrieval_ms":retrieval_ms,
         "numeric_check":numeric_check,
         "owner_feedback_count":len(user_corrections),
+        "screen_context":{
+            "module":(ui_context or {}).get("module",""),
+            "document_used":bool(screen_sources),
+        },
         "historical_chat":{
             "requested":wants_history(text),
             "matches":len(history_matches),
@@ -2847,6 +2862,13 @@ async def send_message(request: ChatRequest) -> dict:
     if not get_project(request.project_id):
         raise HTTPException(status_code=404, detail="Проект не найден.")
 
+    # UI hints are never permissions. Document ownership must be checked
+    # even when no document content is loaded.
+    try:
+        ui_context=normalize_screen_context(request.project_id,request.ui_context)
+    except ValueError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
     # Validated before the agent starts, with strict project ownership.
     attachment_ids = request.attachment_ids or []
     try:
@@ -2864,6 +2886,7 @@ async def send_message(request: ChatRequest) -> dict:
             existing_message["content"] != text
             or (existing_message.get("metadata") or {}).get("attachments", []) != attachment_ids
             or bool((existing_message.get("metadata") or {}).get("read_only", False)) != request.read_only
+            or (existing_message.get("metadata") or {}).get("ui_context", {}) != ui_context
         ):
             raise HTTPException(
                 status_code=409,
@@ -2904,7 +2927,11 @@ async def send_message(request: ChatRequest) -> dict:
             "user",
             text,
             client_request_id=request.request_id,
-            metadata={"attachments": attachment_ids, "read_only": request.read_only},
+            metadata={
+                "attachments":attachment_ids,
+                "read_only":request.read_only,
+                "ui_context":ui_context,
+            },
         )
         is_new_message = True
         request_key = (
@@ -2984,6 +3011,7 @@ async def send_message(request: ChatRequest) -> dict:
             request_id=request.request_id,
             attachment_ids=attachment_ids,
             user_message_id=user_message_id,
+            ui_context=ui_context,
         )
     except ProviderError as exc:
         raise HTTPException(
