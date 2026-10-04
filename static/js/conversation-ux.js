@@ -9,6 +9,7 @@
     snapshot: null,
     folder: sessionStorage.getItem("miyori.chat.folder") || "all",
     pendingScheduleId: null,
+    pendingScheduleText: "",
     dueSeen: new Set(),
     recording: null,
     transcript: "",
@@ -373,13 +374,17 @@
     window.setTimeout(() => void markLatestRead(), 450);
   }
 
-  async function afterSend(data) {
+  async function afterSend(data, submittedText = "") {
     clearReply();
     clearVoiceDraft();
     await refreshSnapshot();
-    if (ux.pendingScheduleId) {
+    if (
+      ux.pendingScheduleId &&
+      submittedText.trim() === String(ux.pendingScheduleText || "").trim()
+    ) {
       const scheduleId = ux.pendingScheduleId;
       ux.pendingScheduleId = null;
+      ux.pendingScheduleText = "";
       try {
         await api("/api/projects/" + projectId() + "/chat/schedules/" + scheduleId + "/complete", {
           method:"POST"
@@ -896,6 +901,7 @@
           input.value = item.text;
           input.dispatchEvent(new Event("input",{bubbles:true}));
           ux.pendingScheduleId = Number(item.id);
+          ux.pendingScheduleText = item.text;
           form.requestSubmit();
           break;
         }
@@ -911,6 +917,7 @@
           input.value = item.text;
           input.dispatchEvent(new Event("input",{bubbles:true}));
           ux.pendingScheduleId = Number(item.id);
+          ux.pendingScheduleText = item.text;
           form.requestSubmit();
         };
         card.append(copy,send);
