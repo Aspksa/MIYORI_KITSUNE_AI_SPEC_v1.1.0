@@ -10,10 +10,17 @@ async function loadProjects() {
   if (!state.projectId && data.projects.length) state.projectId = data.projects[0].id;
   projectSelect.value = String(state.projectId);
   updateProjectLabel();
-  await Promise.all([
-    loadConversations(), loadMemory(), loadDocuments(),
-    loadTools(), loadPermissions(), loadAudit(), loadTasks(), loadDevelopment(), loadNexus()
-  ]);
+  // Only conversation navigation and the authoritative NEXUS snapshot block
+  // chat readiness. Legacy panels populate opportunistically afterwards.
+  const selectedProject=Number(state.projectId);
+  await Promise.allSettled([loadConversations(),loadNexus()]);
+  setTimeout(()=>{
+    if(Number(state.projectId)!==selectedProject)return;
+    void Promise.allSettled([
+      loadMemory(),loadDocuments(),loadTools(),loadPermissions(),
+      loadAudit(),loadTasks(),loadDevelopment(),
+    ]);
+  },0);
 }
 
 function updateProjectLabel() {
