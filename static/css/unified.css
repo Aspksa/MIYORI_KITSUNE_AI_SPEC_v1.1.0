@@ -1,0 +1,522 @@
+/* 00.00.59 — Unified Miyori UI foundation.
+   Loaded last on purpose: one visual contract for every module. */
+
+:root {
+  --ui-bg: #f4f2f7;
+  --ui-rail: #fbfafd;
+  --ui-surface: #ffffff;
+  --ui-surface-soft: #faf8fc;
+  --ui-surface-muted: #f6f3f9;
+  --ui-border: #e6e0eb;
+  --ui-border-strong: #d9d0e2;
+  --ui-text: #302936;
+  --ui-text-2: #625a69;
+  --ui-muted: #91899a;
+  --ui-accent: #7958d3;
+  --ui-accent-soft: #f0ebff;
+  --ui-success: #3f9b63;
+  --ui-warning: #a97832;
+  --ui-danger: #b95f65;
+  --ui-radius: 16px;
+  --ui-shadow: 0 10px 30px rgba(58, 46, 69, .07);
+  --ui-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html,
+html[data-theme="system"],
+html[data-theme="light"] {
+  color-scheme: light;
+  background: var(--ui-bg);
+}
+
+html body,
+html[data-theme="system"] body,
+html[data-theme="light"] body {
+  background: var(--ui-bg) !important;
+  color: var(--ui-text) !important;
+  font-family: var(--ui-font);
+}
+
+body {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.app-shell {
+  width: min(1500px, 100vw);
+  height: 100vh;
+  margin: 0 auto;
+  grid-template-columns: 292px minmax(0, 1fr) !important;
+  gap: 12px;
+  padding: 12px;
+  background: var(--ui-bg) !important;
+}
+
+.left-rail {
+  padding: 18px 14px 14px !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 20px;
+  background: var(--ui-rail) !important;
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: none !important;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.brand {
+  padding: 2px 5px 16px !important;
+}
+.brand h1 {
+  color: var(--ui-text) !important;
+  font-size: 18px !important;
+}
+.brand p {
+  color: var(--ui-muted) !important;
+  font-size: 11px !important;
+}
+.version-pill {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-muted) !important;
+}
+
+.nexus-primary-nav {
+  gap: 5px !important;
+}
+.nexus-nav-button {
+  min-height: 54px !important;
+  border-radius: 13px !important;
+  color: var(--ui-text-2) !important;
+}
+.nexus-nav-button:hover {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface-soft) !important;
+}
+.nexus-nav-button.active,
+.nexus-nav-button[aria-current="page"] {
+  border-color: #d9cff0 !important;
+  background: var(--ui-accent-soft) !important;
+  box-shadow: inset 3px 0 var(--ui-accent) !important;
+}
+.nexus-nav-copy strong {
+  color: var(--ui-text) !important;
+  font-size: 13px !important;
+  font-weight: 700;
+}
+.nexus-nav-copy small {
+  color: var(--ui-muted) !important;
+  font-size: 10px !important;
+}
+.nexus-nav-icon {
+  border-color: #e2daf1 !important;
+  background: #f8f5ff !important;
+  color: var(--ui-accent) !important;
+}
+.nexus-nav-meta {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-text-2) !important;
+  font-size: 9px !important;
+}
+.nexus-rail-status,
+.system-status-launcher {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface) !important;
+  box-shadow: none !important;
+}
+.nexus-rail-status strong,
+.system-status-launcher strong {
+  color: var(--ui-text) !important;
+  font-size: 12px !important;
+}
+.nexus-rail-status small,
+.system-status-launcher small {
+  color: var(--ui-muted) !important;
+  font-size: 10px !important;
+}
+.nexus-secondary-details {
+  border-color: var(--ui-border) !important;
+}
+.nexus-secondary-details > summary {
+  color: var(--ui-muted) !important;
+  font-size: 10px !important;
+}
+.nexus-secondary-details .side-menu-copy strong {
+  color: var(--ui-text) !important;
+  font-size: 12px !important;
+}
+.nexus-secondary-details .side-menu-copy small {
+  color: var(--ui-muted) !important;
+  font-size: 10px !important;
+}
+
+.chat-area {
+  min-width: 0;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 20px !important;
+  background: var(--ui-surface) !important;
+  box-shadow: var(--ui-shadow) !important;
+  overflow: hidden;
+}
+
+.chat-header {
+  min-height: 72px !important;
+  padding: 14px max(24px, calc((100% - 900px) / 2)) !important;
+  border-bottom: 1px solid var(--ui-border) !important;
+  background: rgba(255,255,255,.96) !important;
+  backdrop-filter: none !important;
+}
+.chat-title h2 {
+  margin: 0 !important;
+  color: var(--ui-text) !important;
+  font-size: 20px !important;
+  font-weight: 720;
+  letter-spacing: -.02em !important;
+}
+.chat-title .section-caption[hidden] {
+  display: none !important;
+}
+.nexus-header-status {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface-soft) !important;
+}
+.nexus-header-status strong {
+  color: var(--ui-text) !important;
+  font-size: 10px !important;
+}
+.nexus-header-status small {
+  color: var(--ui-muted) !important;
+  font-size: 9px !important;
+}
+
+.messages {
+  min-height: 0;
+  padding: 30px max(28px, calc((100% - 900px) / 2)) 120px !important;
+  background: linear-gradient(180deg, #fff 0%, #fcfbfd 100%) !important;
+}
+.message {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto 18px !important;
+  gap: 11px !important;
+  align-items: flex-start;
+}
+.avatar {
+  width: 36px !important;
+  height: 36px !important;
+  border: 1px solid #e1d9ef !important;
+  background: #f4effd !important;
+  color: var(--ui-accent) !important;
+  font-size: 12px !important;
+  box-shadow: none !important;
+}
+.bubble {
+  max-width: min(680px, calc(100% - 52px)) !important;
+  padding: 13px 16px !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 15px !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-text) !important;
+  box-shadow: 0 5px 18px rgba(65, 52, 76, .05) !important;
+}
+.user .bubble {
+  border-color: #ddd2f3 !important;
+  background: #f3effd !important;
+}
+.bubble strong {
+  color: #6250a7 !important;
+  font-size: 12px !important;
+}
+.bubble p {
+  margin: 5px 0 0;
+  color: var(--ui-text) !important;
+  font-size: 14px !important;
+  line-height: 1.62 !important;
+}
+.welcome-bubble.clean-welcome {
+  max-width: 620px !important;
+}
+.quiet-welcome,
+.living-intent,
+.response-context,
+.activity-card {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface) !important;
+  box-shadow: none !important;
+}
+
+.composer-wrap {
+  padding: 12px max(28px, calc((100% - 900px) / 2)) 18px !important;
+  border-top: 1px solid var(--ui-border) !important;
+  background: rgba(255,255,255,.97) !important;
+  backdrop-filter: none !important;
+}
+.composer {
+  max-width: 900px;
+  min-height: 60px !important;
+  margin: 0 auto;
+  padding: 7px 8px 7px 12px !important;
+  border: 1px solid #dcd3e7 !important;
+  border-radius: 17px !important;
+  background: var(--ui-surface) !important;
+  box-shadow: 0 6px 22px rgba(72, 55, 87, .07) !important;
+}
+.composer textarea {
+  min-height: 46px !important;
+  color: var(--ui-text) !important;
+  font-size: 14px !important;
+}
+.composer textarea::placeholder {
+  color: #a49cab !important;
+}
+.composer-hint {
+  color: #aaa2b2 !important;
+  font-size: 10px !important;
+}
+.send-button {
+  width: 44px !important;
+  height: 44px !important;
+  flex-basis: 44px !important;
+  background: var(--ui-accent) !important;
+  box-shadow: none !important;
+}
+
+.nexus-body-host,
+.nexus-presence-host,
+.nexus-proactive-host,
+.nexus-surface-host {
+  width: min(900px, calc(100% - 56px)) !important;
+}
+.nexus-body-shell {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface-soft) !important;
+  box-shadow: none !important;
+}
+
+/* Workspaces share one width, typography and surface language. */
+.workspace-view {
+  background: var(--ui-surface) !important;
+}
+.workspace-page-header {
+  min-height: 78px !important;
+  padding: 16px max(24px, calc((100% - 1040px) / 2)) !important;
+  border-bottom: 1px solid var(--ui-border) !important;
+  background: var(--ui-surface) !important;
+  backdrop-filter: none !important;
+}
+.workspace-page-header > div {
+  min-width: 0;
+}
+.workspace-page-header .section-caption:empty,
+.workspace-page-header p:empty {
+  display: none !important;
+}
+.workspace-page-header h2 {
+  margin: 0 !important;
+  color: var(--ui-text) !important;
+  font-size: 22px !important;
+  font-weight: 720;
+  letter-spacing: -.02em;
+}
+.workspace-page-header p {
+  max-width: 720px;
+  margin-top: 5px !important;
+  color: var(--ui-muted) !important;
+  font-size: 12px !important;
+  line-height: 1.5;
+}
+.workspace-page-body {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 24px 30px 40px !important;
+}
+.workspace-card,
+.settings-section-card,
+.system-info-grid article,
+.nexus-action-group,
+.nexus-action-metric,
+.nexus-home-section,
+.nexus-home-policy,
+.knowledge-item,
+.knowledge-domain-card,
+.home-module-card,
+.business-list-row,
+.document-folder-card,
+.drive-tile,
+.drive-file-row {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface) !important;
+  box-shadow: none !important;
+}
+.workspace-card,
+.settings-section-card,
+.nexus-action-group,
+.nexus-home-section {
+  border-radius: var(--ui-radius) !important;
+}
+.workspace-card > strong,
+.workspace-card-head strong,
+.settings-section-card > strong,
+.nexus-action-group strong,
+.nexus-home-section strong {
+  color: var(--ui-text) !important;
+}
+.workspace-card small,
+.settings-section-card small,
+.workspace-page-body p,
+.nexus-action-group small,
+.nexus-home-section small {
+  color: var(--ui-muted) !important;
+}
+
+.settings-tabs {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface-soft) !important;
+}
+.settings-tab {
+  color: var(--ui-text-2) !important;
+  font-size: 12px !important;
+}
+.settings-tab.active {
+  background: var(--ui-surface) !important;
+  color: var(--ui-accent) !important;
+}
+.settings-module-version {
+  color: var(--ui-muted) !important;
+}
+input,
+select,
+textarea {
+  border-color: #ddd6e3 !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-text) !important;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #a994df !important;
+  box-shadow: 0 0 0 3px rgba(121,88,211,.09) !important;
+}
+.primary-sheet-button,
+.primary-soft {
+  border-color: transparent !important;
+  background: var(--ui-accent) !important;
+  color: #fff !important;
+}
+.secondary-sheet-button {
+  border-color: var(--ui-border-strong) !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-text-2) !important;
+}
+
+/* Explicit dark mode: every major surface changes together. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --ui-bg: #17151b;
+  --ui-rail: #1d1a22;
+  --ui-surface: #221f27;
+  --ui-surface-soft: #28242e;
+  --ui-surface-muted: #2c2732;
+  --ui-border: #3a3442;
+  --ui-border-strong: #494151;
+  --ui-text: #f0ebf3;
+  --ui-text-2: #c8c0cd;
+  --ui-muted: #918797;
+  --ui-accent-soft: #302846;
+  --ui-shadow: 0 14px 38px rgba(0,0,0,.2);
+}
+html[data-theme="dark"] body,
+html[data-theme="dark"] .app-shell,
+html[data-theme="dark"] .chat-area,
+html[data-theme="dark"] .workspace-view,
+html[data-theme="dark"] .workspace-page-header,
+html[data-theme="dark"] .chat-header,
+html[data-theme="dark"] .composer-wrap {
+  background: var(--ui-bg) !important;
+  color: var(--ui-text) !important;
+}
+html[data-theme="dark"] .left-rail,
+html[data-theme="dark"] .workspace-card,
+html[data-theme="dark"] .settings-section-card,
+html[data-theme="dark"] .system-info-grid article,
+html[data-theme="dark"] .settings-tabs,
+html[data-theme="dark"] .settings-panel,
+html[data-theme="dark"] .account-tab-panel,
+html[data-theme="dark"] .miyori-drive,
+html[data-theme="dark"] .drive-main,
+html[data-theme="dark"] .bubble,
+html[data-theme="dark"] .composer,
+html[data-theme="dark"] .nexus-body-shell,
+html[data-theme="dark"] .nexus-rail-status,
+html[data-theme="dark"] .system-status-launcher {
+  background: var(--ui-surface) !important;
+  border-color: var(--ui-border) !important;
+  color: var(--ui-text) !important;
+}
+html[data-theme="dark"] .messages {
+  background: #1b181f !important;
+}
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+  background: var(--ui-surface-soft) !important;
+  color: var(--ui-text) !important;
+  border-color: var(--ui-border) !important;
+}
+html[data-theme="dark"] strong,
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] .bubble p {
+  color: var(--ui-text) !important;
+}
+
+/* Wide screens should feel like an application, not a stretched web page. */
+@media (min-width: 1501px) {
+  body {
+    background: #ebe8ef !important;
+  }
+  html[data-theme="dark"] body {
+    background: #111014 !important;
+  }
+}
+@media (max-width: 1050px) {
+  .app-shell {
+    width: 100vw;
+    grid-template-columns: 250px minmax(0,1fr) !important;
+    gap: 8px;
+    padding: 8px;
+  }
+  .workspace-page-body {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
+@media (max-width: 700px) {
+  .app-shell {
+    display: block;
+    height: auto;
+    padding: 0;
+  }
+  .left-rail {
+    border-radius: 0;
+    border-left: 0 !important;
+    border-right: 0 !important;
+  }
+  .chat-area {
+    border-radius: 0 !important;
+  }
+  .messages,
+  .chat-header,
+  .composer-wrap {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+  .workspace-page-header {
+    padding: 14px 16px !important;
+  }
+  .workspace-page-body {
+    padding: 16px !important;
+  }
+}

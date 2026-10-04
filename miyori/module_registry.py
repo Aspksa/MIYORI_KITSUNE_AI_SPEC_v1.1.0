@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.58"
+PROJECT_VERSION = "00.00.59"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "1.6.0",
+        "version": "1.6.1",
         "status": "active",
-        "description": "NEXUS Digital Body 1.4: полнофигурный trusted_character_rig, owner Appearance Profile и реальные Presence/Voice state channels.",
+        "description": "NEXUS Digital Body 1.4 и единый UI shell: стабильная навигация, согласованная тема и читаемая ширина рабочих областей.",
     },
     "digital_body": {
         "name": "Digital Body Miyori",
@@ -47,9 +47,9 @@ MODULES = {
     },
     "settings": {
         "name": "Настройки",
-        "version": "0.4.1",
+        "version": "0.5.0",
         "status": "active",
-        "description": "Системные параметры Miyori и состояние локальных компонентов.",
+        "description": "Единый экран настроек Miyori без дублирующей навигации; общая светлая/тёмная визуальная система для всех модулей.",
     },
     "drive": {
         "name": "Документы / Облако / Miyori",
@@ -156,6 +156,33 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.59",
+        "title": "Unified Interface · Chat & Modules",
+        "summary": "Полный UI/UX cleanup по реальному экрану 00.00.58: устранены дубли навигации и технические заголовки, скрыт legacy-блок проекта/разговоров, весь интерфейс переведён на единую типографику, палитру и ограниченную рабочую ширину.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "1.6.1",
+                "changes": [
+                    "Основной shell ограничен 1500 px и больше не растягивается на весь ultra-wide экран.",
+                    "Чат, Digital Body и composer используют согласованную читаемую колонку до 900 px.",
+                    "Действия, Знания, Дом и системные workspace используют единый контейнер до 1100 px.",
+                    "Убраны пользовательские заголовки NEXUS · Agents & Actions, NEXUS · Home и NEXUS · Knowledge."
+                ],
+            },
+            {
+                "key": "settings",
+                "version": "0.5.0",
+                "changes": [
+                    "Оставлен один видимый вход Настройки; старый дублирующий пункт удалён.",
+                    "Заголовок Настройки больше не дублируется подписью Система и общим служебным описанием.",
+                    "Блок Проект и разговоры убран из пользовательского sidebar; внутренние runtime controls сохранены скрыто для совместимости.",
+                    "Светлая тема стала единым foundation; явная тёмная тема теперь перекрашивает основные поверхности согласованно."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.58",
         "title": "Miyori Character Rig · Final Visual Body",

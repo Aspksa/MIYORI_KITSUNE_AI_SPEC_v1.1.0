@@ -85,9 +85,17 @@ function showWorkspaceShell(name, eyebrow, title, subtitle) {
     workspaceView.hidden = false;
     workspaceView.style.display = "grid";
   }
-  workspaceEyebrow.textContent = eyebrow;
+  const cleanEyebrow = String(eyebrow || "").trim();
+  const cleanSubtitle = String(subtitle || "").trim();
+  if (workspaceEyebrow) {
+    workspaceEyebrow.textContent = cleanEyebrow;
+    workspaceEyebrow.hidden = !cleanEyebrow;
+  }
   workspaceTitle.textContent = title;
-  workspaceSubtitle.textContent = subtitle;
+  if (workspaceSubtitle) {
+    workspaceSubtitle.textContent = cleanSubtitle;
+    workspaceSubtitle.hidden = !cleanSubtitle;
+  }
   workspaceBody.innerHTML = '<div class="workspace-loading">Загружаю раздел…</div>';
   setWorkspaceMenuActive(name);
   announceNexusView(NEXUS_VIEW_BY_WORKSPACE[name] || "system");
@@ -312,12 +320,7 @@ function nexusActionCardMarkup(action) {
 }
 
 async function renderNexusActionsWorkspace() {
-  showWorkspaceShell(
-    "actions",
-    "NEXUS · Agents & Actions",
-    "Действия",
-    "План, разрешения, выполнение, проверка, recovery и результат из единого runtime-контракта."
-  );
+  showWorkspaceShell("actions", "", "Действия", "");
 
   try {
     const center = await api(
@@ -354,8 +357,7 @@ async function renderNexusActionsWorkspace() {
     workspaceBody.innerHTML =
       '<section class="nexus-actions-dashboard nexus-actions-v2">' +
         '<div class="nexus-actions-overview">' +
-          '<div><span class="section-caption">N3 · authoritative action state</span>' +
-            '<h3>Agents & Actions</h3>' +
+          '<div><h3>Центр действий</h3>' +
             '<p>Одна карточка соответствует одному реальному workflow, tool operation или background task. ' +
             'Permission внутри workflow не считается отдельным действием.</p></div>' +
           '<div class="nexus-actions-head-controls">' +
@@ -547,18 +549,13 @@ function nexusAgentWorkspaceMarkup(workspace) {
 }
 
 async function renderNexusAgentWorkspace() {
-  showWorkspaceShell(
-    "actions",
-    "NEXUS · Agent Workspace",
-    "Agent Workspace",
-    "Делегирование, dependency graph, budgets, parallel-ready узлы и handoff поверх существующего Workflow Engine."
-  );
+  showWorkspaceShell("actions", "", "Команда агентов", "");
 
   workspaceBody.innerHTML =
     '<section class="agent-workspace-page">' +
       '<header class="agent-workspace-intro">' +
-        '<div><span class="section-caption">N8 · orchestration</span><h3>Команда агентов</h3>' +
-          '<p>Независимые узлы могут работать параллельно. Любой write-tool всё равно проходит через Actions permissions.</p></div>' +
+        '<div><h3>Оркестрация задач</h3>' +
+          '<p>Независимые узлы могут работать параллельно. Зависимости, бюджеты шагов и handoff контролируются сервером; запись требует разрешения.</p></div>' +
         '<button id="agentWorkspaceBack" class="secondary-sheet-button" type="button">← Действия</button>' +
       '</header>' +
       '<form id="agentWorkspaceCreate" class="agent-workspace-create">' +
@@ -779,17 +776,11 @@ function showNexusHomeCredential(deviceName, credential) {
 }
 
 async function renderNexusHomeWorkspace() {
-  showWorkspaceShell(
-    "home",
-    "NEXUS · Home",
-    "Дом",
-    "Identity, authenticated heartbeat, connectivity evidence и безопасная привязка parental rules."
-  );
+  showWorkspaceShell("home", "", "Дом", "");
 
   workspaceBody.innerHTML =
     '<section class="nexus-home-page">' +
-      '<header class="nexus-home-intro"><div><span class="section-caption">N11 · trusted home state</span>' +
-        '<h3>Home Runtime</h3>' +
+      '<header class="nexus-home-intro"><div><h3>Устройства и связи</h3>' +
         '<p>Online определяется только свежим authenticated heartbeat. Legacy status и адрес устройства не являются доказательством связи.</p></div>' +
         '<button id="nexusHomeRefresh" class="secondary-sheet-button" type="button">Обновить</button>' +
       '</header>' +
@@ -1172,19 +1163,13 @@ function nexusKnowledgeClaimMarkup(item) {
 }
 
 async function renderNexusKnowledgeWorkspace() {
-  showWorkspaceShell(
-    "knowledge",
-    "NEXUS · Knowledge",
-    "Знания",
-    "Память, документы и проверяемые утверждения — рядом, но не смешаны."
-  );
+  showWorkspaceShell("knowledge", "", "Знания", "");
 
   workspaceBody.innerHTML =
     '<section class="nexus-knowledge">' +
       '<header class="knowledge-head">' +
-        '<div><span class="section-caption">N4 · Knowledge</span>' +
-          '<h3>Карта знаний проекта</h3>' +
-          '<p>Сначала краткая картина. Provenance, evidence и технические детали раскрываются только по запросу.</p></div>' +
+        '<div><h3>Карта знаний проекта</h3>' +
+          '<p>Память, документы и проверенные знания показаны рядом, но не смешиваются. Детали источников раскрываются по запросу.</p></div>' +
         '<button id="knowledgeOpenDrive" class="secondary-sheet-button" type="button">Открыть файлы</button>' +
       '</header>' +
       '<form id="knowledgeSearchForm" class="knowledge-search" role="search">' +

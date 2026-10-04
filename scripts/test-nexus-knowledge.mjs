@@ -21,7 +21,7 @@ assert.ok(
   "Knowledge navigation must expose the WAI-ARIA tabs structure",
 );
 assert.ok(
-  workspace.includes("Память, документы и проверяемые утверждения — рядом, но не смешаны."),
+  workspace.includes("Память, документы и проверенные знания показаны рядом, но не смешиваются."),
   "Knowledge UI must explain that source domains stay distinct",
 );
 assert.ok(

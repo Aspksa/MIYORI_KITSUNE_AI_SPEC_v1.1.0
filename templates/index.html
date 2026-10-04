@@ -3,16 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b0d12">
+  <meta name="theme-color" content="#f4f2f7">
   <title>Miyori Kitsune AI</title>
-  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.58">
-  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.58">
-  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.58">
-  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.58">
-  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.58">
-  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.58">
-  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.58">
-  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.58">
+  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.59">
+  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.59">
+  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.59">
+  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.59">
+  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.59">
+  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.59">
+  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.59">
+  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.59">
+  <link rel="stylesheet" href="/static/css/unified.css?v=00.00.59">
 </head>
 <body>
   <div class="app-shell">
@@ -22,7 +23,7 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.58</span>
+            <span class="version-pill" id="versionText">00.00.59</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
@@ -51,7 +52,7 @@
         </button>
         <button id="nexusNavSystem" class="nexus-nav-button" data-nexus-view="system" type="button">
           <span class="nexus-nav-icon" aria-hidden="true">⚙</span>
-          <span class="nexus-nav-copy"><strong>Система</strong><small>Настройки · клиенты · обновления</small></span>
+          <span class="nexus-nav-copy"><strong>Настройки</strong><small>Система · клиенты · обновления</small></span>
           <span id="nexusNavSystemMeta" class="nexus-nav-meta">—</span>
         </button>
       </nav>
@@ -85,11 +86,6 @@
             <span class="side-menu-copy"><strong>Личный кабинет</strong><small>Профиль и доступ</small></span>
             <span class="side-menu-chevron">›</span>
           </button>
-          <button class="side-menu-item" id="menuSettings" type="button">
-            <span class="side-menu-icon">⚙</span>
-            <span class="side-menu-copy"><strong>Настройки</strong><small>Миёри и система</small></span>
-            <span class="side-menu-chevron">›</span>
-          </button>
           <button class="side-menu-item" id="menuDocumentsHub" type="button">
             <span class="side-menu-icon">▤</span>
             <span class="side-menu-copy"><strong>Документы / Облако / Miyori</strong><small>Файлы и знания</small></span>
@@ -113,8 +109,7 @@
         </nav>
       </details>
 
-      <details class="workspace-details">
-        <summary>Проект и разговоры</summary>
+      <div class="workspace-details" hidden aria-hidden="true">
         <section class="project-card compact-project">
           <div class="project-row">
             <select id="projectSelect" aria-label="Выбор проекта"></select>
@@ -125,14 +120,14 @@
           <span>Разговоры</span>
         </div>
         <div id="conversationList" class="conversation-list"></div>
-      </details>
+      </div>
     </aside>
 
     <main class="chat-area">
       <header class="chat-header" id="chatHeader">
         <div class="chat-title">
-          <span id="nexusViewEyebrow" class="section-caption">NEXUS · Чат</span>
-          <h2 id="conversationTitle">Miyori Kitsune</h2>
+          <span id="nexusViewEyebrow" class="section-caption" hidden>Чат</span>
+          <h2 id="conversationTitle">Миёри</h2>
         </div>
         <div id="nexusHeaderStatus" class="nexus-header-status" role="status" aria-live="polite">
           <span id="nexusHeaderStateDot" class="nexus-state-dot" data-state="not_connected" aria-hidden="true"></span>
@@ -426,14 +421,14 @@
     </section>
   </div>
 
-  <script src="/static/js/core.js?v=00.00.58"></script>
-  <script src="/static/js/data.js?v=00.00.58"></script>
-  <script src="/static/js/chat.js?v=00.00.58"></script>
-  <script src="/static/js/workspace.js?v=00.00.58"></script>
-  <script src="/static/js/drive.js?v=00.00.58"></script>
-  <script src="/static/js/projects.js?v=00.00.58"></script>
-  <script src="/static/js/settings.js?v=00.00.58"></script>
-  <script src="/static/js/boot.js?v=00.00.58"></script>
-  <script type="module" src="/static/js/nexus/index.js?v=00.00.58"></script>
+  <script src="/static/js/core.js?v=00.00.59"></script>
+  <script src="/static/js/data.js?v=00.00.59"></script>
+  <script src="/static/js/chat.js?v=00.00.59"></script>
+  <script src="/static/js/workspace.js?v=00.00.59"></script>
+  <script src="/static/js/drive.js?v=00.00.59"></script>
+  <script src="/static/js/projects.js?v=00.00.59"></script>
+  <script src="/static/js/settings.js?v=00.00.59"></script>
+  <script src="/static/js/boot.js?v=00.00.59"></script>
+  <script type="module" src="/static/js/nexus/index.js?v=00.00.59"></script>
 </body>
 </html>
