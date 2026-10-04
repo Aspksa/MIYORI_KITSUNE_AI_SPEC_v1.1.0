@@ -128,6 +128,8 @@ form.addEventListener("submit", async (event) => {
   if (!text) return;
 
   showError("");
+  const uploadStatus = el("composerUploadStatus");
+  if (uploadStatus) uploadStatus.textContent = "";
   addMessage("user", text);
   input.value = "";
   input.style.height = "auto";
@@ -272,6 +274,15 @@ if (composerAttach && documentInput) {
   composerAttach.addEventListener("click", () => documentInput.click());
 }
 const chatHistoryButton = el("chatHistoryButton");
+conversationList?.addEventListener("click", (event) => {
+  if (!event.target.closest(".conversation-item")) return;
+  const drawer = document.querySelector(".workspace-details");
+  if (!drawer) return;
+  drawer.hidden = true;
+  drawer.setAttribute("aria-hidden", "true");
+  drawer.classList.remove("history-drawer-open");
+  chatHistoryButton?.setAttribute("aria-expanded", "false");
+});
 if (chatHistoryButton) {
   chatHistoryButton.addEventListener("click", () => {
     const drawer = document.querySelector(".workspace-details");
