@@ -1,0 +1,25 @@
+/* Structured differences stay inside the existing collapsed insight block. */
+.chat-answer-insight-body .chat-review-field {
+  grid-column:1 / -1;
+  background:var(--ui-surface-soft);
+  border-radius:7px;
+  padding:7px 9px;
+  font-size:11px!important;
+  overflow-wrap:anywhere;
+}
+.chat-full-review-button {
+  grid-column:1 / -1;
+  justify-self:start;
+  margin:4px 0 2px;
+  background:transparent;
+  color:var(--ui-accent);
+  border:1px solid var(--ui-border-strong);
+  border-radius:8px;
+  padding:8px 10px;
+  font:600 12px/1.4 inherit;
+  cursor:pointer;
+}
+.chat-full-review-button:hover:not(:disabled) {
+  background:var(--ui-accent-soft);
+}
+.chat-full-review-button:disabled {cursor:default;opacity:.7}
