@@ -75,9 +75,80 @@ function renderTrustedVectorRig(presentation, effectiveState) {
     appendStateMark(portrait);
     return portrait;
 }
+function safeOwnerColor(value) {
+    if (!value || typeof CSS === "undefined" || !CSS.supports("color", value)) {
+        return null;
+    }
+    return value;
+}
+function renderTrustedCharacterRig(body, presentation, effectiveState) {
+    const portrait = basePortrait(presentation, effectiveState);
+    portrait.classList.add("nexus-body-character-rig");
+    const root = rigPart("miyori-character-root");
+    const tails = rigPart("miyori-character-tails");
+    const tailCount = body.appearance.selections.tail_count;
+    if (Number.isInteger(tailCount) && Number(tailCount) > 0) {
+        const capped = Math.min(Number(tailCount), 9);
+        tails.dataset.ownerTailCount = String(tailCount);
+        for (let index = 0; index < capped; index += 1) {
+            const tail = rigPart("miyori-character-tail");
+            const center = (capped - 1) / 2;
+            const angle = (index - center) * 11;
+            tail.style.setProperty("--tail-angle", `${angle}deg`);
+            tails.appendChild(tail);
+        }
+    }
+    else {
+        tails.classList.add("unresolved");
+        tails.appendChild(rigPart("miyori-character-tail-aura"));
+    }
+    const legs = rigPart("miyori-character-legs");
+    legs.append(rigPart("miyori-character-leg left"), rigPart("miyori-character-leg right"));
+    const torso = rigPart("miyori-character-torso");
+    const outfit = rigPart("miyori-character-outfit");
+    if (body.appearance.selections.main_outfit) {
+        outfit.dataset.ownerOutfit = body.appearance.selections.main_outfit;
+    }
+    else {
+        outfit.classList.add("unresolved");
+    }
+    const leftArm = rigPart("miyori-character-arm left");
+    const rightArm = rigPart("miyori-character-arm right");
+    torso.append(outfit, leftArm, rightArm);
+    const head = rigPart("miyori-character-head");
+    const hair = rigPart("miyori-character-hair");
+    const ownerHair = safeOwnerColor(body.appearance.selections.hair_color);
+    if (ownerHair)
+        hair.style.setProperty("--owner-hair-color", ownerHair);
+    else
+        hair.classList.add("neutral-owner-color");
+    const leftEar = rigPart("miyori-character-ear left");
+    const rightEar = rigPart("miyori-character-ear right");
+    const face = rigPart("miyori-character-face");
+    const leftEye = rigPart("miyori-character-eye left");
+    const rightEye = rigPart("miyori-character-eye right");
+    const ownerEyes = safeOwnerColor(body.appearance.selections.eye_color);
+    if (ownerEyes) {
+        leftEye.style.setProperty("--owner-eye-color", ownerEyes);
+        rightEye.style.setProperty("--owner-eye-color", ownerEyes);
+    }
+    else {
+        leftEye.classList.add("neutral-owner-color");
+        rightEye.classList.add("neutral-owner-color");
+    }
+    const mouth = rigPart("miyori-character-mouth");
+    face.append(leftEye, rightEye, mouth);
+    head.append(hair, leftEar, rightEar, face);
+    root.append(tails, legs, torso, head);
+    portrait.appendChild(root);
+    appendStateMark(portrait);
+    return portrait;
+}
 export function renderTrustedBodyVisual(body, presentation, effectiveState) {
     const selectedAdapter = String(body.renderer.selected_adapter);
     switch (selectedAdapter) {
+        case "trusted_character_rig":
+            return renderTrustedCharacterRig(body, presentation, effectiveState);
         case "trusted_vector_rig":
             return renderTrustedVectorRig(presentation, effectiveState);
         case "static_portrait":
