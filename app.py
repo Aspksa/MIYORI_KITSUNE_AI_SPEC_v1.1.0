@@ -176,11 +176,7 @@ from miyori.nexus_actions import build_nexus_action_center
 from miyori.nexus_knowledge import build_nexus_knowledge_center
 from miyori.nexus_surfaces import build_nexus_surfaces
 from miyori.nexus_presence import build_nexus_presence
-from miyori.nexus_proactive import (
-    build_nexus_proactive,
-    init_proactive_db,
-    set_proactive_disposition,
-)
+from miyori.proactive import apply_proactive_decision, build_nexus_proactive
 from miyori.nexus_events import list_nexus_events
 from miyori.system_settings import (
     cleanup_runtime_logs,
@@ -244,7 +240,6 @@ async def lifespan(app: FastAPI):
     recovery_marked = mark_interrupted_runtime_for_recovery()
     recovery_checked = reconcile_recoverable_operations(allow_retry=False)
     init_epistemic_db()
-    init_proactive_db()
     for project in list_projects():
         _sync_project_drive(int(project["id"]))
     init_rag()
@@ -323,10 +318,6 @@ class DocumentQuestionRequest(BaseModel):
 
 class PermissionDecisionRequest(BaseModel):
     approved: bool
-
-
-class ProactiveSnoozeRequest(BaseModel):
-    minutes: int = Field(default=60, ge=15, le=10080)
 
 
 class ClaimCreateRequest(BaseModel):
@@ -1686,51 +1677,6 @@ def project_nexus_proactive_decision(
             decision=request.decision,
             snooze_minutes=request.snooze_minutes,
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.get("/api/projects/{project_id}/nexus/proactive")
-def project_nexus_proactive(project_id: int, limit: int | None = None) -> dict:
-    try:
-        return build_nexus_proactive(project_id, limit=limit)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@app.post("/api/projects/{project_id}/nexus/proactive/{signal_id}/dismiss")
-def project_nexus_proactive_dismiss(project_id: int, signal_id: str) -> dict:
-    try:
-        result = set_proactive_disposition(
-            project_id,
-            signal_id,
-            disposition="dismissed",
-        )
-        return {
-            **result,
-            "proactive": build_nexus_proactive(project_id),
-        }
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post("/api/projects/{project_id}/nexus/proactive/{signal_id}/snooze")
-def project_nexus_proactive_snooze(
-    project_id: int,
-    signal_id: str,
-    request: ProactiveSnoozeRequest,
-) -> dict:
-    try:
-        result = set_proactive_disposition(
-            project_id,
-            signal_id,
-            disposition="snoozed",
-            snooze_minutes=request.minutes,
-        )
-        return {
-            **result,
-            "proactive": build_nexus_proactive(project_id),
-        }
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
