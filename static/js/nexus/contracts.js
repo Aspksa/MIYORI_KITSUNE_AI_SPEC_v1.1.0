@@ -1,5 +1,6 @@
 export const NEXUS_SCHEMA_VERSION = "1.0.0";
 export const NEXUS_EVENT_SCHEMA_VERSION = "1.0.0";
+export const NEXUS_ACTION_SCHEMA_VERSION = "1.0.0";
 export function isNexusOperationalState(value) {
     return [
         "disabled",
@@ -12,4 +13,16 @@ export function isNexusOperationalState(value) {
 }
 export function isNexusEventSeverity(value) {
     return ["info", "success", "warning", "error"].includes(String(value));
+}
+export function isNexusActionState(value) {
+    return [
+        "planned",
+        "waiting_permission",
+        "running",
+        "verifying",
+        "recovery",
+        "completed",
+        "error",
+        "cancelled",
+    ].includes(String(value));
 }

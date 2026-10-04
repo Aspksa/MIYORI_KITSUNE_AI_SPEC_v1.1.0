@@ -1,8 +1,11 @@
 import {
+  NEXUS_ACTION_SCHEMA_VERSION,
   NEXUS_EVENT_SCHEMA_VERSION,
   NEXUS_SCHEMA_VERSION,
+  isNexusActionState,
   isNexusEventSeverity,
   isNexusOperationalState,
+  type NexusActionCenter,
   type NexusEventPage,
   type NexusSnapshot,
 } from "./contracts.js";
@@ -77,4 +80,37 @@ export async function fetchNexusEvents(
     }
   }
   return payload as NexusEventPage;
+}
+
+export async function fetchNexusActions(
+  projectId: number,
+  limit = 60,
+): Promise<NexusActionCenter> {
+  validateProjectId(projectId);
+  const params = new URLSearchParams({ limit: String(limit) });
+  const response = await fetch(
+    `/api/projects/${projectId}/nexus/actions?${params.toString()}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!response.ok) {
+    throw new Error(`NEXUS actions API: HTTP ${response.status}`);
+  }
+
+  const payload = (await response.json()) as Partial<NexusActionCenter>;
+  if (payload.schema_version !== NEXUS_ACTION_SCHEMA_VERSION) {
+    throw new Error("Несовместимая версия NEXUS actions API.");
+  }
+  if (!Array.isArray(payload.actions)) {
+    throw new Error("NEXUS actions API не вернул список действий.");
+  }
+  for (const action of payload.actions) {
+    if (
+      !action ||
+      action.project_id !== projectId ||
+      !isNexusActionState(action.state)
+    ) {
+      throw new Error("NEXUS actions API вернул некорректное действие.");
+    }
+  }
+  return payload as NexusActionCenter;
 }

@@ -86,6 +86,16 @@ class NexusContractTests(unittest.TestCase):
         self.assertEqual(modules["desktop"]["state"], "disabled")
         self.assertEqual(modules["generative_ui"]["state"], "disabled")
 
+    def test_configured_provider_is_ready_without_faking_live_health(self) -> None:
+        object.__setattr__(settings, "cloudru_api_key", "configured-key")
+        object.__setattr__(settings, "cloudru_model_id", "model/test")
+        project = create_project("NEXUS Provider", kind="work")
+        snapshot = build_nexus_snapshot(int(project["id"]))
+        modules = {item["id"]: item for item in snapshot["modules"]}
+        self.assertEqual(modules["ai"]["state"], "ready")
+        self.assertIn("health-check", modules["ai"]["limitation"])
+        self.assertEqual(snapshot["overall_state"], "ready")
+
     def test_home_project_reports_home_capability_ready(self) -> None:
         project = create_project("NEXUS Home", kind="home")
         snapshot = build_nexus_snapshot(int(project["id"]))

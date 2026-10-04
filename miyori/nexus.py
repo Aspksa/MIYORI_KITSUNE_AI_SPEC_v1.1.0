@@ -103,6 +103,23 @@ def build_nexus_snapshot(project_id: int) -> dict:
     recovering_workflows = [
         item for item in workflows if item.get("status") == "recovering"
     ]
+    waiting_workflows = [
+        item for item in workflows if item.get("status") == "waiting_permission"
+    ]
+    standalone_pending_permissions = [
+        item for item in pending_permissions if not item.get("workflow_id")
+    ]
+    active_actions = (
+        len(active_workflows)
+        + len(active_tasks)
+        + len(standalone_pending_permissions)
+    )
+    attention_actions = (
+        len(waiting_workflows)
+        + len(recovering_workflows)
+        + len(standalone_pending_permissions)
+        + len(failed_tasks)
+    )
 
     suggestions = []
     if pending_permissions:
@@ -153,7 +170,7 @@ def build_nexus_snapshot(project_id: int) -> dict:
         _module(
             "ai",
             "ИИ",
-            "degraded" if provider_configured else "not_connected",
+            "ready" if provider_configured else "not_connected",
             operation="configured" if provider_configured else None,
             last_result=(
                 f"Модель настроена: {settings.cloudru_model_id}"
@@ -290,6 +307,8 @@ def build_nexus_snapshot(project_id: int) -> dict:
         "active_tasks": len(active_tasks),
         "active_workflows": len(active_workflows),
         "recovering_workflows": len(recovering_workflows),
+        "active_actions": active_actions,
+        "attention_actions": attention_actions,
         "failed_tasks": len(failed_tasks),
         "checks_passed": development.get("checks_passed", 0),
         "checks_total": development.get("checks_total", 0),

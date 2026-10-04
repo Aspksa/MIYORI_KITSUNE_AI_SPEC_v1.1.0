@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.45"
+PROJECT_VERSION = "00.00.46"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.6.0",
+        "version": "2.7.0",
         "status": "active",
-        "description": "AI Core v2.6: NEXUS state + event fabric поверх persistent workflows, Document Intelligence, проверяемой памяти и безопасных инструментов.",
+        "description": "AI Core v2.7: NEXUS Action Contract поверх persistent workflows, permission/preflight/verification/recovery, Document Intelligence и проверяемой памяти.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "status": "active",
-        "description": "Persistent workflow state, permission continuation, tool operations, background-task recovery, idempotency и audit trail.",
+        "description": "Persistent workflow state, permission continuation, explicit verifying state, tool operations, crash recovery, idempotency и audit trail.",
     },
     "account": {
         "name": "Личный кабинет",
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "status": "active",
-        "description": "NEXUS Shell: пять стабильных разделов, state-driven navigation, Actions workspace, keyboard/mobile accessibility и совместимость с legacy renderers.",
+        "description": "NEXUS Agents & Actions: единый typed action contract, structured previews, progress/evidence/result/history, recovery controls и state-driven shell.",
     },
     "settings": {
         "name": "Настройки",
@@ -144,6 +144,34 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.46",
+        "title": "NEXUS Agents & Actions · рабочий орган управления",
+        "summary": "N3 вводит единый action contract поверх существующего Workflow Engine: workflow, permission, tool operation и background task отображаются без дублирования, с реальными preview, verifying, evidence, recovery, result и history состояниями.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.4.0",
+                "changes": [
+                    "Добавлен versioned /api/projects/{project_id}/nexus/actions как единый read model для Action Center.",
+                    "Permission, принадлежащий workflow, встраивается в карточку workflow и не считается вторым действием.",
+                    "UI различает planned, waiting_permission, running, verifying, recovery, completed, error и cancelled.",
+                    "Preview, preflight/verification evidence, workflow steps, result/error и history идут из persisted runtime state.",
+                    "Actions workspace больше не склеивает пять независимых API-ответов на клиенте.",
+                    "Исправлены двойной action badge и ложное «готово» Chat при degraded/error/not_connected."
+                ],
+            },
+            {
+                "key": "workflow_engine",
+                "version": "1.2.0",
+                "changes": [
+                    "Tool operation получил persisted verifying state.",
+                    "Verification failure переводит операцию в recovery_required вместо зависания.",
+                    "Interrupted verifying operation участвует в startup recovery так же, как running."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.45",
         "title": "Portable Launch Reliability · исправление запуска ZIP",

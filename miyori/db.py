@@ -407,7 +407,8 @@ def init_db() -> None:
                 arguments_json TEXT NOT NULL,
                 preflight_json TEXT NOT NULL DEFAULT '{}',
                 status TEXT NOT NULL CHECK(status IN (
-                    'planned','running','recovery_required','executed','failed','cancelled'
+                    'planned','running','verifying','recovery_required',
+                    'executed','failed','cancelled'
                 )),
                 result_json TEXT,
                 error_json TEXT,
@@ -460,6 +461,75 @@ def init_db() -> None:
             );
             """
         )
+
+        tool_operation_schema = conn.execute(
+            """
+            SELECT sql FROM sqlite_master
+            WHERE type = 'table' AND name = 'tool_operations'
+            """
+        ).fetchone()
+        tool_operation_sql = (
+            str(tool_operation_schema["sql"] or "") if tool_operation_schema else ""
+        )
+        if "'verifying'" not in tool_operation_sql:
+            conn.execute(
+                "ALTER TABLE tool_operations RENAME TO tool_operations_legacy_0046"
+            )
+            conn.execute(
+                """
+                CREATE TABLE tool_operations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    workflow_id INTEGER,
+                    workflow_step_id INTEGER,
+                    permission_request_id INTEGER,
+                    tool_name TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    arguments_json TEXT NOT NULL,
+                    preflight_json TEXT NOT NULL DEFAULT '{}',
+                    status TEXT NOT NULL CHECK(status IN (
+                        'planned','running','verifying','recovery_required',
+                        'executed','failed','cancelled'
+                    )),
+                    result_json TEXT,
+                    error_json TEXT,
+                    attempt_count INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    started_at TEXT,
+                    finished_at TEXT,
+                    UNIQUE(project_id, idempotency_key),
+                    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                    FOREIGN KEY(workflow_id) REFERENCES agent_workflows(id) ON DELETE SET NULL,
+                    FOREIGN KEY(workflow_step_id) REFERENCES workflow_steps(id) ON DELETE SET NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO tool_operations(
+                    id, project_id, workflow_id, workflow_step_id,
+                    permission_request_id, tool_name, idempotency_key,
+                    arguments_json, preflight_json, status,
+                    result_json, error_json, attempt_count,
+                    created_at, updated_at, started_at, finished_at
+                )
+                SELECT
+                    id, project_id, workflow_id, workflow_step_id,
+                    permission_request_id, tool_name, idempotency_key,
+                    arguments_json, preflight_json, status,
+                    result_json, error_json, attempt_count,
+                    created_at, updated_at, started_at, finished_at
+                FROM tool_operations_legacy_0046
+                """
+            )
+            conn.execute("DROP TABLE tool_operations_legacy_0046")
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_tool_operations_recovery
+                ON tool_operations(project_id, status, id DESC)
+                """
+            )
 
         columns = {
             row["name"]
@@ -2861,7 +2931,8 @@ WORKFLOW_STEP_STATUSES = {
 }
 
 TOOL_OPERATION_STATUSES = {
-    "planned", "running", "recovery_required", "executed", "failed", "cancelled",
+    "planned", "running", "verifying", "recovery_required",
+    "executed", "failed", "cancelled",
 }
 
 
@@ -3376,7 +3447,7 @@ def update_tool_operation(
 
 def list_recoverable_tool_operations(project_id: int | None = None) -> list[dict]:
     params: list[object] = []
-    where = "WHERE status IN ('running','recovery_required')"
+    where = "WHERE status IN ('running','verifying','recovery_required')"
     if project_id is not None:
         where += " AND project_id = ?"
         params.append(project_id)
@@ -3428,7 +3499,7 @@ def mark_interrupted_runtime_for_recovery() -> dict:
             """
             UPDATE tool_operations
             SET status = 'recovery_required', updated_at = ?
-            WHERE status = 'running'
+            WHERE status IN ('running','verifying')
             """,
             (now,),
         ).rowcount

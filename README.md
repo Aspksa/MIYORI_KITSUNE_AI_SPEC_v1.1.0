@@ -2,8 +2,26 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.45.**  
+**Внутренняя версия приложения: 00.00.46.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.46
+
+`00.00.46` — **NEXUS Agents & Actions · рабочий орган управления**.
+
+N3 переводит Actions из агрегированного dashboard в единый authoritative action contract:
+
+- один workflow отображается одной карточкой; связанный permission не дублирует действие;
+- состояния нормализованы как `planned / waiting_permission / running / verifying / recovery / completed / error / cancelled`;
+- preview показывается до подтверждения write-действия;
+- preflight и verification фиксируются как evidence из реального tool pipeline;
+- progress для workflow показывает фактический текущий шаг, завершённые шаги и бюджет, без выдуманного процента;
+- result/error и история workflow/task/audit остаются доступны после завершения;
+- recovery использует существующие workflow/recovery endpoints, новый engine не создавался;
+- состояние `verifying` сохраняется в tool operation и переводится в recovery после аварийного рестарта;
+- Action Center читает один `/api/projects/{id}/nexus/actions` вместо ручного объединения пяти независимых запросов;
+- исправлена семантика NEXUS badges: permission внутри workflow больше не считается дважды, Chat не показывает «готово» при error/degraded/not_connected;
+- настроенный AI считается готовым по конфигурации, а отсутствие live health-check явно остаётся limitation, а не ложной деградацией.
 
 ## Состояние релиза 00.00.45
 

@@ -1218,7 +1218,54 @@ def _execute_write_operation(
         }
 
     if spec.verify_handler:
-        verification = _verify_operation(spec, operation)
+        update_tool_operation(
+            int(operation["id"]),
+            status="verifying",
+            error=None,
+            mark_started=True,
+        )
+        try:
+            verification = _verify_operation(spec, operation)
+        except Exception as exc:
+            update_tool_operation(
+                int(operation["id"]),
+                status="recovery_required",
+                error={
+                    "type": exc.__class__.__name__,
+                    "message": str(exc),
+                    "phase": "verification",
+                },
+            )
+            record_audit_event(
+                project_id,
+                "system",
+                "tool.verification_failed",
+                f"Ошибка проверки состояния перед выполнением {spec.name}.",
+                conversation_id=conversation_id,
+                workflow_id=operation.get("workflow_id"),
+                entity_type="tool_operation",
+                entity_id=operation["id"],
+                details={"tool": spec.name, "error": str(exc)},
+            )
+            raise RuntimeError(
+                "Не удалось безопасно проверить состояние операции; требуется recovery."
+            ) from exc
+        record_audit_event(
+            project_id,
+            "miyori",
+            "tool.verification",
+            f"Проверено состояние перед выполнением {spec.name}.",
+            conversation_id=conversation_id,
+            workflow_id=operation.get("workflow_id"),
+            entity_type="tool_operation",
+            entity_id=operation["id"],
+            details={
+                "tool": spec.name,
+                "verification": verification,
+                "completed": bool(verification.get("completed")),
+                "safe_to_retry": bool(verification.get("safe_to_retry")),
+            },
+        )
         if verification.get("completed"):
             result = verification.get("result") or {}
             update_tool_operation(
