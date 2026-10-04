@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.50"
+PROJECT_VERSION = "00.00.51"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.8.0",
+        "version": "0.9.0",
         "status": "active",
-        "description": "NEXUS Proactive Miyori: attention budget, stable derived signals, persistent snooze/dismiss, explicit-user-action policy и quiet inbox вне Chat stream.",
+        "description": "NEXUS Voice Core: explicit microphone permission, optional STT, transcript/confidence, opt-in TTS, interruption semantics и integration с Living Presence.",
     },
     "settings": {
         "name": "Настройки",
@@ -144,6 +144,26 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.51",
+        "title": "NEXUS Voice Core · explicit permission and safe interaction",
+        "summary": "N5 добавляет Voice как replaceable capability transport поверх существующего Chat/Actions: explicit microphone permission, optional browser STT, transcript/confidence, opt-in TTS, interruption/barge-in и запрет обхода permission pipeline.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.9.0",
+                "changes": [
+                    "Добавлен /api/projects/{project_id}/nexus/voice с versioned Voice protocol.",
+                    "Final transcript отправляется только через существующий chatForm и только по явному действию пользователя.",
+                    "Interim transcript временный; confidence отображается как advisory.",
+                    "TTS opt-in и может быть прерван; микрофон отменяет активную речь перед listening.",
+                    "Voice states подключены к Living Presence.",
+                    "Browser SpeechRecognition является optional transport; Desktop сможет заменить transport без изменения контракта.",
+                    "Background recording, server audio storage и обход Actions permissions запрещены."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.50",
         "title": "NEXUS Proactive Miyori · attention budget",
