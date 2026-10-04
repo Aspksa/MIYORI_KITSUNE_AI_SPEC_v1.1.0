@@ -146,6 +146,25 @@ MODULES = {
 RELEASES = [
     {
         "version": "00.00.49",
+        "title": "NEXUS Living Presence · реальное состояние без симуляции",
+        "summary": "N9 добавляет versioned Living Presence поверх snapshot/actions/events и реального chat request state. Idle скрыт, activity не симулируется, а waiting/verifying/recovery/error показываются только из фактических runtime states.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.7.0",
+                "changes": [
+                    "Добавлен /api/projects/{project_id}/nexus/presence.",
+                    "Presence различает working, verifying, waiting, recovery, attention и degraded по реальному runtime state.",
+                    "Chat request lifecycle публикует interaction-state вместо декоративного thinking timer.",
+                    "Ready Presence скрывается и не создаёт постоянный визуальный шум.",
+                    "Knowledge attention не меняет primary Presence, а остаётся фоновым сигналом.",
+                    "Случайная/таймерная анимация запрещена source contract и UI contract tests."
+                ],
+            },
+        ],
+    },
+    {
+        "version": "00.00.49",
         "title": "NEXUS Living Presence · реальная активность без имитации",
         "summary": "N9 вводит versioned presence contract и компактный event-driven UI: Miyori показывает работу, ожидание, recovery или attention только при наличии реального runtime/event source.",
         "modules": [
