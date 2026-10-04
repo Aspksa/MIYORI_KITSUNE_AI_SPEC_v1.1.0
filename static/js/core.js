@@ -205,6 +205,81 @@ function addMessage(role, text, sources = [], options = {}) {
         line("Токены Cloud.ru",usage.total_tokens);
       if (Number.isFinite(usage.estimated_cost_rub))
         line("Расчётная стоимость",usage.estimated_cost_rub+" ₽ (не счёт)");
+      const offer=options.comparison_offer;
+      if(Array.isArray(offer?.document_ids) &&
+         offer.document_ids.length>=2 &&
+         typeof offer.question==="string") {
+        const button=document.createElement("button");
+        button.type="button";
+        button.className="chat-compare-button";
+        button.textContent="Проверить все страницы " + offer.document_ids.length + " документов";
+        const results=document.createElement("div");
+        results.className="chat-compare-results";
+        results.setAttribute("role","status");
+        const render=async(comparisonId)=>{
+          const reply=await api(
+            "/api/projects/"+state.projectId+"/document-comparisons/"+comparisonId
+          );
+          const report=reply.comparison;
+          results.replaceChildren();
+          const status=document.createElement("p");
+          status.textContent=report.finished ?
+            "Проверка завершена. Сопоставьте найденные факты и источники." :
+            "Проверка выполняется в фоновых задачах. Результаты сохраняются.";
+          results.appendChild(status);
+          for(const doc of report.documents||[]){
+            const details=document.createElement("details");
+            const title=document.createElement("summary");
+            title.textContent=(doc.filename||"Документ")+" · "+doc.status+
+              (doc.coverage_ratio!=null?
+                " · покрытие ~"+Math.round(doc.coverage_ratio*100)+"%":"");
+            details.appendChild(title);
+            if(doc.answer){
+              const text=document.createElement("p");
+              text.textContent=doc.answer;
+              details.appendChild(text);
+            }
+            for(const item of (doc.evidence||[]).slice(0,18)){
+              const row=document.createElement("p");
+              row.textContent=(item.locator||"Источник не определён")+
+                ": "+(item.text||"");
+              details.appendChild(row);
+            }
+            if(doc.error){
+              const error=document.createElement("p");
+              error.textContent=doc.error;
+              details.appendChild(error);
+            }
+            results.appendChild(details);
+          }
+          return report.finished;
+        };
+        button.addEventListener("click",async()=>{
+          if(button.disabled)return;
+          button.disabled=true;
+          try{
+            const data=await api(
+              "/api/projects/"+state.projectId+"/document-comparisons",{
+                method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({
+                  document_ids:offer.document_ids,
+                  question:offer.question,
+                  conversation_id:state.conversationId,
+                })
+              }
+            );
+            const id=data.comparison.id;
+            button.textContent="Обновить результаты проверки";
+            await render(id);
+            button.onclick=async()=>{
+              try{await render(id);}catch(error){results.textContent=error.message;}
+            };
+          } catch(error){
+            results.textContent=error.message;
+          } finally{button.disabled=false;}
+        },{once:true});
+        content.append(button,results);
+      }
       box.append(summary,content);
       bubble.appendChild(box);
     }

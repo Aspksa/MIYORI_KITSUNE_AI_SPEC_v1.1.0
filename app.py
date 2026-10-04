@@ -20,6 +20,11 @@ from miyori.chat_intelligence import plan_chat_query,enhance_context_route
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
+from miyori.document_comparisons import (
+    init_document_comparisons_db,
+    enqueue_document_comparison,
+    get_document_comparison,
+)
 from miyori.conversation_ui import (
     attached_document_context,
     chat_message_page,
@@ -281,6 +286,7 @@ async def lifespan(app: FastAPI):
     init_chat_metrics_db()
     init_document_intelligence_db()
     init_document_questions_db()
+    init_document_comparisons_db()
     init_agent_workspace_db()
     init_nexus_home_db()
     init_appearance_db()
@@ -302,7 +308,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.63", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.64", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -314,6 +320,12 @@ async def no_cache_static_assets(request: Request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
+
+
+class ComparisonRequest(BaseModel):
+    question: str = Field(min_length=1,max_length=5000)
+    document_ids: list[int] = Field(min_length=2,max_length=5)
+    conversation_id: int | None = None
 
 
 class ChatRequest(BaseModel):
@@ -563,7 +575,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.63",
+        "version": "00.00.64",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -861,7 +873,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.63",
+        "project_version": "00.00.64",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1736,6 +1748,29 @@ def document_intelligence_analyze(
     }
 
 
+@app.post("/api/projects/{project_id}/document-comparisons")
+def document_comparison_create(project_id: int, request: ComparisonRequest) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404,detail="Проект не найден.")
+    try:
+        comparison=enqueue_document_comparison(
+            project_id,request.document_ids,request.question,
+            conversation_id=request.conversation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+    wake_worker()
+    return {"comparison":comparison}
+
+
+@app.get("/api/projects/{project_id}/document-comparisons/{comparison_id}")
+def document_comparison_get(project_id: int, comparison_id: int) -> dict:
+    try:
+        return {"comparison":get_document_comparison(project_id,comparison_id)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404,detail=str(exc)) from exc
+
+
 @app.get("/api/projects/{project_id}/documents/{document_id}/questions")
 def document_questions_list(
     project_id: int,
@@ -2270,6 +2305,10 @@ async def _build_agent_response(
             "request_id": request_id,
             "response_key": response_key,
             "diagnostics": diagnostics,
+            "comparison_offer": (
+                {"document_ids": list(attachment_ids), "question": text}
+                if attachment_ids and len(attachment_ids) >= 2 else None
+            ),
         },
         client_request_id=response_key,
     )
@@ -2291,6 +2330,10 @@ async def _build_agent_response(
         "answer": answer,
         "sources": sources,
         "diagnostics": diagnostics,
+        "comparison_offer": (
+            {"document_ids": list(attachment_ids), "question": text}
+            if attachment_ids and len(attachment_ids) >= 2 else None
+        ),
         "attachments": attachment_sources,
         "workflow": {
             "id": agent.workflow_id,

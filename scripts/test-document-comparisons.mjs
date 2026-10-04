@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const app=readFileSync("app.py","utf8");
+const core=readFileSync("static/js/core.js","utf8");
+const chat=readFileSync("static/js/chat.js","utf8");
+const module=readFileSync("miyori/document_comparisons.py","utf8");
+assert.ok(app.includes('"/api/projects/{project_id}/document-comparisons"'));
+assert.ok(app.includes('get_document_comparison(project_id,comparison_id)'));
+assert.ok(core.includes("Проверить все страницы"));
+assert.ok(core.includes("chat-compare-results"));
+assert.ok(chat.includes("comparison_offer: item.metadata?.comparison_offer"));
+assert.ok(module.includes("get_document(project_id,did)"));
+assert.ok(module.includes("get_document_question(project_id,did,qid)"));
+assert.ok(module.includes('"full_originals_verified":False'));
+assert.ok(module.includes("task_id"));
+console.log("Project-isolated exhaustive comparison contract OK.");

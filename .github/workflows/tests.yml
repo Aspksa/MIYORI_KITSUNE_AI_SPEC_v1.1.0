@@ -108,6 +108,9 @@ jobs:
       - name: Chat Intelligence UI contract
         run: npm run test:chat-intelligence
 
+      - name: Document comparison contract
+        run: npm run test:document-comparisons
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
