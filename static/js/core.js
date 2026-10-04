@@ -113,7 +113,18 @@ function renderMessageMarkdown(container, value) {
   }
 }
 
+function chatNearBottom() {
+  if (!messages) return true;
+  return messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 96;
+}
+
+messages?.addEventListener("scroll", () => {
+  if (chatNearBottom()) delete messages.dataset.unreadReply;
+}, {passive:true});
+
 function addMessage(role, text, sources = [], options = {}) {
+  const followLatest = !options.suppressScroll &&
+    (role === "user" || chatNearBottom());
   if (role === "user") messages.querySelector(".welcome-message")?.remove();
   const article = document.createElement("article");
   article.className = "message " + role;
@@ -434,7 +445,29 @@ function addMessage(role, text, sources = [], options = {}) {
   bubble.appendChild(controls);
   article.append(avatar, bubble);
   messages.appendChild(article);
-  if (!options.suppressScroll) messages.scrollTop = messages.scrollHeight;
+
+  if (options.animate) {
+    article.classList.add("message-arriving");
+    if (role === "assistant") {
+      [...body.children].slice(0, 12).forEach((node, index) => {
+        node.style.setProperty(
+          "--chat-reveal-delay",
+          Math.min(index * 28, 196) + "ms"
+        );
+      });
+    }
+    window.setTimeout(() => article.classList.remove("message-arriving"), 520);
+  }
+
+  if (!options.suppressScroll && followLatest) {
+    messages.scrollTop = messages.scrollHeight;
+    delete messages.dataset.unreadReply;
+  } else if (!options.suppressScroll && role === "assistant") {
+    messages.dataset.unreadReply = "true";
+    const summary = el("chatActivitySummary");
+    if (summary) summary.textContent = "Новый ответ ниже";
+  }
+
   if (role === "assistant" && !options.suppressEvent) {
     window.dispatchEvent(
       new CustomEvent("miyori:assistant-message", {
