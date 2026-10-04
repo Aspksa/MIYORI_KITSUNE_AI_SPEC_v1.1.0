@@ -19,6 +19,7 @@ const nexusNavSystem = el("nexusNavSystem");
 
 const NEXUS_VIEW_BY_WORKSPACE = {
   actions: "actions",
+  knowledge: "knowledge",
   documents: "knowledge",
   work: "knowledge",
   home: "home",
@@ -478,6 +479,557 @@ async function renderNexusActionsWorkspace() {
   } catch (error) {
     workspaceBody.innerHTML = workspaceResult(error.message, "error");
   }
+}
+
+
+function nexusKnowledgePercent(value) {
+  const numeric = Number(value || 0);
+  return Math.max(0, Math.min(100, Math.round(numeric * 100)));
+}
+
+function nexusKnowledgeStatusLabel(value) {
+  return ({
+    verified: "Подтверждено",
+    candidate: "Нужно проверить",
+    disputed: "Есть спор",
+    superseded: "Заменено",
+    supported: "Поддержано",
+    rejected: "Отклонено",
+    complete: "Готово",
+    partial: "Частично",
+    indexed: "Структура готова",
+    queued: "В очереди",
+    analyzing: "Анализируется",
+    needs_ocr: "Нужен OCR",
+    unsupported: "Только оригинал",
+    failed: "Ошибка",
+    not_indexed: "Не проиндексировано",
+    unknown: "Неизвестно"
+  }[value] || value || "—");
+}
+
+function nexusKnowledgeTone(value) {
+  if (["verified", "complete"].includes(value)) return "success";
+  if (["supported", "indexed", "queued", "analyzing"].includes(value)) return "working";
+  if (["candidate", "partial", "needs_ocr", "unknown"].includes(value)) return "warning";
+  if (["disputed", "rejected", "failed", "unsupported"].includes(value)) return "error";
+  return "neutral";
+}
+
+function nexusKnowledgeTime(value) {
+  return nexusActionTime(value);
+}
+
+function nexusKnowledgeProvenanceMarkup(provenance) {
+  const data = provenance || {};
+  const rows = [
+    ["Источник", data.source_kind],
+    ["Проект происхождения", data.origin_project_name],
+    ["Conversation", data.conversation_id],
+    ["Message", data.message_id],
+    ["Locator", data.locator],
+    ["SHA-256", data.sha256]
+  ].filter(row => row[1] !== null && row[1] !== undefined && row[1] !== "");
+  if (!rows.length) return '<p class="knowledge-muted">Provenance пока не записан.</p>';
+  return '<dl class="knowledge-provenance">' +
+    rows.map(row =>
+      '<div><dt>' + escapeHtml(String(row[0])) + '</dt><dd>' +
+      escapeHtml(String(row[1])) + '</dd></div>'
+    ).join("") +
+  '</dl>';
+}
+
+function nexusKnowledgeMemoryMarkup(item) {
+  const conflicts = Array.isArray(item.possible_conflict_ids)
+    ? item.possible_conflict_ids
+    : [];
+  const meta = [
+    item.scope === "user" ? "Личная память" : "Память проекта",
+    item.kind,
+    item.observed_at ? nexusKnowledgeTime(item.observed_at) : null
+  ].filter(Boolean).join(" · ");
+
+  const actions = [];
+  if (item.actions?.verify) {
+    actions.push(
+      '<button type="button" class="knowledge-action-button" data-knowledge-memory="' +
+      item.id + '" data-memory-status="verified">Подтвердить</button>'
+    );
+  }
+  if (item.actions?.dispute) {
+    actions.push(
+      '<button type="button" class="knowledge-action-button quiet" data-knowledge-memory="' +
+      item.id + '" data-memory-status="disputed">Оспорить</button>'
+    );
+  }
+
+  return '<article class="knowledge-item knowledge-memory-item">' +
+    '<div class="knowledge-item-main">' +
+      '<div class="knowledge-item-copy"><strong>' + escapeHtml(item.statement || "") + '</strong>' +
+      '<small>' + escapeHtml(meta) + '</small></div>' +
+      '<span class="knowledge-status tone-' + nexusKnowledgeTone(item.status) + '">' +
+        escapeHtml(nexusKnowledgeStatusLabel(item.status)) + '</span>' +
+    '</div>' +
+    (actions.length ? '<div class="knowledge-inline-actions">' + actions.join("") + '</div>' : '') +
+    '<details class="knowledge-disclosure">' +
+      '<summary>Происхождение и состояние</summary>' +
+      '<div class="knowledge-disclosure-body">' +
+        nexusKnowledgeProvenanceMarkup(item.provenance) +
+        '<div class="knowledge-facts-grid">' +
+          '<div><span>Confidence</span><strong>' +
+            escapeHtml(item.confidence === null || item.confidence === undefined ? "—" : Math.round(Number(item.confidence) * 100) + "%") +
+          '</strong></div>' +
+          '<div><span>Salience</span><strong>' +
+            escapeHtml(Math.round(Number(item.salience || 0) * 100) + "%") +
+          '</strong></div>' +
+          '<div><span>Метод проверки</span><strong>' +
+            escapeHtml(item.verification_method || "—") +
+          '</strong></div>' +
+          '<div><span>Возможные конфликты</span><strong>' + conflicts.length + '</strong></div>' +
+        '</div>' +
+        (conflicts.length
+          ? '<p class="knowledge-attention-note">Возможные связанные конфликты: #' +
+            conflicts.map(value => escapeHtml(String(value))).join(", #") + '</p>'
+          : '') +
+      '</div>' +
+    '</details>' +
+  '</article>';
+}
+
+function nexusKnowledgeDocumentMarkup(item) {
+  const intel = item.intelligence || {};
+  const exhaustive = item.exhaustive || {};
+  const extraction = nexusKnowledgePercent(intel.extraction_coverage);
+  const understanding = nexusKnowledgePercent(intel.coverage);
+  const exhaustiveCoverage = nexusKnowledgePercent(exhaustive.best_coverage);
+  const warnings = Array.isArray(intel.warnings) ? intel.warnings : [];
+  const status = intel.status || "not_indexed";
+  const meta = [
+    item.folder_name || "Мои файлы",
+    item.mime_type || "файл",
+    item.index?.chunks ? item.index.chunks + " фрагментов" : null,
+    item.created_at ? nexusKnowledgeTime(item.created_at) : null
+  ].filter(Boolean).join(" · ");
+
+  const actions = [];
+  if (item.actions?.analyze && !["queued", "analyzing"].includes(status)) {
+    actions.push(
+      '<button type="button" class="knowledge-action-button" data-knowledge-analyze="' +
+      item.id + '">Глубокий анализ</button>'
+    );
+  }
+
+  return '<article class="knowledge-item knowledge-document-item">' +
+    '<div class="knowledge-item-main">' +
+      '<div class="knowledge-item-copy"><strong>' + escapeHtml(item.filename || "Документ") + '</strong>' +
+        '<small>' + escapeHtml(meta) + '</small>' +
+        (intel.summary ? '<p>' + escapeHtml(intel.summary) + '</p>' : '') +
+      '</div>' +
+      '<span class="knowledge-status tone-' + nexusKnowledgeTone(status) + '">' +
+        escapeHtml(nexusKnowledgeStatusLabel(status)) + '</span>' +
+    '</div>' +
+    '<div class="knowledge-coverage-pair">' +
+      '<div class="knowledge-coverage">' +
+        '<div><span>Извлечение оригинала</span><strong>' + extraction + '%</strong></div>' +
+        '<progress max="100" value="' + extraction + '" aria-label="Покрытие извлечения ' + extraction + '%"></progress>' +
+      '</div>' +
+      '<div class="knowledge-coverage">' +
+        '<div><span>Понимание документа</span><strong>' + understanding + '%</strong></div>' +
+        '<progress max="100" value="' + understanding + '" aria-label="Покрытие понимания ' + understanding + '%"></progress>' +
+      '</div>' +
+    '</div>' +
+    (actions.length ? '<div class="knowledge-inline-actions">' + actions.join("") + '</div>' : '') +
+    '<details class="knowledge-disclosure">' +
+      '<summary>Coverage, provenance и exhaustive verification</summary>' +
+      '<div class="knowledge-disclosure-body">' +
+        '<div class="knowledge-facts-grid">' +
+          '<div><span>Страниц</span><strong>' + Number(intel.page_count || 0) + '</strong></div>' +
+          '<div><span>Разделов</span><strong>' + Number(intel.section_count || 0) + '</strong></div>' +
+          '<div><span>Структурных узлов</span><strong>' + Number(item.index?.nodes || 0) + '</strong></div>' +
+          '<div><span>Exhaustive Q&A</span><strong>' + Number(exhaustive.complete || 0) + ' / ' + Number(exhaustive.questions || 0) + '</strong></div>' +
+          '<div><span>Лучшее exhaustive coverage</span><strong>' + exhaustiveCoverage + '%</strong></div>' +
+          '<div><span>Parser</span><strong>' + escapeHtml(item.index?.parser_version || "—") + '</strong></div>' +
+        '</div>' +
+        nexusKnowledgeProvenanceMarkup(item.provenance) +
+        (warnings.length
+          ? '<div class="knowledge-warning-list"><strong>Ограничения извлечения</strong><ul>' +
+            warnings.map(warning => '<li>' + escapeHtml(String(warning)) + '</li>').join("") +
+            '</ul></div>'
+          : '') +
+        (intel.last_error
+          ? '<p class="knowledge-error-note">' + escapeHtml(intel.last_error) + '</p>'
+          : '') +
+        '<div class="knowledge-inline-actions nested">' +
+          '<button type="button" class="knowledge-action-button quiet" data-knowledge-rebuild="' +
+            item.id + '">Перестроить структуру</button>' +
+        '</div>' +
+      '</div>' +
+    '</details>' +
+  '</article>';
+}
+
+function nexusKnowledgeClaimMarkup(item) {
+  const evidence = Array.isArray(item.evidence_preview) ? item.evidence_preview : [];
+  const meta = [
+    item.claim_type,
+    item.independent_sources + " независимых источников",
+    item.evidence_count + " evidence",
+    item.updated_at ? nexusKnowledgeTime(item.updated_at) : null
+  ].filter(Boolean).join(" · ");
+
+  return '<article class="knowledge-item knowledge-claim-item">' +
+    '<div class="knowledge-item-main">' +
+      '<div class="knowledge-item-copy"><strong>' + escapeHtml(item.statement || "") + '</strong>' +
+      '<small>' + escapeHtml(meta) + '</small></div>' +
+      '<span class="knowledge-status tone-' + nexusKnowledgeTone(item.status) + '">' +
+        escapeHtml(item.assessment || nexusKnowledgeStatusLabel(item.status)) + '</span>' +
+    '</div>' +
+    '<div class="knowledge-claim-score">' +
+      '<span>Confidence</span><strong>' + Math.round(Number(item.confidence || 0) * 100) + '%</strong>' +
+      '<span>Поддержка</span><strong>' + Number(item.supports || 0) + '</strong>' +
+      '<span>Противоречия</span><strong>' + Number(item.contradictions || 0) + '</strong>' +
+    '</div>' +
+    (item.can_verify
+      ? '<div class="knowledge-inline-actions"><button type="button" class="knowledge-action-button" data-knowledge-verify="' +
+        item.id + '">Перепроверить evidence</button></div>'
+      : '') +
+    '<details class="knowledge-disclosure">' +
+      '<summary>Evidence и источники</summary>' +
+      '<div class="knowledge-disclosure-body">' +
+        (evidence.length
+          ? '<div class="knowledge-evidence-list">' + evidence.map(ev => {
+              const source = ev.source || {};
+              return '<article class="knowledge-evidence stance-' + escapeHtml(ev.stance || "neutral") + '">' +
+                '<div><span>' + escapeHtml(ev.stance === "supports" ? "Поддерживает" : ev.stance === "contradicts" ? "Противоречит" : "Нейтрально") + '</span>' +
+                '<strong>' + escapeHtml(source.title || source.type || "Источник") + '</strong></div>' +
+                (ev.excerpt ? '<p>' + escapeHtml(ev.excerpt) + '</p>' : '') +
+                '<small>' +
+                  escapeHtml([
+                    source.type,
+                    source.publisher,
+                    source.locator,
+                    source.quality !== null && source.quality !== undefined
+                      ? "quality " + Math.round(Number(source.quality) * 100) + "%"
+                      : null
+                  ].filter(Boolean).join(" · ")) +
+                '</small>' +
+              '</article>';
+            }).join("") + '</div>'
+          : '<p class="knowledge-muted">Evidence пока не записан.</p>') +
+        (Number(item.open_contradictions || 0) > 0
+          ? '<p class="knowledge-attention-note">Открытых противоречий: ' +
+            Number(item.open_contradictions || 0) + '</p>'
+          : '') +
+      '</div>' +
+    '</details>' +
+  '</article>';
+}
+
+async function renderNexusKnowledgeWorkspace() {
+  showWorkspaceShell(
+    "knowledge",
+    "NEXUS · Knowledge",
+    "Знания",
+    "Память, документы и проверяемые утверждения — рядом, но не смешаны."
+  );
+
+  workspaceBody.innerHTML =
+    '<section class="nexus-knowledge">' +
+      '<header class="knowledge-head">' +
+        '<div><span class="section-caption">N4 · Knowledge</span>' +
+          '<h3>Карта знаний проекта</h3>' +
+          '<p>Сначала краткая картина. Provenance, evidence и технические детали раскрываются только по запросу.</p></div>' +
+        '<button id="knowledgeOpenDrive" class="secondary-sheet-button" type="button">Открыть файлы</button>' +
+      '</header>' +
+      '<form id="knowledgeSearchForm" class="knowledge-search" role="search">' +
+        '<label for="knowledgeSearchInput">Поиск по знаниям</label>' +
+        '<div><input id="knowledgeSearchInput" type="search" autocomplete="off" placeholder="Факт, документ, источник или утверждение…">' +
+        '<button class="primary-sheet-button" type="submit">Найти</button>' +
+        '<button id="knowledgeSearchClear" class="secondary-sheet-button" type="button" hidden>Сбросить</button></div>' +
+      '</form>' +
+      '<div id="knowledgeQuietStatus" class="knowledge-quiet-status" role="status" aria-live="polite"></div>' +
+      '<div id="knowledgeTabs" class="knowledge-tabs" role="tablist" aria-label="Разделы Knowledge">' +
+        '<button id="knowledgeTabOverview" role="tab" aria-selected="true" tabindex="0" data-knowledge-tab="overview" type="button">Обзор <span id="knowledgeTabOverviewCount"></span></button>' +
+        '<button id="knowledgeTabMemory" role="tab" aria-selected="false" tabindex="-1" data-knowledge-tab="memory" type="button">Память <span id="knowledgeTabMemoryCount"></span></button>' +
+        '<button id="knowledgeTabDocuments" role="tab" aria-selected="false" tabindex="-1" data-knowledge-tab="documents" type="button">Документы <span id="knowledgeTabDocumentsCount"></span></button>' +
+        '<button id="knowledgeTabClaims" role="tab" aria-selected="false" tabindex="-1" data-knowledge-tab="claims" type="button">Проверенные знания <span id="knowledgeTabClaimsCount"></span></button>' +
+      '</div>' +
+      '<section id="knowledgePanel" class="knowledge-panel" role="tabpanel" tabindex="0" aria-labelledby="knowledgeTabOverview">' +
+        '<div class="workspace-loading">Загружаю Knowledge…</div>' +
+      '</section>' +
+    '</section>';
+
+  let center = null;
+  let activeTab = "overview";
+  let currentQuery = "";
+
+  const tabId = tab => ({
+    overview: "knowledgeTabOverview",
+    memory: "knowledgeTabMemory",
+    documents: "knowledgeTabDocuments",
+    claims: "knowledgeTabClaims"
+  }[tab]);
+
+  const renderOverview = () => {
+    const memory = center?.counts?.memory || {};
+    const documents = center?.counts?.documents || {};
+    const claims = center?.counts?.claims || {};
+    const attention = center?.counts?.attention || {};
+    const resultCounts = center?.results || {};
+    const queryNotice = currentQuery
+      ? '<div class="knowledge-query-summary"><strong>Поиск: «' + escapeHtml(currentQuery) + '»</strong>' +
+        '<span>Память ' + Number(resultCounts.memory || 0) + ' · документы ' +
+        Number(resultCounts.documents || 0) + ' · утверждения ' + Number(resultCounts.claims || 0) + '</span></div>'
+      : "";
+
+    const domainCard = (tab, title, note, value, sub, attentionCount) =>
+      '<button type="button" class="knowledge-domain-card" data-knowledge-open="' + tab + '">' +
+        '<span>' + escapeHtml(title) + '</span><strong>' + escapeHtml(String(value)) + '</strong>' +
+        '<small>' + escapeHtml(note) + '</small>' +
+        '<em>' + escapeHtml(sub) + '</em>' +
+        (attentionCount > 0 ? '<b>' + attentionCount + ' проверить</b>' : '') +
+      '</button>';
+
+    const attentionItems = [
+      [attention.memory_disputed, "Спорные записи памяти"],
+      [attention.memory_conflicts, "Возможные конфликты памяти"],
+      [attention.documents_limited, "Документы с ограниченным извлечением"],
+      [attention.claim_disputed, "Спорные утверждения"],
+      [attention.claim_open_contradictions, "Открытые противоречия evidence"]
+    ].filter(item => Number(item[0] || 0) > 0);
+
+    return queryNotice +
+      '<div class="knowledge-domain-grid">' +
+        domainCard(
+          "memory",
+          "Память",
+          "Контекст, предпочтения, процессы и ограничения",
+          memory.visible || 0,
+          (memory.verified || 0) + " подтверждено",
+          Number(attention.memory_disputed || 0) + Number(attention.memory_conflicts || 0)
+        ) +
+        domainCard(
+          "documents",
+          "Документы",
+          "Оригиналы, структура, extraction и coverage",
+          documents.total || 0,
+          nexusKnowledgePercent(documents.average_extraction_coverage) + "% извлечено",
+          Number(attention.documents_limited || 0)
+        ) +
+        domainCard(
+          "claims",
+          "Проверенные знания",
+          "Утверждения с evidence и противоречиями",
+          claims.total || 0,
+          (claims.verified || 0) + " подтверждено",
+          Number(attention.claim_disputed || 0) + Number(attention.claim_open_contradictions || 0)
+        ) +
+      '</div>' +
+      (attentionItems.length
+        ? '<section class="knowledge-attention"><header><strong>Нужно проверить</strong><span>' +
+          Number(attention.total || 0) + '</span></header><ul>' +
+          attentionItems.map(item =>
+            '<li><span>' + escapeHtml(item[1]) + '</span><strong>' + Number(item[0]) + '</strong></li>'
+          ).join("") + '</ul></section>'
+        : '<div class="knowledge-calm-state"><strong>Критичных конфликтов не видно</strong><span>Подробности остаются внутри соответствующих разделов.</span></div>') +
+      '<details class="knowledge-principles">' +
+        '<summary>Как NEXUS различает источники</summary>' +
+        '<div><p><strong>Память</strong> — сохранённый контекст и пользовательские/проектные факты.</p>' +
+        '<p><strong>Документы</strong> — оригинальные материалы и измеримое покрытие их извлечения/анализа.</p>' +
+        '<p><strong>Проверенные знания</strong> — отдельные утверждения, чей статус определяется evidence, а не уверенностью модели.</p>' +
+        '<p>Эти слои связаны навигацией, но не сливаются в одну сущность.</p></div>' +
+      '</details>';
+  };
+
+  const renderList = (items, renderer, emptyTitle) =>
+    items.length
+      ? '<div class="knowledge-list">' + items.map(renderer).join("") + '</div>'
+      : '<div class="knowledge-empty"><strong>' + escapeHtml(emptyTitle) + '</strong>' +
+        '<span>' + (currentQuery ? 'Попробуйте другой запрос.' : 'Данные появятся после работы с проектом.') + '</span></div>';
+
+  const bindActions = () => {
+    workspaceBody.querySelectorAll("[data-knowledge-memory]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/memory/" + button.dataset.knowledgeMemory,
+            {
+              method: "PATCH",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({status: button.dataset.memoryStatus})
+            }
+          );
+          await Promise.all([loadAudit(), loadNexus()]);
+          await loadKnowledge(currentQuery, false);
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+
+    workspaceBody.querySelectorAll("[data-knowledge-verify]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/epistemic/claims/" +
+              button.dataset.knowledgeVerify + "/verify",
+            {method: "POST"}
+          );
+          await loadKnowledge(currentQuery, false);
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+
+    workspaceBody.querySelectorAll("[data-knowledge-analyze]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/documents/" +
+              button.dataset.knowledgeAnalyze + "/intelligence/analyze",
+            {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({force: false})
+            }
+          );
+          await Promise.all([loadTasks(), loadNexus()]);
+          await loadKnowledge(currentQuery, false);
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+
+    workspaceBody.querySelectorAll("[data-knowledge-rebuild]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/documents/" +
+              button.dataset.knowledgeRebuild + "/intelligence/rebuild",
+            {method: "POST"}
+          );
+          await loadKnowledge(currentQuery, false);
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+
+    workspaceBody.querySelectorAll("[data-knowledge-open]").forEach(button => {
+      button.onclick = () => setActiveTab(button.dataset.knowledgeOpen);
+    });
+  };
+
+  const renderPanel = () => {
+    const panel = el("knowledgePanel");
+    if (!center) {
+      panel.innerHTML = '<div class="workspace-loading">Загружаю Knowledge…</div>';
+      return;
+    }
+    if (activeTab === "memory") {
+      panel.innerHTML = renderList(center.memory || [], nexusKnowledgeMemoryMarkup, "Память пока пуста");
+    } else if (activeTab === "documents") {
+      panel.innerHTML = renderList(center.documents || [], nexusKnowledgeDocumentMarkup, "Документов пока нет");
+    } else if (activeTab === "claims") {
+      panel.innerHTML = renderList(center.claims || [], nexusKnowledgeClaimMarkup, "Проверяемых утверждений пока нет");
+    } else {
+      panel.innerHTML = renderOverview();
+    }
+    bindActions();
+  };
+
+  const setActiveTab = tab => {
+    if (!["overview", "memory", "documents", "claims"].includes(tab)) return;
+    activeTab = tab;
+    workspaceBody.querySelectorAll("[data-knowledge-tab]").forEach(button => {
+      const selected = button.dataset.knowledgeTab === activeTab;
+      button.setAttribute("aria-selected", selected ? "true" : "false");
+      button.tabIndex = selected ? 0 : -1;
+    });
+    const panel = el("knowledgePanel");
+    panel.setAttribute("aria-labelledby", tabId(activeTab));
+    renderPanel();
+  };
+
+  const updateCounts = () => {
+    const memory = center?.counts?.memory || {};
+    const documents = center?.counts?.documents || {};
+    const claims = center?.counts?.claims || {};
+    const attention = center?.counts?.attention || {};
+    el("knowledgeTabOverviewCount").textContent = Number(attention.total || 0)
+      ? String(attention.total)
+      : "";
+    el("knowledgeTabMemoryCount").textContent = String(memory.visible || 0);
+    el("knowledgeTabDocumentsCount").textContent = String(documents.total || 0);
+    el("knowledgeTabClaimsCount").textContent = String(claims.total || 0);
+  };
+
+  const loadKnowledge = async (query = "", announce = true) => {
+    const statusNode = el("knowledgeQuietStatus");
+    if (announce) statusNode.textContent = query ? "Ищу по трём независимым слоям…" : "Обновляю Knowledge…";
+    try {
+      const params = new URLSearchParams({limit: "80"});
+      if (query) params.set("q", query);
+      center = await api(
+        "/api/projects/" + state.projectId + "/nexus/knowledge?" + params.toString()
+      );
+      currentQuery = center.query || query || "";
+      el("knowledgeSearchInput").value = currentQuery;
+      el("knowledgeSearchClear").hidden = !currentQuery;
+      updateCounts();
+      renderPanel();
+      statusNode.textContent = currentQuery
+        ? "Результаты разделены по источникам: память, документы, утверждения."
+        : "Knowledge синхронизирован.";
+    } catch (error) {
+      statusNode.textContent = "";
+      el("knowledgePanel").innerHTML = workspaceResult(error.message, "error");
+    }
+  };
+
+  workspaceBody.querySelectorAll("[data-knowledge-tab]").forEach(button => {
+    button.onclick = () => setActiveTab(button.dataset.knowledgeTab);
+  });
+
+  el("knowledgeTabs").onkeydown = event => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const buttons = [...workspaceBody.querySelectorAll("[data-knowledge-tab]")];
+    const current = buttons.indexOf(document.activeElement);
+    if (current < 0) return;
+    event.preventDefault();
+    let next = current;
+    if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = buttons.length - 1;
+    else if (event.key === "ArrowRight") next = (current + 1) % buttons.length;
+    else next = (current - 1 + buttons.length) % buttons.length;
+    buttons[next].focus();
+    setActiveTab(buttons[next].dataset.knowledgeTab);
+  };
+
+  el("knowledgeSearchForm").onsubmit = async event => {
+    event.preventDefault();
+    const query = el("knowledgeSearchInput").value.trim();
+    await loadKnowledge(query);
+  };
+
+  el("knowledgeSearchClear").onclick = async () => {
+    el("knowledgeSearchInput").value = "";
+    await loadKnowledge("");
+  };
+
+  el("knowledgeOpenDrive").onclick = () => renderDocumentsWorkspace();
+
+  await loadKnowledge("");
 }
 
 async function renderMiyoriAiWorkspace() {
@@ -942,6 +1494,6 @@ async function renderUpdateWorkspace(refresh = false) {
 
 if (nexusNavChat) nexusNavChat.onclick = showChatWorkspace;
 if (nexusNavActions) nexusNavActions.onclick = renderNexusActionsWorkspace;
-if (nexusNavKnowledge) nexusNavKnowledge.onclick = () => renderDocumentsWorkspace();
+if (nexusNavKnowledge) nexusNavKnowledge.onclick = renderNexusKnowledgeWorkspace;
 if (nexusNavHome) nexusNavHome.onclick = () => renderProjectsWorkspace("home");
 if (nexusNavSystem) nexusNavSystem.onclick = () => renderSettingsWorkspace();
