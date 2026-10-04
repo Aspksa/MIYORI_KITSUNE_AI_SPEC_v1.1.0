@@ -3024,6 +3024,15 @@ async def send_message(request: ChatRequest) -> dict:
         captured_memory = None
         captured_claims = []
 
+    set_chat_progress(
+        request.project_id,
+        request.request_id,
+        "accepted",
+        "Запрос принят и сохранён.",
+        conversation_id=conversation_id,
+        user_message_id=user_message_id,
+    )
+
     message_history = recent_messages(conversation_id)
     query_plan = plan_chat_query(
         text,message_history,attached_count=len(attachment_ids)
