@@ -115,138 +115,283 @@ function nexusActionTime(value) {
   });
 }
 
-function nexusActionStatusLabel(status) {
+function nexusActionStateLabel(stateName) {
   return ({
-    queued: "в очереди",
-    running: "выполняется",
-    waiting_permission: "ждёт решения",
-    recovering: "восстановление",
-    completed: "завершено",
-    failed: "ошибка",
-    cancelled: "отменено",
-    pending: "ожидает решения",
-    approved: "разрешено",
-    denied: "отклонено"
-  }[status] || status || "—");
+    planned: "Планируется",
+    waiting_permission: "Ждёт разрешения",
+    running: "Выполняется",
+    verifying: "Проверяется",
+    recovery: "Требует восстановления",
+    completed: "Завершено",
+    error: "Ошибка",
+    cancelled: "Отменено"
+  }[stateName] || stateName || "—");
+}
+
+function nexusActionJson(value) {
+  if (value === null || value === undefined) return "";
+  try {
+    return escapeHtml(JSON.stringify(value, null, 2));
+  } catch (_) {
+    return escapeHtml(String(value));
+  }
+}
+
+function nexusActionValue(value) {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch (_) {
+    return String(value);
+  }
+}
+
+function nexusActionPreviewMarkup(preview) {
+  if (!preview || typeof preview !== "object") return "";
+  const changes = Array.isArray(preview.changes) ? preview.changes : [];
+  const rows = changes.map(change =>
+    '<li><strong>' + escapeHtml(change.field || "изменение") + '</strong><span>' +
+      escapeHtml(nexusActionValue(change.value)) + '</span></li>'
+  ).join("");
+  const flags = [
+    preview.destructive ? "разрушительное" : null,
+    preview.reversible === true ? "обратимое" : null,
+    preview.reversible === false ? "без гарантированного отката" : null
+  ].filter(Boolean).join(" · ");
+  return '<details class="nexus-action-detail nexus-action-preview">' +
+    '<summary>Preview изменений</summary>' +
+    '<div class="nexus-action-detail-body">' +
+      (preview.title ? '<strong>' + escapeHtml(preview.title) + '</strong>' : '') +
+      (preview.summary ? '<p>' + escapeHtml(preview.summary) + '</p>' : '') +
+      (flags ? '<small>' + escapeHtml(flags) + '</small>' : '') +
+      (rows ? '<ul class="nexus-action-change-list">' + rows + '</ul>' : '') +
+    '</div>' +
+  '</details>';
+}
+
+function nexusActionEvidenceMarkup(evidence) {
+  if (!Array.isArray(evidence) || !evidence.length) return "";
+  return '<details class="nexus-action-detail">' +
+    '<summary>Evidence · ' + evidence.length + '</summary>' +
+    '<div class="nexus-action-evidence-list">' +
+      evidence.map(item =>
+        '<article><div><strong>' + escapeHtml(item.label || item.kind || "Evidence") + '</strong>' +
+          '<small>' + escapeHtml(item.status || "recorded") + '</small></div>' +
+          (item.data !== null && item.data !== undefined
+            ? '<pre>' + nexusActionJson(item.data) + '</pre>'
+            : '') +
+        '</article>'
+      ).join("") +
+    '</div>' +
+  '</details>';
+}
+
+function nexusActionStepsMarkup(action) {
+  const steps = Array.isArray(action.steps) ? action.steps : [];
+  if (!steps.length) return "";
+  return '<details class="nexus-action-detail">' +
+    '<summary>Шаги · ' + steps.length + '</summary>' +
+    '<ol class="nexus-action-step-list">' +
+      steps.map(step =>
+        '<li><span class="nexus-action-step-state">' + escapeHtml(step.status || "planned") + '</span>' +
+          '<div><strong>' + escapeHtml(step.tool_name || step.kind || ("Шаг " + step.index)) + '</strong>' +
+          '<small>' + escapeHtml(step.reason || "") + '</small></div></li>'
+      ).join("") +
+    '</ol>' +
+  '</details>';
+}
+
+function nexusActionHistoryMarkup(history) {
+  if (!Array.isArray(history) || !history.length) return "";
+  const visible = history.slice(-20).reverse();
+  return '<details class="nexus-action-detail">' +
+    '<summary>История · ' + history.length + '</summary>' +
+    '<div class="nexus-action-history">' +
+      visible.map(item =>
+        '<article class="severity-' + escapeHtml(item.severity || "info") + '">' +
+          '<span class="nexus-event-mark" aria-hidden="true"></span>' +
+          '<div><strong>' + escapeHtml(item.summary || item.type || "Событие") + '</strong>' +
+          '<small>' + escapeHtml(nexusActionTime(item.created_at)) + '</small></div>' +
+        '</article>'
+      ).join("") +
+    '</div>' +
+  '</details>';
+}
+
+function nexusActionResultMarkup(label, value, tone) {
+  if (value === null || value === undefined) return "";
+  return '<details class="nexus-action-detail ' + (tone || "") + '">' +
+    '<summary>' + escapeHtml(label) + '</summary>' +
+    '<pre>' + nexusActionJson(value) + '</pre>' +
+  '</details>';
+}
+
+function nexusActionControlsMarkup(action) {
+  const controls = action.controls || {};
+  const buttons = [];
+  if (controls.approve_permission) {
+    buttons.push(
+      '<button type="button" data-nexus-permission="' + controls.approve_permission +
+      '" data-decision="allow" class="primary-sheet-button">Разрешить</button>'
+    );
+  }
+  if (controls.deny_permission) {
+    buttons.push(
+      '<button type="button" data-nexus-permission="' + controls.deny_permission +
+      '" data-decision="deny" class="secondary-sheet-button">Отклонить</button>'
+    );
+  }
+  if (controls.recover_workflow) {
+    buttons.push(
+      '<button type="button" data-nexus-workflow-resume="' + controls.recover_workflow +
+      '" class="primary-sheet-button">Восстановить</button>'
+    );
+  }
+  if (controls.cancel_workflow) {
+    buttons.push(
+      '<button type="button" data-nexus-workflow-cancel="' + controls.cancel_workflow +
+      '" class="secondary-sheet-button">Отменить workflow</button>'
+    );
+  }
+  if (controls.cancel_task) {
+    buttons.push(
+      '<button type="button" data-nexus-task-cancel="' + controls.cancel_task +
+      '" class="secondary-sheet-button">Отменить задачу</button>'
+    );
+  }
+  if (controls.check_recovery) {
+    buttons.push(
+      '<button type="button" data-nexus-recovery-check="1" class="primary-sheet-button">Проверить recovery</button>'
+    );
+  }
+  return buttons.length
+    ? '<div class="nexus-action-controls">' + buttons.join("") + '</div>'
+    : "";
+}
+
+function nexusActionCardMarkup(action) {
+  const tool = action.tool || {};
+  const meta = [
+    action.kind === "workflow" ? "Workflow #" + action.workflow_id :
+      action.kind === "task" ? "Task #" + action.task_id : "Tool action",
+    tool.name || null,
+    tool.risk_level ? "risk: " + tool.risk_level : null,
+    action.updated_at ? nexusActionTime(action.updated_at) : null
+  ].filter(Boolean).join(" · ");
+  const progress = action.progress?.label
+    ? '<div class="nexus-action-progress"><span>Progress</span><strong>' +
+        escapeHtml(action.progress.label) + '</strong></div>'
+    : "";
+  const destructive = tool.destructive
+    ? '<span class="nexus-action-warning">Изменяет существующие данные</span>'
+    : "";
+  return '<article class="nexus-action-card state-' + escapeHtml(action.state || "planned") + '">' +
+    '<header class="nexus-action-card-header">' +
+      '<div class="nexus-action-card-title">' +
+        '<div class="nexus-action-card-meta"><span>' + escapeHtml(meta) + '</span>' + destructive + '</div>' +
+        '<h4>' + escapeHtml(action.title || "Действие") + '</h4>' +
+        '<p>' + escapeHtml(action.summary || "") + '</p>' +
+      '</div>' +
+      '<span class="nexus-action-state-chip">' +
+        escapeHtml(action.state_label || nexusActionStateLabel(action.state)) +
+      '</span>' +
+    '</header>' +
+    progress +
+    nexusActionControlsMarkup(action) +
+    '<div class="nexus-action-details-grid">' +
+      nexusActionPreviewMarkup(action.preview) +
+      nexusActionStepsMarkup(action) +
+      nexusActionEvidenceMarkup(action.evidence) +
+      nexusActionResultMarkup("Result", action.result, "result") +
+      nexusActionResultMarkup("Ошибка", action.error, "error") +
+      nexusActionHistoryMarkup(action.history) +
+    '</div>' +
+  '</article>';
 }
 
 async function renderNexusActionsWorkspace() {
   showWorkspaceShell(
     "actions",
-    "NEXUS · Actions",
+    "NEXUS · Agents & Actions",
     "Действия",
-    "Workflow, разрешения и фоновые задачи в одном операционном экране."
+    "План, разрешения, выполнение, проверка, recovery и результат из единого runtime-контракта."
   );
 
   try {
-    const [snapshotData, permissionsData, workflowsData, tasksData, eventsData] =
-      await Promise.all([
-        api("/api/projects/" + state.projectId + "/nexus"),
-        api("/api/projects/" + state.projectId + "/permissions"),
-        api("/api/projects/" + state.projectId + "/workflows"),
-        api("/api/projects/" + state.projectId + "/tasks"),
-        api("/api/projects/" + state.projectId + "/nexus/events?tail=true&limit=40")
-      ]);
-
-    const requests = (permissionsData.requests || []).filter(item => item.status === "pending");
-    const workflows = workflowsData.workflows || [];
-    const activeWorkflows = workflows.filter(item =>
-      ["running", "waiting_permission", "recovering"].includes(item.status)
+    const center = await api(
+      "/api/projects/" + state.projectId + "/nexus/actions?limit=80"
     );
-    const tasks = tasksData.tasks || [];
-    const activeTasks = tasks.filter(item => ["queued", "running"].includes(item.status));
-    const events = eventsData.events || [];
-    const counts = snapshotData.counts || {};
+    const actions = Array.isArray(center.actions) ? center.actions : [];
+    const counts = center.counts || {};
+    const attention = actions.filter(item =>
+      ["waiting_permission", "recovery", "error"].includes(item.state)
+    );
+    const active = actions.filter(item =>
+      ["planned", "running", "verifying"].includes(item.state)
+    );
+    const history = actions.filter(item =>
+      ["completed", "cancelled"].includes(item.state)
+    );
 
     const metric = (label, value, note, tone = "neutral") =>
       '<div class="nexus-action-metric tone-' + tone + '">' +
-        '<span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(String(value)) + '</strong>' +
+        '<span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(String(value || 0)) + '</strong>' +
         '<small>' + escapeHtml(note) + '</small>' +
       '</div>';
 
-    const permissionRows = requests.length
-      ? requests.slice(0, 20).map(req => {
-          const summary = req.preview?.summary || req.reason || nexusActionStatusLabel(req.status);
-          return '<article class="nexus-action-row requires-decision">' +
-            '<div class="nexus-action-row-main"><span class="nexus-action-kind">Разрешение</span>' +
-            '<strong>#' + req.id + ' · ' + escapeHtml(toolLabel(req.tool_name)) + '</strong>' +
-            '<small>' + escapeHtml(summary) + '</small></div>' +
-            '<div class="nexus-action-controls">' +
-              '<button type="button" data-nexus-permission="' + req.id + '" data-decision="allow" class="primary-sheet-button">Разрешить</button>' +
-              '<button type="button" data-nexus-permission="' + req.id + '" data-decision="deny" class="secondary-sheet-button">Отклонить</button>' +
-            '</div>' +
-          '</article>';
-        }).join("")
-      : '<div class="nexus-actions-empty"><strong>Решений не требуется</strong><small>Нет ожидающих разрешений.</small></div>';
-
-    const workflowRows = activeWorkflows.length
-      ? activeWorkflows.slice(0, 20).map(workflow => {
-          const canResume = workflow.status === "recovering";
-          return '<article class="nexus-action-row">' +
-            '<div class="nexus-action-row-main"><span class="nexus-action-kind">Workflow</span>' +
-            '<strong>#' + workflow.id + ' · ' + escapeHtml(workflow.goal || "Workflow") + '</strong>' +
-            '<small>' + escapeHtml(nexusActionStatusLabel(workflow.status)) +
-              ' · ' + escapeHtml(nexusActionTime(workflow.updated_at || workflow.created_at)) + '</small></div>' +
-            '<div class="nexus-action-controls">' +
-              (canResume
-                ? '<button type="button" data-nexus-workflow-resume="' + workflow.id + '" class="primary-sheet-button">Восстановить</button>'
-                : '') +
-              '<button type="button" data-nexus-workflow-cancel="' + workflow.id + '" class="secondary-sheet-button">Отменить</button>' +
-            '</div>' +
-          '</article>';
-        }).join("")
-      : '<div class="nexus-actions-empty"><strong>Активных workflow нет</strong><small>Новые workflow появятся после задач, требующих Agent Core.</small></div>';
-
-    const taskRows = activeTasks.length
-      ? activeTasks.slice(0, 20).map(task =>
-          '<article class="nexus-action-row">' +
-            '<div class="nexus-action-row-main"><span class="nexus-action-kind">Задача</span>' +
-            '<strong>#' + task.id + ' · ' + escapeHtml(task.task_type || "task") + '</strong>' +
-            '<small>' + escapeHtml(nexusActionStatusLabel(task.status)) +
-              ' · ' + escapeHtml(nexusActionTime(task.started_at || task.created_at)) + '</small></div>' +
-            '<div class="nexus-action-controls">' +
-              '<button type="button" data-nexus-task-cancel="' + task.id + '" class="secondary-sheet-button">Отменить</button>' +
-            '</div>' +
-          '</article>'
-        ).join("")
-      : '<div class="nexus-actions-empty"><strong>Фоновых задач нет</strong><small>Очередь свободна.</small></div>';
-
-    const eventRows = events.length
-      ? events.slice().reverse().slice(0, 30).map(event =>
-          '<article class="nexus-event-row severity-' + escapeHtml(event.severity || "info") + '">' +
-            '<span class="nexus-event-mark" aria-hidden="true"></span>' +
-            '<div><strong>' + escapeHtml(event.summary || event.event_type || "Событие") + '</strong>' +
-            '<small>' + escapeHtml(event.source || "system") + ' · ' +
-              escapeHtml(nexusActionTime(event.created_at)) + '</small></div>' +
-          '</article>'
-        ).join("")
-      : '<div class="nexus-actions-empty"><strong>Событий пока нет</strong><small>Лента появится после действий системы.</small></div>';
+    const group = (title, note, items, empty) =>
+      '<section class="nexus-action-group">' +
+        '<header><div><strong>' + escapeHtml(title) + '</strong><small>' +
+          escapeHtml(note) + '</small></div><span>' + items.length + '</span></header>' +
+        '<div class="nexus-action-card-list">' +
+          (items.length ? items.map(nexusActionCardMarkup).join("") :
+            '<div class="nexus-actions-empty"><strong>' + escapeHtml(empty) + '</strong></div>') +
+        '</div>' +
+      '</section>';
 
     workspaceBody.innerHTML =
-      '<section class="nexus-actions-dashboard">' +
+      '<section class="nexus-actions-dashboard nexus-actions-v2">' +
         '<div class="nexus-actions-overview">' +
-          '<div><span class="section-caption">Операционное состояние</span>' +
-            '<h3>' + escapeHtml(snapshotData.overall_state || "ready") + '</h3>' +
-            '<p>Экран показывает только фактические workflow, разрешения, задачи и события текущего проекта.</p></div>' +
+          '<div><span class="section-caption">N3 · authoritative action state</span>' +
+            '<h3>Agents & Actions</h3>' +
+            '<p>Одна карточка соответствует одному реальному workflow, tool operation или background task. ' +
+            'Permission внутри workflow не считается отдельным действием.</p></div>' +
           '<button id="nexusActionsRefresh" class="secondary-sheet-button" type="button">Обновить</button>' +
         '</div>' +
         '<div class="nexus-action-metrics">' +
-          metric("Требуют решения", requests.length, "permissions", requests.length ? "warning" : "success") +
-          metric("Workflow", activeWorkflows.length, "активно", activeWorkflows.length ? "working" : "neutral") +
-          metric("Задачи", activeTasks.length, "в очереди / работе", activeTasks.length ? "working" : "neutral") +
-          metric("Документы", counts.documents || 0, "контекст проекта", "neutral") +
+          metric("Требуют внимания", counts.attention, "permission · recovery · error",
+            counts.attention ? "warning" : "success") +
+          metric("В работе", counts.active, "planned · running · verifying",
+            counts.active ? "working" : "neutral") +
+          metric("Проверяются", counts.verifying, "только реальный verify state",
+            counts.verifying ? "working" : "neutral") +
+          metric("История", counts.history, "completed · cancelled", "neutral") +
         '</div>' +
-        '<div class="nexus-actions-columns">' +
-          '<section class="nexus-actions-panel"><header><div><strong>Нужно решение</strong><small>Write-действия и recovery не выполняются скрытно.</small></div><span>' + requests.length + '</span></header>' +
-            '<div class="nexus-action-list">' + permissionRows + '</div></section>' +
-          '<section class="nexus-actions-panel"><header><div><strong>В работе</strong><small>Активные workflow и фоновые задачи.</small></div><span>' + (activeWorkflows.length + activeTasks.length) + '</span></header>' +
-            '<div class="nexus-action-list">' + workflowRows + taskRows + '</div></section>' +
-          '<section class="nexus-actions-panel nexus-actions-events"><header><div><strong>Последние события</strong><small>Audit · workflow · task; authoritative state берётся из snapshot.</small></div><span>' + events.length + '</span></header>' +
-            '<div class="nexus-event-list">' + eventRows + '</div></section>' +
+        '<div class="nexus-action-groups">' +
+          group("Требуют внимания",
+            "Подтверждение, восстановление или ошибка требуют осознанного решения.",
+            attention, "Нет действий, требующих внимания.") +
+          group("В работе",
+            "Никакой симуляции прогресса: показываются только сохранённые runtime-состояния.",
+            active, "Активных действий нет.") +
+          group("История",
+            "Результаты, evidence и журнал выполнения остаются доступными после завершения.",
+            history, "История действий пока пуста.") +
         '</div>' +
       '</section>';
 
     el("nexusActionsRefresh").onclick = renderNexusActionsWorkspace;
+
+    const refreshActionState = async () => {
+      await Promise.all([
+        loadPermissions(),
+        loadAudit(),
+        loadTasks(),
+        loadNexus()
+      ]);
+      await renderNexusActionsWorkspace();
+    };
 
     workspaceBody.querySelectorAll("[data-nexus-permission]").forEach(button => {
       button.onclick = async () => {
@@ -256,7 +401,7 @@ async function renderNexusActionsWorkspace() {
             Number(button.dataset.nexusPermission),
             button.dataset.decision === "allow"
           );
-          await renderNexusActionsWorkspace();
+          await refreshActionState();
         } catch (error) {
           showError(error.message);
           button.disabled = false;
@@ -273,8 +418,7 @@ async function renderNexusActionsWorkspace() {
               button.dataset.nexusWorkflowResume + "/resume",
             {method: "POST"}
           );
-          await Promise.all([loadPermissions(), loadAudit(), loadNexus()]);
-          await renderNexusActionsWorkspace();
+          await refreshActionState();
         } catch (error) {
           showError(error.message);
           button.disabled = false;
@@ -291,8 +435,7 @@ async function renderNexusActionsWorkspace() {
               button.dataset.nexusWorkflowCancel + "/cancel",
             {method: "POST"}
           );
-          await Promise.all([loadPermissions(), loadAudit(), loadNexus()]);
-          await renderNexusActionsWorkspace();
+          await refreshActionState();
         } catch (error) {
           showError(error.message);
           button.disabled = false;
@@ -309,8 +452,23 @@ async function renderNexusActionsWorkspace() {
               button.dataset.nexusTaskCancel + "/cancel",
             {method: "POST"}
           );
-          await Promise.all([loadTasks(), loadNexus()]);
-          await renderNexusActionsWorkspace();
+          await refreshActionState();
+        } catch (error) {
+          showError(error.message);
+          button.disabled = false;
+        }
+      };
+    });
+
+    workspaceBody.querySelectorAll("[data-nexus-recovery-check]").forEach(button => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await api(
+            "/api/projects/" + state.projectId + "/recovery/check",
+            {method: "POST"}
+          );
+          await refreshActionState();
         } catch (error) {
           showError(error.message);
           button.disabled = false;
