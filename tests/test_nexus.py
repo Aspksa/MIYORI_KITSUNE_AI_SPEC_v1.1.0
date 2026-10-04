@@ -89,7 +89,6 @@ class NexusContractTests(unittest.TestCase):
         self.assertEqual(modules["generative_ui"]["state"], "ready")
         self.assertEqual(modules["presence"]["state"], "ready")
         self.assertEqual(modules["proactive"]["state"], "ready")
-        self.assertEqual(modules["presence"]["state"], "ready")
         self.assertFalse(snapshot["ui_contract"]["model_html_allowed"])
         self.assertFalse(snapshot["ui_contract"]["script_allowed"])
         self.assertTrue(snapshot["ui_contract"]["unknown_components_rejected"])
