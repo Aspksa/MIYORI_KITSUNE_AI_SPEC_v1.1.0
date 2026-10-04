@@ -2,7 +2,7 @@ import { installDialogAccessibility, installDisclosureAccessibility } from "./a1
 import { installNexusShell } from "./shell.js";
 import { installNexusSurfaceHost } from "./surfaces.js";
 
-const NEXUS_FRONTEND_VERSION = "0.4.0";
+const NEXUS_FRONTEND_VERSION = "0.6.0";
 
 function boot(): void {
   document.documentElement.dataset.nexus = "ready";
