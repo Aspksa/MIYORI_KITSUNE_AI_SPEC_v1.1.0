@@ -3377,7 +3377,7 @@ def update_tool_operation(
 
 def list_recoverable_tool_operations(project_id: int | None = None) -> list[dict]:
     params: list[object] = []
-    where = "WHERE status IN ('running','recovery_required')"
+    where = "WHERE status IN ('running','verifying','recovery_required')"
     if project_id is not None:
         where += " AND project_id = ?"
         params.append(project_id)
