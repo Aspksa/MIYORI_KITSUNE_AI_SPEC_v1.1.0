@@ -2,8 +2,27 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.57.**  
+**Внутренняя версия приложения: 00.00.58.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.58
+
+`00.00.58` — **Miyori Character Rig / Final Visual Body**.
+
+N12.4 превращает нейтральный динамический rig в полноценное тело Миёри:
+
+- новый trusted adapter `trusted_character_rig` стал основным динамическим renderer без static portrait;
+- фигура содержит лицо, волосы, лисьи ушки, торс, руки, ноги, одежду и отдельный хвостовой слой;
+- pose / expression / gesture / state продолжают быть единственным источником движения;
+- цвет волос и глаз берётся только из Appearance Profile и применяется только когда значение владельца является валидным CSS-цветом;
+- точное число хвостов создаётся только из owner `tail_count`; до выбора показан абстрактный tail aura, не фиксирующий количество;
+- основной наряд не придумывается: без owner choice отображается neutral unresolved outfit;
+- предыдущий `trusted_vector_rig` сохранён в registry как trusted fallback;
+- unknown asset/adapter по-прежнему fail-closed использует `neutral_shell`;
+- random/timer liveness, model-selected renderer, asset-authored JavaScript и model-authored appearance запрещены;
+- `prefers-reduced-motion` отключает движение character rig.
+
+Итог: Миёри получила полноценную state-driven фигуру, а её открытые визуальные параметры по-прежнему принадлежат только владельцу.
 
 ## Состояние релиза 00.00.57
 
