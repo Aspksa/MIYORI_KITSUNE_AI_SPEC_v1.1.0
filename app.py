@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from time import perf_counter
 from miyori.chat_intelligence import plan_chat_query,enhance_context_route
+from miyori.chat_document_review import compare_project_documents
 from miyori.chat_metrics import (
     init_chat_metrics_db,store_model_usage,model_usage_summary,
 )
@@ -2205,6 +2206,22 @@ async def _build_agent_response(
     attachment_context, attachment_sources = attached_document_context(
         project_id, attachment_ids or []
     )
+    document_review = None
+    if len(attachment_ids or []) >= 2 and query_plan.depth == "deep":
+        document_review = compare_project_documents(
+            project_id, attachment_ids or []
+        )
+        # This is a bounded, deterministic scan of extracted data, NOT an
+        # authoritative verification of contractual equivalence or intent.
+        attachment_context.append({
+            "filename":"Служебная сверка текстовых фактов (не оригинал)",
+            "chunk_index":"potential_differences",
+            "content":json.dumps({
+                "differences":document_review["potential_differences"][:8],
+                "note":document_review["note"],
+                "original_fully_verified":False,
+            },ensure_ascii=False)[:14000],
+        })
     retrieval_ms = round((perf_counter() - started_retrieval) * 1000)
     source_ids = {s.get("document_id") for s in sources}
     for attachment in attachment_sources:
@@ -2255,6 +2272,7 @@ async def _build_agent_response(
         },
         "model_usage":actual_usage,
         "retrieval_ms":retrieval_ms,
+        "document_review":document_review,
     }
 
     assistant_message_id = add_message(
