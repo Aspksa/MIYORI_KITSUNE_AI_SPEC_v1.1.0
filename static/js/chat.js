@@ -320,6 +320,7 @@ form.addEventListener("submit", async (event) => {
   if (uploadStatus) uploadStatus.textContent = "";
   const userRow = addMessage("user", text, [], {
     attachments: attachedFiles,
+    animate: true,
   });
   input.value = "";
   window.miyoriDrafts?.save();
@@ -375,7 +376,8 @@ form.addEventListener("submit", async (event) => {
       id:data.assistant_message_id, diagnostics:data.diagnostics,
       comparison_offer:data.comparison_offer,
       task_goal:data.task_goal,
-      workflow:data.workflow
+      workflow:data.workflow,
+      animate:true
     });
     attachmentStore?.clear();
     state.pendingRequest = null;
