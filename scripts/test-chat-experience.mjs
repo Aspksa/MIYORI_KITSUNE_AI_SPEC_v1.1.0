@@ -67,4 +67,11 @@ assert.ok(
   "history hydration must not replay arrival animations",
 );
 
+assert.ok(
+  core.includes('messages.setAttribute("aria-busy", value ? "true" : "false")') &&
+    html.includes('id="chatActivitySummary" role="status" aria-live="polite"') &&
+    readFileSync("static/css/chat-extras.css","utf8").includes("miyori-chat-stage-active"),
+  "real request activity must be accessible and motion must be tied to actual request state",
+);
+
 console.log("Chat composition, offline Markdown and DOMPurify safety OK.");
