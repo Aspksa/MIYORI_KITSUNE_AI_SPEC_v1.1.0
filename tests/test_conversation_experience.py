@@ -172,8 +172,14 @@ class ConversationExperienceTests(unittest.TestCase):
             self.project, self.conversation, "Проверить договор",
             past, "daily", True,
         )
+        future = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+        future_item = schedule_message(
+            self.project, self.conversation, "Не сейчас",
+            future, "none", False,
+        )
         due = due_schedules(self.project)
         self.assertEqual(due[0]["id"], scheduled["id"])
+        self.assertNotIn(future_item["id"], [item["id"] for item in due])
         updated = complete_schedule(self.project, scheduled["id"])
         self.assertEqual(updated["status"], "scheduled")
         self.assertEqual(updated["repeat_mode"], "daily")
