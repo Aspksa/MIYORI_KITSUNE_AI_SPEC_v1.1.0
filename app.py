@@ -23,6 +23,8 @@ from miyori.conversation_ui import (
     list_chat_conversations,
     set_message_bookmark,
     update_chat_conversation,
+    list_bookmarked_messages,
+    search_conversation_messages,
 )
 from miyori.config import settings
 from miyori.appearance import (
@@ -1294,6 +1296,23 @@ def conversation(
         "project_id": project_id,
         **page,
     }
+
+
+@app.get("/api/projects/{project_id}/bookmarks")
+def chat_bookmarks(project_id: int) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Проект не найден.")
+    return {"bookmarks": list_bookmarked_messages(project_id)}
+
+
+@app.get("/api/projects/{project_id}/conversations/{conversation_id}/search")
+def conversation_search(project_id: int, conversation_id: int, q: str = "") -> dict:
+    try:
+        return {
+            "matches": search_conversation_messages(project_id, conversation_id, q)
+        }
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.put("/api/projects/{project_id}/conversations/{conversation_id}/messages/{message_id}/bookmark")
