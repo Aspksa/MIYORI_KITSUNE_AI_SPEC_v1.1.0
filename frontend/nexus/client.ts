@@ -1,11 +1,13 @@
 import {
   NEXUS_ACTION_SCHEMA_VERSION,
+  NEXUS_KNOWLEDGE_SCHEMA_VERSION,
   NEXUS_EVENT_SCHEMA_VERSION,
   NEXUS_SCHEMA_VERSION,
   isNexusActionState,
   isNexusEventSeverity,
   isNexusOperationalState,
   type NexusActionCenter,
+  type NexusKnowledgeCenter,
   type NexusEventPage,
   type NexusSnapshot,
 } from "./contracts.js";
@@ -113,4 +115,36 @@ export async function fetchNexusActions(
     }
   }
   return payload as NexusActionCenter;
+}
+
+export async function fetchNexusKnowledge(
+  projectId: number,
+  options: { query?: string; limit?: number } = {},
+): Promise<NexusKnowledgeCenter> {
+  validateProjectId(projectId);
+  const params = new URLSearchParams();
+  if (options.query?.trim()) params.set("q", options.query.trim());
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  const suffix = params.size ? `?${params.toString()}` : "";
+  const response = await fetch(
+    `/api/projects/${projectId}/nexus/knowledge${suffix}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!response.ok) {
+    throw new Error(`NEXUS knowledge API: HTTP ${response.status}`);
+  }
+
+  const payload = (await response.json()) as Partial<NexusKnowledgeCenter>;
+  if (payload.schema_version !== NEXUS_KNOWLEDGE_SCHEMA_VERSION) {
+    throw new Error("Несовместимая версия NEXUS knowledge API.");
+  }
+  if (
+    !Array.isArray(payload.memory) ||
+    !Array.isArray(payload.documents) ||
+    !Array.isArray(payload.claims) ||
+    payload.semantics?.sections_are_distinct !== true
+  ) {
+    throw new Error("NEXUS knowledge API нарушил разделение источников.");
+  }
+  return payload as NexusKnowledgeCenter;
 }
