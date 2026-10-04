@@ -136,6 +136,13 @@ function addMessage(role, text, sources = []) {
   article.append(avatar, bubble);
   messages.appendChild(article);
   messages.scrollTop = messages.scrollHeight;
+  if (role === "assistant") {
+    window.dispatchEvent(
+      new CustomEvent("miyori:assistant-message", {
+        detail: {text: String(text || "")}
+      })
+    );
+  }
 }
 
 function showWelcome() {
