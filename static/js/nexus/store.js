@@ -48,7 +48,7 @@ export class NexusStore {
         this.#emit();
         return this.state;
     }
-    async sync() {
+    async sync(options = {}) {
         if (!this.#synchronized) {
             return this.hydrate();
         }
@@ -68,7 +68,7 @@ export class NexusStore {
             if (!page.has_more)
                 break;
         } while (true);
-        if (sawEvents) {
+        if (sawEvents || options.forceSnapshot) {
             this.#snapshot = await this.transport.snapshot(this.projectId);
         }
         this.#synchronized = true;

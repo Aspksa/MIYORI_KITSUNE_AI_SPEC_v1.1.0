@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.43"
+PROJECT_VERSION = "00.00.44"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "2.6.0",
+        "version": "2.7.0",
         "status": "active",
-        "description": "AI Core v2.6: NEXUS state + event fabric поверх persistent workflows, Document Intelligence, проверяемой памяти и безопасных инструментов.",
+        "description": "AI Core v2.7: NEXUS Shell поверх state/event fabric, persistent workflows, Document Intelligence, проверяемой памяти и безопасных инструментов.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "status": "active",
-        "description": "Versioned state/event fabric: реальные состояния, unified event envelope, cursor/resync store, typed UI boundary и accessibility foundation.",
+        "description": "NEXUS Shell: пять стабильных разделов, operational Actions workspace, authoritative state/event sync, keyboard/accessibility и responsive foundation.",
     },
     "settings": {
         "name": "Настройки",
@@ -138,6 +138,36 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.44",
+        "title": "NEXUS Shell · функциональная оболочка без декоративной имитации",
+        "summary": "Первый видимый слой MIYORI NEXUS построен поверх уже стабильных state/event контрактов. Навигация сведена к пяти устойчивым разделам Chat / Actions / Knowledge / Home / System, старые рабочие экраны сохранены через совместимый bridge, а новый Actions workspace показывает только реальные workflow, permissions, tasks и события.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.3.0",
+                "changes": [
+                    "Primary navigation ограничена пятью разделами: Chat, Actions, Knowledge, Home, System.",
+                    "Legacy workspace-renderers сохранены; их переходы синхронизируются с NEXUS view-state вместо переписывания.",
+                    "Добавлен Actions workspace для pending permissions, active/recovering workflows, background tasks и последних NEXUS events.",
+                    "NEXUS Store выполняет быстрый event sync и периодический authoritative snapshot refresh.",
+                    "Навигация поддерживает Arrow/Home/End keyboard flow, aria-current и live status semantics.",
+                    "Secondary функции Account, Mobile, Update и AI settings сохранены в progressive disclosure «Дополнительно».",
+                    "Responsive mobile layout использует те же пять разделов без отдельной модели навигации.",
+                    "NEXUS CSS не добавляет декоративные keyframe-анимации."
+                ],
+            },
+            {
+                "key": "miyori_ai",
+                "version": "2.7.0",
+                "changes": [
+                    "NEXUS snapshot расширен активными и recovering workflow counts для operational UI.",
+                    "Actions screen использует существующий permission/recovery/cancel API и не создаёт параллельный execution path.",
+                    "Устранена устаревшая третья grid-column базового shell и очищены буквальные escaped-newline артефакты template."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.43",
         "title": "NEXUS State & Event Fabric · единый нервный контур",

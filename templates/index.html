@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0d12">
   <title>Miyori Kitsune AI</title>
-  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.43">
-  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.43">
-  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.43">
-  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.43">
-  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.43">
-  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.43">
-  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.43">\n  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.43">
+  <link rel="stylesheet" href="/static/css/foundation.css?v=00.00.44">
+  <link rel="stylesheet" href="/static/css/chat.css?v=00.00.44">
+  <link rel="stylesheet" href="/static/css/workspace.css?v=00.00.44">
+  <link rel="stylesheet" href="/static/css/drive.css?v=00.00.44">
+  <link rel="stylesheet" href="/static/css/modules.css?v=00.00.44">
+  <link rel="stylesheet" href="/static/css/modes.css?v=00.00.44">
+  <link rel="stylesheet" href="/static/css/audit.css?v=00.00.44">
+  <link rel="stylesheet" href="/static/css/nexus.css?v=00.00.44">
 </head>
 <body>
   <div class="app-shell">
@@ -21,10 +22,43 @@
         <div class="brand-copy">
           <div class="brand-row">
             <h1>Миёри</h1>
-            <span class="version-pill" id="versionText">00.00.43</span>
+            <span class="version-pill" id="versionText">00.00.44</span>
           </div>
           <p>Miyori Kitsune AI</p>
         </div>
+      </div>
+
+      <nav id="nexusPrimaryNav" class="nexus-primary-nav" aria-label="Основные разделы MIYORI NEXUS">
+        <button id="nexusNavChat" class="nexus-nav-button active" data-nexus-view="chat" type="button" aria-current="page">
+          <span class="nexus-nav-icon" aria-hidden="true">◇</span>
+          <span class="nexus-nav-copy"><strong>Чат</strong><small>Диалог и текущая задача</small></span>
+          <span id="nexusNavChatMeta" class="nexus-nav-meta">готово</span>
+        </button>
+        <button id="nexusNavActions" class="nexus-nav-button" data-nexus-view="actions" type="button">
+          <span class="nexus-nav-icon" aria-hidden="true">⌘</span>
+          <span class="nexus-nav-copy"><strong>Действия</strong><small>Workflow · разрешения · задачи</small></span>
+          <span id="nexusNavActionsMeta" class="nexus-nav-meta">0</span>
+        </button>
+        <button id="nexusNavKnowledge" class="nexus-nav-button" data-nexus-view="knowledge" type="button">
+          <span class="nexus-nav-icon" aria-hidden="true">▤</span>
+          <span class="nexus-nav-copy"><strong>Знания</strong><small>Документы · файлы · знания</small></span>
+          <span id="nexusNavKnowledgeMeta" class="nexus-nav-meta">0</span>
+        </button>
+        <button id="nexusNavHome" class="nexus-nav-button" data-nexus-view="home" type="button">
+          <span class="nexus-nav-icon" aria-hidden="true">⌂</span>
+          <span class="nexus-nav-copy"><strong>Дом</strong><small>Устройства и домашние проекты</small></span>
+          <span id="nexusNavHomeMeta" class="nexus-nav-meta">—</span>
+        </button>
+        <button id="nexusNavSystem" class="nexus-nav-button" data-nexus-view="system" type="button">
+          <span class="nexus-nav-icon" aria-hidden="true">⚙</span>
+          <span class="nexus-nav-copy"><strong>Система</strong><small>Настройки · клиенты · обновления</small></span>
+          <span id="nexusNavSystemMeta" class="nexus-nav-meta">—</span>
+        </button>
+      </nav>
+
+      <div id="nexusRailStatus" class="nexus-rail-status" role="status" aria-live="polite">
+        <span id="nexusRailStateDot" class="nexus-state-dot" data-state="not_connected" aria-hidden="true"></span>
+        <span><strong id="nexusRailState">Подключение</strong><small id="nexusRailDetail">Получаю состояние проекта…</small></span>
       </div>
 
       <button id="openSystemStatus" class="system-status-launcher" type="button">
@@ -33,48 +67,51 @@
         <span class="side-menu-chevron">›</span>
       </button>
 
-      <nav class="main-side-menu" aria-label="Основное меню">
-        <button class="side-menu-item ai-home-item" id="menuMiyoriAI" type="button">
-          <span class="side-menu-icon ai-menu-icon">AI</span>
-          <span class="side-menu-copy"><strong>Miyori Kitsune</strong><small>Персональный AI</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
-        <button class="side-menu-item" id="menuMobileApp" type="button">
-          <span class="side-menu-icon">▣</span>
-          <span class="side-menu-copy"><strong>Мобильное приложение</strong><small>iOS · Android</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
-        <button class="side-menu-item" id="menuAccount" type="button">
-          <span class="side-menu-icon">◌</span>
-          <span class="side-menu-copy"><strong>Личный кабинет</strong><small>Профиль и доступ</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
-        <button class="side-menu-item" id="menuSettings" type="button">
-          <span class="side-menu-icon">⚙</span>
-          <span class="side-menu-copy"><strong>Настройки</strong><small>Миёри и система</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
-        <button class="side-menu-item" id="menuDocumentsHub" type="button">
-          <span class="side-menu-icon">▤</span>
-          <span class="side-menu-copy"><strong>Документы / Облако / Miyori</strong><small>Файлы и знания</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
-        <button class="side-menu-item" id="menuWorkProjects" type="button">
-          <span class="side-menu-icon">▰</span>
-          <span class="side-menu-copy"><strong>Рабочие проекты</strong><small>Рабочие пространства</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
-        <button class="side-menu-item" id="menuHomeProjects" type="button">
-          <span class="side-menu-icon">⌂</span>
-          <span class="side-menu-copy"><strong>Домашние проекты</strong><small>Личные пространства</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
-        <button class="side-menu-item update-project-item" id="menuProjectUpdate" type="button">
-          <span class="side-menu-icon">↻</span>
-          <span class="side-menu-copy"><strong>Обновление проекта</strong><small>Версия и компоненты</small></span>
-          <span class="side-menu-chevron">›</span>
-        </button>
-      </nav>
+      <details class="nexus-secondary-details">
+        <summary>Дополнительно</summary>
+        <nav class="main-side-menu" aria-label="Основное меню">
+          <button class="side-menu-item ai-home-item" id="menuMiyoriAI" type="button">
+            <span class="side-menu-icon ai-menu-icon">AI</span>
+            <span class="side-menu-copy"><strong>Miyori Kitsune</strong><small>Персональный AI</small></span>
+            <span class="side-menu-chevron">›</span>
+          </button>
+          <button class="side-menu-item" id="menuMobileApp" type="button">
+            <span class="side-menu-icon">▣</span>
+            <span class="side-menu-copy"><strong>Мобильное приложение</strong><small>iOS · Android</small></span>
+            <span class="side-menu-chevron">›</span>
+          </button>
+          <button class="side-menu-item" id="menuAccount" type="button">
+            <span class="side-menu-icon">◌</span>
+            <span class="side-menu-copy"><strong>Личный кабинет</strong><small>Профиль и доступ</small></span>
+            <span class="side-menu-chevron">›</span>
+          </button>
+          <button class="side-menu-item" id="menuSettings" type="button">
+            <span class="side-menu-icon">⚙</span>
+            <span class="side-menu-copy"><strong>Настройки</strong><small>Миёри и система</small></span>
+            <span class="side-menu-chevron">›</span>
+          </button>
+          <button class="side-menu-item" id="menuDocumentsHub" type="button">
+            <span class="side-menu-icon">▤</span>
+            <span class="side-menu-copy"><strong>Документы / Облако / Miyori</strong><small>Файлы и знания</small></span>
+            <span class="side-menu-chevron">›</span>
+          </button>
+          <button class="side-menu-item" id="menuWorkProjects" type="button">
+            <span class="side-menu-icon">▰</span>
+            <span class="side-menu-copy"><strong>Рабочие проекты</strong><small>Рабочие пространства</small></span>
+            <span class="side-menu-chevron">›</span>
+          </button>
+          <button class="side-menu-item" id="menuHomeProjects" type="button">
+            <span class="side-menu-icon">⌂</span>
+            <span class="side-menu-copy"><strong>Домашние проекты</strong><small>Личные пространства</small></span>
+            <span class="side-menu-chevron">›</span>
+          </button>
+          <button class="side-menu-item update-project-item" id="menuProjectUpdate" type="button">
+            <span class="side-menu-icon">↻</span>
+            <span class="side-menu-copy"><strong>Обновление проекта</strong><small>Версия и компоненты</small></span>
+            <span class="side-menu-chevron">›</span>
+          </button>
+        </nav>
+      </details>
 
       <details class="workspace-details">
         <summary>Проект и разговоры</summary>
@@ -94,7 +131,12 @@
     <main class="chat-area">
       <header class="chat-header" id="chatHeader">
         <div class="chat-title">
+          <span id="nexusViewEyebrow" class="section-caption">NEXUS · Чат</span>
           <h2 id="conversationTitle">Miyori Kitsune</h2>
+        </div>
+        <div id="nexusHeaderStatus" class="nexus-header-status" aria-label="Состояние проекта">
+          <span id="nexusHeaderStateDot" class="nexus-state-dot" data-state="not_connected" aria-hidden="true"></span>
+          <span><strong id="nexusHeaderState">Подключение</strong><small id="nexusHeaderDetail">Состояние проекта ещё не синхронизировано</small></span>
         </div>
       </header>
 
@@ -363,13 +405,14 @@
     </section>
   </div>
 
-  <script src="/static/js/core.js?v=00.00.43"></script>
-  <script src="/static/js/data.js?v=00.00.43"></script>
-  <script src="/static/js/chat.js?v=00.00.43"></script>
-  <script src="/static/js/workspace.js?v=00.00.43"></script>
-  <script src="/static/js/drive.js?v=00.00.43"></script>
-  <script src="/static/js/projects.js?v=00.00.43"></script>
-  <script src="/static/js/settings.js?v=00.00.43"></script>
-  <script src="/static/js/boot.js?v=00.00.43"></script>\n  <script type="module" src="/static/js/nexus/index.js?v=00.00.43"></script>
+  <script src="/static/js/core.js?v=00.00.44"></script>
+  <script src="/static/js/data.js?v=00.00.44"></script>
+  <script src="/static/js/chat.js?v=00.00.44"></script>
+  <script src="/static/js/workspace.js?v=00.00.44"></script>
+  <script src="/static/js/drive.js?v=00.00.44"></script>
+  <script src="/static/js/projects.js?v=00.00.44"></script>
+  <script src="/static/js/settings.js?v=00.00.44"></script>
+  <script src="/static/js/boot.js?v=00.00.44"></script>
+  <script type="module" src="/static/js/nexus/index.js?v=00.00.44"></script>
 </body>
 </html>

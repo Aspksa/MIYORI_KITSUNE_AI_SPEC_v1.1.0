@@ -85,7 +85,9 @@ export class NexusStore {
     return this.state;
   }
 
-  async sync(): Promise<NexusStoreState> {
+  async sync(
+    options: { forceSnapshot?: boolean } = {},
+  ): Promise<NexusStoreState> {
     if (!this.#synchronized) {
       return this.hydrate();
     }
@@ -106,7 +108,7 @@ export class NexusStore {
       if (!page.has_more) break;
     } while (true);
 
-    if (sawEvents) {
+    if (sawEvents || options.forceSnapshot) {
       this.#snapshot = await this.transport.snapshot(this.projectId);
     }
     this.#synchronized = true;

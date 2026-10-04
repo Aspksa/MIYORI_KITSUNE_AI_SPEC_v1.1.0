@@ -54,13 +54,26 @@ const transport = {
         },
       };
     }
-    assert.equal(options.after, "cursor-1");
+    if (options.after === "cursor-1") {
+      return {
+        schema_version: "1.0.0",
+        events: [
+          event("audit:1", "2026-10-04T00:00:01+00:00"),
+          event("audit:2", "2026-10-04T00:00:02+00:00"),
+        ],
+        next_cursor: "cursor-2",
+        has_more: false,
+        tail: false,
+        resync: {
+          authoritative_source: "snapshot",
+          required_after_events: true,
+        },
+      };
+    }
+    assert.equal(options.after, "cursor-2");
     return {
       schema_version: "1.0.0",
-      events: [
-        event("audit:1", "2026-10-04T00:00:01+00:00"),
-        event("audit:2", "2026-10-04T00:00:02+00:00"),
-      ],
+      events: [],
       next_cursor: "cursor-2",
       has_more: false,
       tail: false,
@@ -94,9 +107,14 @@ assert.equal(synchronized.cursor, "cursor-2");
 assert.equal(snapshotCalls, 2, "new events must trigger authoritative snapshot resync");
 assert.equal(eventCalls, 2);
 
+const refreshed = await store.sync({ forceSnapshot: true });
+assert.equal(refreshed.events.length, 2);
+assert.equal(snapshotCalls, 3, "forced refresh must update authoritative snapshot without events");
+assert.equal(refreshed.snapshot?.counts.revision, 3);
+
 store.invalidate();
 assert.equal(store.state.synchronized, false);
 unsubscribe();
-assert.ok(notifications.length >= 3);
+assert.ok(notifications.length >= 4);
 
 console.log("NEXUS state store contract OK.");

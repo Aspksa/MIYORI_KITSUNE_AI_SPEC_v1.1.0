@@ -2,8 +2,40 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.43.**  
+**Внутренняя версия приложения: 00.00.44.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.44
+
+`00.00.44` — **NEXUS Shell · функциональная оболочка без декоративной имитации**.
+
+Первый видимый слой MIYORI NEXUS построен поверх уже проверенных snapshot/event контрактов. Это не новый параллельный frontend и не big-bang rewrite.
+
+Основная навигация теперь формируется вокруг пяти устойчивых пользовательских областей:
+
+- **Чат** — диалог и текущая задача;
+- **Действия** — workflow, разрешения и фоновые задачи;
+- **Знания** — документы, память и рабочие проекты;
+- **Дом** — домашние проекты и будущие device capabilities;
+- **Система** — настройки и системные функции.
+
+Существующие рабочие render-функции Drive, Projects, Settings, Account, Update и AI Center не переписаны. NEXUS Shell использует compatibility bridge: старые переходы объявляют текущий NEXUS view, поэтому primary-навигация и legacy workspace остаются согласованными.
+
+Новый экран **Actions** читает только реальные данные текущего проекта:
+
+- pending permissions;
+- active / waiting / recovering workflows;
+- queued / running background tasks;
+- последние события единого NEXUS event fabric;
+- approve / reject / resume / cancel используют существующие API и permission/recovery pipeline.
+
+UI-состояние не вычисляется из декоративных эффектов: быстрые события служат сигналом, а authoritative snapshot периодически перечитывается из backend. Для primary navigation добавлены `aria-current`, live status semantics и Arrow/Home/End keyboard navigation.
+
+На мобильной ширине используются те же пять разделов в компактной горизонтальной навигации. Отдельной мобильной логики состояния нет.
+
+Secondary-функции сохранены под progressive disclosure **«Дополнительно»**. Это уменьшает визуальную плотность, не удаляя Account, Mobile, AI settings, Work projects и Updater.
+
+В NEXUS CSS не добавлены `@keyframes`: shell не изображает активность, которой нет в runtime.
 
 ## Состояние релиза 00.00.43
 
@@ -259,7 +291,7 @@ CSS загружается в фиксированном cascade-порядке:
 
 С `00.00.42` рядом с legacy runtime существует отдельный NEXUS island:
 
-- `frontend/nexus/*.ts` — TypeScript contracts, API client, accessibility runtime и state store;
+- `frontend/nexus/*.ts` — TypeScript contracts, API client, state store, accessibility runtime и NEXUS Shell controller;
 - `static/js/nexus/*.js` — собранные browser ES modules;
 - `static/css/nexus.css` — только функциональный accessibility/motion layer;
 - `tsconfig.nexus.json` — strict TypeScript contract;
@@ -324,6 +356,7 @@ GitHub Actions запускает полный `unittest`-контур на push
 - сборку NEXUS ES modules;
 - accessibility contract;
 - исполняемый NEXUS state-store contract;
+- NEXUS Shell contract: пять primary views, ARIA/live semantics, keyboard navigation и запрет декоративных keyframes;
 - синтаксическую проверку classic JS и NEXUS modules;
 - `git diff --exit-code -- static/js/nexus`, чтобы committed build не расходился с TypeScript source.
 
@@ -364,6 +397,7 @@ Document Intelligence дополнительно проверяет:
 - `00.00.40` — Exhaustive Document Q&A: all-window verification + evidence/locators + question coverage + fingerprint recovery;
 - `00.00.41` — Extraction Integrity: source extraction coverage + Office/PDF completeness manifest + truthful exhaustive coverage;
 - `00.00.42` — NEXUS Foundation: versioned state contract + TypeScript island + typed Generative UI boundary + accessibility/frontend CI;
-- `00.00.43` — NEXUS State & Event Fabric: unified read-only event envelope + cursor/tail + client store + authoritative snapshot resync.
+- `00.00.43` — NEXUS State & Event Fabric: unified read-only event envelope + cursor/tail + client store + authoritative snapshot resync;
+- `00.00.44` — NEXUS Shell: five-view navigation + operational Actions workspace + compatibility bridge + accessible responsive shell.
 
 Канонический changelog приложения доступен через `miyori/module_registry.py` и API manifest/changelog.

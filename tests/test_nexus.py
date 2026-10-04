@@ -53,6 +53,8 @@ class NexusContractTests(unittest.TestCase):
         self.assertIn("suggestions", snapshot)
         self.assertIn("epistemic", snapshot)
         self.assertIn("documents", snapshot["counts"])
+        self.assertIn("active_workflows", snapshot["counts"])
+        self.assertIn("recovering_workflows", snapshot["counts"])
         self.assertTrue(snapshot["suggestions"])
 
         self.assertIn(snapshot["overall_state"], NEXUS_OPERATIONAL_STATES)
