@@ -194,3 +194,5 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **00.00.65 — Agent Continuation.** Compact persisted task status shown only on actual pending work; links into NEXUS Actions for permission/recovery. No automatic tool execution, no synthetic progress, no new memory architecture.
 
 - **00.00.66 — Chat Reliability.** Отображение состояния проектов и аналитика не образуют второй агентный контур. Обновление только затронутых модулей выполняется после подтверждённого ответа, фоновый отказ статистики не означает ошибки самого чата. Usage Cloud.ru агрегируется лишь по запросу пользователя, без выдуманных цен.
+
+- **00.00.67 — Project-scoped Chat Recall / System Menu.** Старые сообщения — исключительно непроверенные цитаты из текущего проекта. Они извлекаются лишь по явной просьбе, имеют conversation/message provenance и никогда не используются как tool authority. «Состояние системы» перенесено в верхнюю точку меню; исходные runtime ID статуса не дублируются, значения отображаются в едином окне. «Дополнительно» — постоянная область навигации без disclosure.
