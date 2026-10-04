@@ -15,6 +15,11 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from time import perf_counter
+from miyori.chat_intelligence import plan_chat_query,enhance_context_route
+from miyori.chat_metrics import (
+    init_chat_metrics_db,store_model_usage,model_usage_summary,
+)
 from miyori.conversation_ui import (
     attached_document_context,
     chat_message_page,
@@ -273,6 +278,7 @@ def _sync_project_drive(project_id: int) -> None:
 async def lifespan(app: FastAPI):
     init_db()
     init_conversation_ui_db()
+    init_chat_metrics_db()
     init_document_intelligence_db()
     init_document_questions_db()
     init_agent_workspace_db()
@@ -1259,6 +1265,13 @@ def project_employee_delete(project_id: int, employee_id: int) -> dict:
     return {"ok": True}
 
 
+@app.get("/api/projects/{project_id}/chat/metrics")
+def chat_metrics(project_id: int, days: int = 30) -> dict:
+    if not get_project(project_id):
+        raise HTTPException(status_code=404,detail="Проект не найден.")
+    return model_usage_summary(project_id, days=days)
+
+
 @app.get("/api/projects/{project_id}/conversations")
 def conversations(project_id: int, q: str = "") -> dict:
     if not get_project(project_id):
@@ -2143,6 +2156,11 @@ async def _build_agent_response(
         return cached
 
     context = recent_messages(conversation_id)
+    query_plan = plan_chat_query(
+        text,context,attached_count=len(attachment_ids or [])
+    )
+    query_for_sources = query_plan.retrieval_query
+    started_retrieval = perf_counter()
     tool_catalog = list_tools()
     brain = build_context(
         project_id,
@@ -2164,7 +2182,7 @@ async def _build_agent_response(
 
     rag = rag_retrieve(
         project_id,
-        text,
+        query_for_sources,
         limit=route.max_rag_items,
         include_documents=include_documents,
         include_memory=include_memory,
@@ -2175,7 +2193,7 @@ async def _build_agent_response(
     rag_payload = rag.to_dict()
 
     epistemic = (
-        trusted_claim_context(project_id, text, limit=8)
+        trusted_claim_context(project_id, query_for_sources, limit=8)
         if route.use_epistemic
         else []
     )
@@ -2187,12 +2205,14 @@ async def _build_agent_response(
     attachment_context, attachment_sources = attached_document_context(
         project_id, attachment_ids or []
     )
+    retrieval_ms = round((perf_counter() - started_retrieval) * 1000)
     source_ids = {s.get("document_id") for s in sources}
     for attachment in attachment_sources:
         if attachment["document_id"] not in source_ids:
             sources.append(attachment)
             source_ids.add(attachment["document_id"])
 
+    actual_usage: dict = {}
     answer = await chat(
         context,
         memory_context=None,
@@ -2202,7 +2222,40 @@ async def _build_agent_response(
         epistemic_context=epistemic,
         rag_context=rag_payload,
         answer_sources=sources,
+        usage_sink=actual_usage,
+        quality_guidance=query_plan.public_summary(),
     )
+
+    unreadable_files = [
+        source.get("title") for source in attachment_sources
+        if source.get("readable") is False
+    ]
+    truncated_files = [
+        source.get("title") for source in attachment_sources
+        if source.get("truncated") is True
+    ]
+    if unreadable_files:
+        evidence_status = "missing_extraction"
+    elif truncated_files:
+        evidence_status = "partial_extraction"
+    elif not sources and (route.use_documents or route.use_epistemic):
+        evidence_status = "insufficient_sources"
+    elif sources:
+        evidence_status = "sources_available_not_fact_checked"
+    else:
+        evidence_status = "not_required"
+    diagnostics = {
+        "plan":query_plan.public_summary(),
+        "evidence":{
+            "status":evidence_status,
+            "source_count":len(sources),
+            "unreadable":unreadable_files,
+            "truncated":truncated_files,
+            "semantic_fact_verification":False,
+        },
+        "model_usage":actual_usage,
+        "retrieval_ms":retrieval_ms,
+    }
 
     assistant_message_id = add_message(
         conversation_id,
@@ -2216,10 +2269,12 @@ async def _build_agent_response(
             "workflow_status": agent.workflow_status,
             "request_id": request_id,
             "response_key": response_key,
+            "diagnostics": diagnostics,
         },
         client_request_id=response_key,
     )
 
+    store_model_usage(project_id,assistant_message_id,actual_usage)
     unique_tool_steps = {
         int(action["step_index"])
         for action in agent.actions
@@ -2235,6 +2290,7 @@ async def _build_agent_response(
         "response_key": response_key,
         "answer": answer,
         "sources": sources,
+        "diagnostics": diagnostics,
         "attachments": attachment_sources,
         "workflow": {
             "id": agent.workflow_id,
@@ -2759,10 +2815,14 @@ async def send_message(request: ChatRequest) -> dict:
         captured_memory = None
         captured_claims = []
 
+    message_history = recent_messages(conversation_id)
+    query_plan = plan_chat_query(
+        text,message_history,attached_count=len(attachment_ids)
+    )
     route = (
         _route_from_payload(existing_workflow["route"])
         if existing_workflow else
-        route_context(text)
+        enhance_context_route(text,query_plan,forced_read_only=request.read_only)
     )
     from dataclasses import replace as replace_route
     if request.read_only:
