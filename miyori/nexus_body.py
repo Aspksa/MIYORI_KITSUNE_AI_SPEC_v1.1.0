@@ -8,7 +8,7 @@ from .nexus_presence import build_nexus_presence
 from .persona import load_persona_corpus
 
 
-NEXUS_BODY_SCHEMA_VERSION = "1.2.0"
+NEXUS_BODY_SCHEMA_VERSION = "1.3.0"
 NEXUS_BODY_STATES = (
     "ready",
     "working",
@@ -195,12 +195,15 @@ def build_nexus_body(project_id: int) -> dict:
             "sentiment_to_expression_allowed": False,
             "model_authored_motion_allowed": False,
             "state_transition_motion_allowed": True,
+            "contract_driven_active_motion_allowed": True,
             "reduced_motion_must_be_respected": True,
         },
         "render_policy": {
             "neutral_shell_until_owner_appearance_choice": True,
             "owner_global_appearance_profile": True,
             "static_portrait_is_non_dynamic": True,
+            "trusted_vector_rig_installed": True,
+            "dynamic_renderer_may_invent_appearance": False,
             "invent_open_appearance_choices_allowed": False,
             "tail_count_may_be_invented": False,
             "hair_color_may_be_invented": False,
