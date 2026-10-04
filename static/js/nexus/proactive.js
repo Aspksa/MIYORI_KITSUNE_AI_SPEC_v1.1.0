@@ -1,8 +1,4 @@
-import {
-    dismissNexusProactive,
-    fetchNexusProactive,
-    snoozeNexusProactive,
-} from "./client.js";
+import { dismissNexusProactive, fetchNexusProactive, snoozeNexusProactive, } from "./client.js";
 function currentProjectId() {
     const select = document.getElementById("projectSelect");
     const value = Number(select?.value);
@@ -176,7 +172,7 @@ export function installNexusProactive() {
         wakeTimer = window.setTimeout(() => {
             wakeTimer = null;
             void refresh();
-        }, Math.min(delay, 2147483647));
+        }, Math.min(delay, 2_147_483_647));
     };
     const refresh = async () => {
         if (stopped)
