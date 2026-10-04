@@ -75,6 +75,9 @@ jobs:
       - name: NEXUS Proactive Miyori contract
         run: npm run test:nexus-proactive
 
+      - name: NEXUS Voice contract
+        run: npm run test:nexus-voice
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
