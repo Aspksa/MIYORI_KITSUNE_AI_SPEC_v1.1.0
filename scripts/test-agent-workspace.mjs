@@ -17,7 +17,7 @@ assert.ok(
   "Agent Workspace lifecycle controls are missing",
 );
 assert.ok(
-  workspace.includes("Исследователь + Ревьюер рисков параллельно") &&
+  workspace.includes("два read-only агента параллельно") &&
     workspace.includes("dependency graph") &&
     workspace.includes("step_budget") &&
     workspace.includes("read-only") &&
