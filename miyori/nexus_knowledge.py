@@ -95,6 +95,17 @@ def _visible_memory(project_id: int) -> list[dict]:
         ).fetchall()
 
     facts = [dict(row) for row in rows]
+    deduped: list[dict] = []
+    seen_user_statements: set[str] = set()
+    for item in facts:
+        if item.get("memory_scope") == "user":
+            normalized = " ".join(str(item.get("statement") or "").casefold().split())
+            if normalized in seen_user_statements:
+                continue
+            seen_user_statements.add(normalized)
+        deduped.append(item)
+    facts = deduped
+
     active = [
         item
         for item in facts
