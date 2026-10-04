@@ -2,6 +2,7 @@ export const NEXUS_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_EVENT_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_ACTION_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_KNOWLEDGE_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_SURFACE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -293,14 +294,67 @@ export interface NexusKnowledgeCenter {
   generated_at: string;
 }
 
-export interface NexusGenerativeSurface {
+export type NexusSurfaceKind =
+  | "status"
+  | "progress"
+  | "action"
+  | "source"
+  | "collection";
+
+export type NexusSurfaceComponent =
+  | "status_summary"
+  | "action_card"
+  | "progress_card"
+  | "knowledge_attention"
+  | "result_collection";
+
+export type NexusSurfaceTone =
+  | "neutral"
+  | "working"
+  | "success"
+  | "warning"
+  | "error";
+
+export interface NexusSurfaceAction {
   id: string;
-  kind: "status" | "progress" | "action" | "source" | "collection";
+  type: "navigate";
+  label: string;
+  target: "chat" | "actions" | "knowledge" | "home" | "system";
+}
+
+export interface NexusGenerativeSurface {
+  schema_version: typeof NEXUS_SURFACE_SCHEMA_VERSION;
+  id: string;
+  kind: NexusSurfaceKind;
+  component: NexusSurfaceComponent;
   title: string;
-  description?: string;
-  state?: NexusOperationalState;
-  action_id?: string;
-  data?: Record<string, unknown>;
+  description: string;
+  tone: NexusSurfaceTone;
+  priority: number;
+  data: Record<string, unknown>;
+  actions: NexusSurfaceAction[];
+  policy: {
+    model_html_allowed: false;
+    script_allowed: false;
+    trusted_component_only: true;
+    interrupts_chat: false;
+  };
+}
+
+export interface NexusSurfacePage {
+  schema_version: typeof NEXUS_SURFACE_SCHEMA_VERSION;
+  project: NexusProjectRef;
+  context: "auto" | "chat" | "actions" | "knowledge" | "system";
+  query: string;
+  surfaces: NexusGenerativeSurface[];
+  registry: {
+    allowed_kinds: NexusSurfaceKind[];
+    allowed_components: NexusSurfaceComponent[];
+    model_html_allowed: false;
+    script_allowed: false;
+    unknown_components_rejected: true;
+  };
+  generated_at: string;
 }
 
 export function isNexusOperationalState(value: unknown): value is NexusOperationalState {
