@@ -64,6 +64,8 @@ function setWorkspaceMenuActive(name) {
 }
 
 function showChatWorkspace() {
+  // Returning to Chat must also reset the last-viewed UI hint.
+  window.miyoriScreenContext={module:"chat"};
   if (workspaceView) {
     workspaceView.hidden = true;
     workspaceView.style.display = "none";

@@ -61,4 +61,17 @@ assert.ok(
   "major modules must share the unified surface system",
 );
 
+assert.ok(
+  workspace.includes('window.miyoriScreenContext={module:"chat"}') &&
+    unified.includes('html[data-nexus-view]:not([data-nexus-view="chat"]) .chat-area') &&
+    unified.includes("#chatSearchPanel") &&
+    unified.includes("#nexusPresenceHost") &&
+    unified.includes("#nexusProactiveHost") &&
+    unified.includes("#nexusSurfaceHost") &&
+    unified.includes("#chatActivity") &&
+    unified.includes("#chatComposer") &&
+    unified.includes('html[data-nexus-view="chat"] #workspaceView'),
+  "chat-only chrome must be isolated from standalone module workspaces and reset on return",
+);
+
 console.log("Miyori unified UI contract OK.");

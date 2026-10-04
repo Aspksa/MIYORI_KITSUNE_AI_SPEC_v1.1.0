@@ -159,6 +159,33 @@ body {
   overflow: hidden;
 }
 
+/* Chat and standalone workspaces share the shell, but never the same visual layer. */
+html[data-nexus-view]:not([data-nexus-view="chat"]) .chat-area {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+html[data-nexus-view]:not([data-nexus-view="chat"]) :is(
+  #chatHeader,
+  #chatSearchPanel,
+  #nexusPresenceHost,
+  #nexusProactiveHost,
+  #nexusSurfaceHost,
+  #miyoriConsole,
+  #messages,
+  #chatActivity,
+  #chatComposer
+) {
+  display: none !important;
+}
+html[data-nexus-view]:not([data-nexus-view="chat"]) #workspaceView {
+  display: grid !important;
+  grid-row: 1;
+  min-height: 0 !important;
+  height: 100%;
+}
+html[data-nexus-view="chat"] #workspaceView {
+  display: none !important;
+}
+
 .chat-header {
   min-height: 72px !important;
   padding: 14px max(24px, calc((100% - 900px) / 2)) !important;
