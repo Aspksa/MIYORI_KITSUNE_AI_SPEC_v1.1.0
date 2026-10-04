@@ -2216,3 +2216,231 @@
   .nexus-home-intro,
   .nexus-home-section > header { flex-direction: column; }
 }
+
+
+/* N12 — Digital Body Runtime. Static unless authoritative state changes. */
+.nexus-body-host {
+  width: min(920px, calc(100% - 28px));
+  margin: 8px auto 0;
+}
+.nexus-body-host[hidden] {
+  display: none;
+}
+.nexus-body-shell {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 58px;
+  padding: 7px 10px;
+  border: 1px solid #ebe5ef;
+  border-radius: 12px;
+  background: #fdfcfd;
+}
+.nexus-body-portrait {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  color: #706479;
+}
+.nexus-body-ear {
+  position: absolute;
+  top: 2px;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid currentColor;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 3px 0 0 0;
+  background: #fdfcfd;
+}
+.nexus-body-ear.left {
+  left: 7px;
+  transform: rotate(35deg);
+}
+.nexus-body-ear.right {
+  right: 7px;
+  transform: scaleX(-1) rotate(35deg);
+}
+.nexus-body-face {
+  position: absolute;
+  left: 8px;
+  top: 10px;
+  width: 28px;
+  height: 30px;
+  border: 1.5px solid currentColor;
+  border-radius: 48% 48% 52% 52%;
+  background: #fff;
+}
+.nexus-body-eye {
+  position: absolute;
+  top: 11px;
+  width: 4px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.nexus-body-eye.left {
+  left: 6px;
+}
+.nexus-body-eye.right {
+  right: 6px;
+}
+.nexus-body-mouth {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 7px;
+  height: 3px;
+  transform: translateX(-50%);
+  border-bottom: 1.5px solid currentColor;
+  border-radius: 0 0 50% 50%;
+}
+.nexus-body-state-mark {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid #fdfcfd;
+  border-radius: 50%;
+  background: #9d94a3;
+}
+.nexus-body-portrait[data-pose="listen"] .nexus-body-face {
+  transform: rotate(3deg);
+}
+.nexus-body-portrait[data-pose="focus"] .nexus-body-eye,
+.nexus-body-portrait[data-pose="inspect"] .nexus-body-eye {
+  height: 2px;
+  border-radius: 2px;
+}
+.nexus-body-portrait[data-expression="attentive"] .nexus-body-eye {
+  width: 4px;
+  height: 4px;
+}
+.nexus-body-portrait[data-expression="alert"] .nexus-body-eye {
+  width: 5px;
+  height: 2px;
+  border-radius: 2px;
+}
+.nexus-body-portrait[data-gesture="speak"] .nexus-body-mouth {
+  width: 6px;
+  height: 5px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+.nexus-body-host[data-state="working"] .nexus-body-state-mark,
+.nexus-body-host[data-state="verifying"] .nexus-body-state-mark,
+.nexus-body-host[data-state="thinking"] .nexus-body-state-mark,
+.nexus-body-host[data-state="listening"] .nexus-body-state-mark,
+.nexus-body-host[data-state="transcribing"] .nexus-body-state-mark,
+.nexus-body-host[data-state="speaking"] .nexus-body-state-mark {
+  background: #806cad;
+}
+.nexus-body-host[data-state="waiting"] .nexus-body-state-mark,
+.nexus-body-host[data-state="interrupted"] .nexus-body-state-mark {
+  background: #c49a54;
+}
+.nexus-body-host[data-state="attention"] .nexus-body-state-mark,
+.nexus-body-host[data-state="recovery"] .nexus-body-state-mark,
+.nexus-body-host[data-state="voice_error"] .nexus-body-state-mark {
+  background: #bd6b6b;
+}
+.nexus-body-host[data-state="degraded"] .nexus-body-state-mark {
+  background: #a68a63;
+}
+.nexus-body-copy {
+  min-width: 0;
+}
+.nexus-body-identity,
+.nexus-body-status,
+.nexus-body-detail,
+.nexus-body-appearance-state {
+  display: block;
+}
+.nexus-body-identity {
+  color: #9a909f;
+  font-size: 7px;
+  font-weight: 750;
+}
+.nexus-body-status {
+  margin-top: 1px;
+  color: #554a5d;
+  font-size: 10px;
+}
+.nexus-body-detail {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #817789;
+  font-size: 7px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nexus-body-appearance-state {
+  margin-top: 2px;
+  color: #aaa1ae;
+  font-size: 7px;
+}
+.nexus-body-canon {
+  max-width: 250px;
+  color: #766b7e;
+  font-size: 7px;
+}
+.nexus-body-canon > summary {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid #e2dbe7;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 750;
+}
+.nexus-body-canon-body {
+  position: absolute;
+  z-index: 8;
+  right: 24px;
+  width: min(360px, calc(100vw - 48px));
+  margin-top: 5px;
+  padding: 10px;
+  border: 1px solid #e7e0eb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(56, 45, 65, 0.09);
+}
+.nexus-body-canon-group + .nexus-body-canon-group {
+  margin-top: 8px;
+}
+.nexus-body-canon-group strong {
+  color: #5e5366;
+}
+.nexus-body-canon-group ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+.nexus-body-canon-group li + li {
+  margin-top: 2px;
+}
+.nexus-body-canon-body p {
+  margin: 8px 0 0;
+  color: #8c8292;
+  line-height: 1.45;
+}
+@media (max-width: 620px) {
+  .nexus-body-host {
+    width: calc(100% - 16px);
+    margin-top: 6px;
+  }
+  .nexus-body-shell {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .nexus-body-canon {
+    grid-column: 2;
+    max-width: none;
+  }
+  .nexus-body-canon-body {
+    right: 8px;
+  }
+}
