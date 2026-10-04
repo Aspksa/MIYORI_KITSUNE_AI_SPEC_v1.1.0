@@ -96,6 +96,9 @@ jobs:
       - name: Unified UI contract
         run: npm run test:ui-unification
 
+      - name: Chat experience and sanitized Markdown
+        run: npm run test:chat-experience
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
