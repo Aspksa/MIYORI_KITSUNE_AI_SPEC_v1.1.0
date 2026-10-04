@@ -287,6 +287,7 @@ def _memory_contract(item: dict) -> dict:
             "origin_project_name": item.get("origin_project_name"),
         },
         "actions": {
+            "project_id": int(item.get("origin_project_id") or 0),
             "verify": item.get("status") != "verified",
             "dispute": item.get("status") not in {"disputed", "superseded"},
             "supersede": item.get("status") != "superseded",
