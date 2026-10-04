@@ -1,0 +1,7 @@
+/* 00.00.63: one small optional detail block, not a dashboard */
+.chat-answer-insights {width:100%;margin:10px 0 0;border-top:1px solid var(--ui-border);color:var(--ui-text-2)}
+.chat-answer-insights summary {width:max-content;padding:8px 0 4px;cursor:pointer;font-size:11px;color:var(--ui-muted)}
+.chat-answer-insights summary:hover {color:var(--ui-accent)}
+.chat-answer-insight-body {display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 16px;padding:7px 0 11px}
+.chat-answer-insight-body p {margin:0!important;font-size:11px!important;line-height:1.55!important;color:var(--ui-text-2)!important}
+.chat-answer-insight-body strong {font-size:11px!important;color:var(--ui-text)!important}

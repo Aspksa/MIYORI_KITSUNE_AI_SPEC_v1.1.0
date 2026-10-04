@@ -105,6 +105,9 @@ jobs:
       - name: Safe chat forks and retries
         run: npm run test:chat-safe-forks
 
+      - name: Chat Intelligence UI contract
+        run: npm run test:chat-intelligence
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

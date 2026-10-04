@@ -20,6 +20,13 @@ class Settings:
         "CLOUDRU_BASE_URL", "https://foundation-models.api.cloud.ru/v1"
     ).rstrip("/")
     cloudru_model_id: str = os.getenv("CLOUDRU_MODEL_ID", "").strip()
+    # Optional user-supplied rates. An unset rate means unknown price, not zero cost.
+    cloudru_input_rub_per_million: float = float(
+        os.getenv("CLOUDRU_INPUT_RUB_PER_1M_TOKENS", "0")
+    )
+    cloudru_output_rub_per_million: float = float(
+        os.getenv("CLOUDRU_OUTPUT_RUB_PER_1M_TOKENS", "0")
+    )
     host: str = os.getenv("MIYORI_HOST", "127.0.0.1").strip()
     port: int = int(os.getenv("MIYORI_PORT", "8765"))
     open_browser: bool = os.getenv("MIYORI_OPEN_BROWSER", "1").strip() not in {"0", "false", "False"}

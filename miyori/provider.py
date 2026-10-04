@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import httpx
+from time import perf_counter
 
 from .config import settings
 from .persona import build_persona_context
@@ -48,6 +49,8 @@ async def chat(
     epistemic_context: list[dict] | None = None,
     rag_context: dict | None = None,
     answer_sources: list[dict] | None = None,
+    usage_sink: dict | None = None,
+    quality_guidance: dict | None = None,
 ) -> str:
     if not settings.cloudru_api_key:
         raise ProviderError(
@@ -214,6 +217,17 @@ async def chat(
             },
         )
 
+    if quality_guidance:
+        system_prompt += _json_block("КРИТЕРИИ_ОТВЕТА", {
+            "depth": quality_guidance.get("mode", "standard"),
+            "instruction": (
+                "Для глубокого анализа: проверь каждый подтверждённый вывод по "
+                "переданным источникам; явно отмечай неполное покрытие и "
+                "недоказанные гипотезы. Для простого вопроса отвечай кратко. "
+                "Не выдавай это правило за выполненную проверку."
+            ),
+        })
+
     payload = {
         "model": settings.cloudru_model_id,
         "messages": [{"role": "system", "content": system_prompt}, *messages],
@@ -224,8 +238,10 @@ async def chat(
     }
 
     url = f"{settings.cloudru_base_url}/chat/completions"
+    started = perf_counter()
     async with httpx.AsyncClient(timeout=90.0) as client:
         response = await client.post(url, headers=headers, json=payload)
+    latency_ms = round((perf_counter() - started) * 1000)
 
     if response.is_error:
         detail = response.text[:1500]
@@ -251,6 +267,34 @@ async def chat(
         )
 
     data = response.json()
+    if usage_sink is not None:
+        usage = data.get("usage")
+        usage = usage if isinstance(usage, dict) else {}
+        def actual_count(key: str) -> int | None:
+            value = usage.get(key)
+            return int(value) if isinstance(value, int) and not isinstance(value,bool) and value >= 0 else None
+
+        prompt_tokens = actual_count("prompt_tokens")
+        completion_tokens = actual_count("completion_tokens")
+        total_tokens = actual_count("total_tokens")
+        input_price = settings.cloudru_input_rub_per_million
+        output_price = settings.cloudru_output_rub_per_million
+        cost = None
+        if (prompt_tokens is not None and completion_tokens is not None
+            and input_price > 0 and output_price > 0):
+            cost = round(
+                (prompt_tokens * input_price + completion_tokens * output_price)
+                / 1_000_000, 6
+            )
+        usage_sink.update({
+            "model":settings.cloudru_model_id,
+            "prompt_tokens":prompt_tokens,
+            "completion_tokens":completion_tokens,
+            "total_tokens":total_tokens,
+            "latency_ms":latency_ms,
+            "estimated_cost_rub":cost,
+            "billing_verified":False,
+        })
     try:
         return data["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError, TypeError, AttributeError) as exc:
