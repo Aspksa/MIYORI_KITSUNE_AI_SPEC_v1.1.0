@@ -560,7 +560,7 @@ form.addEventListener("submit", async (event) => {
     } else {
       showError(error.message || "Не удалось получить ответ.");
       // Keep the stable request ID for safe retry of a persisted workflow.
-      if (userRow && !userRow.dataset.messageId) userRow.remove();
+      if (userRow) userRow.remove();
       input.value = text;
       input.dispatchEvent(new Event("input", {bubbles:true}));
       await loadConversations();
