@@ -272,6 +272,38 @@ function addMessage(role, text, sources = [], options = {}) {
         }
       });
       content.append(totalsButton,totalsOutput);
+      const qualityButton=document.createElement("button");
+      qualityButton.type="button";
+      qualityButton.className="chat-quality-details-button";
+      qualityButton.textContent="Качество чата за 30 дней";
+      const qualityOutput=document.createElement("p");
+      qualityOutput.className="chat-quality-monthly";
+      qualityButton.addEventListener("click",async()=>{
+        const project=Number(state.projectId);
+        if(!project || qualityButton.disabled)return;
+        qualityButton.disabled=true;
+        try {
+          const report=await api(
+            "/api/projects/"+project+"/chat/quality?days=30"
+          );
+          if(Number(state.projectId)!==project)return;
+          const feedback=report.feedback||{};
+          qualityOutput.textContent=
+            "Ответов: "+Number(report.assistant_responses||0)+
+            " · с источниками: "+Number(report.responses_with_sources||0)+
+            " · исправлений: "+Number(feedback.corrected||0)+
+            " · чисел без найденного фрагмента: "+
+              Number(report.numeric_claims_missing_source||0)+
+            (report.average_latency_ms==null?"":" · средняя latency: "+
+              Number(report.average_latency_ms)+" мс")+
+            ". Это измерения, не процент точности.";
+        } catch(error) {
+          qualityOutput.textContent="Метрики качества недоступны: "+
+            String(error.message||error);
+          qualityButton.disabled=false;
+        }
+      });
+      content.append(qualityButton,qualityOutput);
       const offer=options.comparison_offer;
       if(Array.isArray(offer?.document_ids) &&
          offer.document_ids.length>=2 &&
