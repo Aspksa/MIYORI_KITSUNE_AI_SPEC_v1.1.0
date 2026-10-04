@@ -237,6 +237,7 @@ def create_agent_workspace(
     *,
     max_parallel: int = 2,
 ) -> dict:
+    init_agent_workspace_db()
     project = get_project(project_id)
     if not project:
         raise ValueError("Проект не найден.")
