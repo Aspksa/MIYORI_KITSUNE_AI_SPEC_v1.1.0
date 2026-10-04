@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.78"
+PROJECT_VERSION = "00.00.81"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "3.1.0",
+        "version": "3.4.0",
         "status": "active",
-        "description": "Чат объединяет reply/topics/saved tags/pins/folders/checklists/routing/scheduling/voice notes/reactions поверх существующих NEXUS, RAG, Memory и Agent contracts.",
+        "description": "Чат поддерживает реальный Cloud.ru streaming, Stop/partial recovery и единый Ctrl+K Command Center поверх существующих NEXUS, RAG, Memory, Documents и Agent contracts.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "1.6.4",
+        "version": "1.7.0",
         "status": "active",
-        "description": "Состояние системы первым в меню, статусы и метрики объединены в одном окне, Дополнительно всегда открыто.",
+        "description": "NEXUS остаётся единым shell/state fabric; Ctrl+K маршрутизирует к существующим Chat, Actions, Knowledge, Documents, Home, System и проектам без обхода permissions.",
     },
     "digital_body": {
         "name": "Digital Body Miyori",
@@ -53,15 +53,15 @@ MODULES = {
     },
     "drive": {
         "name": "Документы / Облако / Miyori",
-        "version": "1.8.0",
+        "version": "2.0.0",
         "status": "active",
-        "description": "Miyori Drive: оригиналы, extraction integrity, структура документов, безопасная корзина, Document Intelligence, поиск и RAG.",
+        "description": "Miyori Drive хранит оригиналы и поддерживает on-demand OCR/Vision для сканов, изображений и media-объектов с page/media provenance и безопасной фоновой обработкой.",
     },
     "document_intelligence": {
         "name": "Document Intelligence",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "status": "active",
-        "description": "Exhaustive Q&A и групповой запуск проверок 2–5 документов с подтверждаемыми источниками, покрытием OCR и сохранёнными задачами.",
+        "description": "Document Intelligence объединяет локальное извлечение, Cloud.ru OCR/Vision, exhaustive Q&A и сравнения; OCR-результаты возвращаются в те же nodes/chunks с точными page/media locator-ами.",
     },
     "projects": {
         "name": "Проекты",
@@ -125,9 +125,9 @@ MODULES = {
     },
     "rag": {
         "name": "RAG Core",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "status": "active",
-        "description": "Hybrid FTS5 + lexical retrieval + Document Intelligence, память и проверенные знания.",
+        "description": "Hybrid retrieval использует те же chunks для локального текста и успешно подтверждённого OCR/Vision-контента; locator сохраняется непосредственно в searchable chunk.",
     },
     "epistemic": {
         "name": "Epistemic Core",
@@ -156,6 +156,47 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.81",
+        "title": "Document Vision & OCR 2.0",
+        "summary": "Miyori Drive получает явный фоновый OCR/Vision pipeline для сканированных PDF, изображений и встроенных media-объектов. Результаты возвращаются в существующие Document Intelligence и RAG с provenance до страницы/media; неподтверждённые bbox не заявляются.",
+        "modules": [
+            {"key":"drive","version":"2.0.0","changes":[
+                "PNG/JPEG/WEBP сохраняются как оригиналы и маркируются как требующие OCR до явного запуска.",
+                "PDF страницы рендерятся локально с ограничением размера; по умолчанию OCR получает только страницы без текстового слоя.",
+                "DOCX/PPTX/XLSX могут передавать встроенные изображения в визуальный pipeline с архивным media-locator.",
+                "OCR запускается через существующий background worker и поддерживает queued/running/partial/complete/cancelled/failed состояния."
+            ]},
+            {"key":"document_intelligence","version":"1.4.0","changes":[
+                "Предпочтительная внутренняя OCR-модель Cloud.ru — deepseek-ai/DeepSeek-OCR-2; Vision-описание используется только если доступна совместимая Vision-модель аккаунта.",
+                "Успешный OCR атомарно перестраивает document_chunks и локальную карту документа, затем обновляет тот же RAG index.",
+                "Источники имеют locator вида pdf:page:N, image:page:1 или <format>:media:<name>.",
+                "bbox_verified=false остаётся явным контрактом: модельные координаты не выдаются за проверенную геометрию."
+            ]}
+        ],
+    },
+    {
+        "version": "00.00.80",
+        "title": "Unified Command Center",
+        "summary": "Ctrl+K становится единым навигационным центром MIYORI: команды, проекты, разговоры, сообщения, документы, Actions и Knowledge открываются через уже существующие поверхности, без второго shell и без права выполнять write-tools.",
+        "modules": [{"key":"nexus","version":"1.7.0","changes":[
+            "Ctrl+K/Cmd+K открывает доступный с клавиатуры dialog/listbox; Esc закрывает, стрелки выбирают, Enter открывает.",
+            "Поиск переиспользует conversation search, project RAG, Drive и NEXUS Actions, а документы и действия открываются в уже существующих workspace.",
+            "Результат навигации не создаёт permission и не обращается к /tools/execute."
+        ]}],
+    },
+    {
+        "version": "00.00.79",
+        "title": "Real Streaming Chat",
+        "summary": "Чат показывает только реально полученные Cloud.ru chunks через OpenAI-compatible streaming. JSON endpoint сохранён для совместимости; Stop закрывает поток, а уже полученная часть хранится отдельно как partial, не как завершённый проверенный ответ.",
+        "modules": [{"key":"miyori_ai","version":"3.4.0","changes":[
+            "Provider использует stream=true и stream_options include_usage; UI читает NDJSON без fake typing timers.",
+            "Тот же Brain/RAG/Agent/permission/finalization pipeline обслуживает обычный и потоковый transport.",
+            "Кнопка отправки во время генерации становится доступным действием «Остановить ответ».",
+            "Abort отменяет upstream stream; partial assistant text получает stopped_by_user=true и semantic_fact_verification=false.",
+            "Повторный запрос продолжает использовать существующий idempotency/recovery контракт."
+        ]}],
+    },
     {
         "version": "00.00.78",
         "title": "Conversation UX · Messenger-grade Working Chat",
