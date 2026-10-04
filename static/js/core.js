@@ -168,6 +168,48 @@ function addMessage(role, text, sources = [], options = {}) {
     bubble.appendChild(sourceBox);
   }
 
+  if (role === "assistant" && options.diagnostics) {
+    const diagnostics=options.diagnostics;
+    const evidence=diagnostics.evidence || {};
+    const plan=diagnostics.plan || {};
+    const usage=diagnostics.model_usage || {};
+    if (plan.mode!=="fast" || Number(evidence.source_count)>0) {
+      const box=document.createElement("details");
+      box.className="chat-answer-insights";
+      const summary=document.createElement("summary");
+      summary.textContent="Проверка и обработка";
+      const content=document.createElement("div");
+      content.className="chat-answer-insight-body";
+      function line(label,value) {
+        const row=document.createElement("p");
+        const head=document.createElement("strong");
+        head.textContent=label+": ";
+        row.append(head,document.createTextNode(String(value)));
+        content.appendChild(row);
+      }
+      const names={
+        missing_extraction:"Некоторые файлы не прочитаны: нужен OCR",
+        partial_extraction:"Изучена только часть текста",
+        insufficient_sources:"Источников недостаточно",
+        sources_available_not_fact_checked:"Источники найдены; выводы модели не гарантированы",
+        not_required:"Проверка источников не запрашивалась",
+      };
+      line("Режим",plan.mode==="deep"?"углублённый":"обычный");
+      line("Источники",Number(evidence.source_count)||0);
+      line("Покрытие",names[evidence.status]||"не определено");
+      if (Number.isFinite(diagnostics.retrieval_ms))
+        line("Поиск",diagnostics.retrieval_ms+" мс");
+      if (Number.isFinite(usage.latency_ms))
+        line("Ответ модели",usage.latency_ms+" мс");
+      if (Number.isFinite(usage.total_tokens))
+        line("Токены Cloud.ru",usage.total_tokens);
+      if (Number.isFinite(usage.estimated_cost_rub))
+        line("Расчётная стоимость",usage.estimated_cost_rub+" ₽ (не счёт)");
+      box.append(summary,content);
+      bubble.appendChild(box);
+    }
+  }
+
   if (role === "assistant") {
     body.querySelectorAll("pre").forEach(pre => {
       const copy = document.createElement("button");
