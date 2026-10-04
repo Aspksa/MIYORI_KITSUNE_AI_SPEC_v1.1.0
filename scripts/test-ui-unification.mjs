@@ -74,4 +74,12 @@ assert.ok(
   "chat-only chrome must be isolated from standalone module workspaces and reset on return",
 );
 
+assert.ok(
+  workspace.includes("saveChatViewState()") &&
+    workspace.includes("restoreChatViewState()") &&
+    workspace.includes("sessionStorage.setItem") &&
+    workspace.includes("requestAnimationFrame"),
+  "chat position must survive module navigation without rebuilding the conversation",
+);
+
 console.log("Miyori unified UI contract OK.");
