@@ -3242,7 +3242,7 @@ async def send_message(request: ChatRequest) -> dict:
         if (
             existing_message["content"] != text
             or stored_meta.get("attachments", []) != attachment_ids
-            or bool(stored_meta.get("read_only", False)) != request.read_only
+            or bool((existing_message.get("metadata") or {}).get("read_only", False)) != request.read_only
             or stored_meta.get("ui_context", {}) != ui_context
             or stored_meta.get("reply_to_message_id") != (
                 int(request.reply_to_message_id) if request.reply_to_message_id is not None else None
