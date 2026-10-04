@@ -84,6 +84,9 @@ jobs:
       - name: NEXUS Home contract
         run: npm run test:nexus-home
 
+      - name: NEXUS Digital Body contract
+        run: npm run test:nexus-body
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
