@@ -21,6 +21,7 @@ from .config import settings
 SUPPORTED_EXTENSIONS = {
     ".txt", ".md", ".markdown", ".json",
     ".pdf", ".docx", ".xlsx", ".pptx",
+    ".png", ".jpg", ".jpeg", ".webp",
 }
 MAX_FILE_BYTES = 25 * 1024 * 1024
 CHUNK_SIZE = 1400
@@ -1059,6 +1060,10 @@ def extract_structured_document(filename: str, data: bytes) -> StructuredDocumen
         result = _structured_xlsx(filename, data)
     elif suffix == ".pptx":
         result = _structured_pptx(filename, data)
+    elif suffix in {".png", ".jpg", ".jpeg", ".webp"}:
+        raise ValueError(
+            "Изображение сохранено как оригинал, но для чтения содержимого нужен OCR/визуальный анализ."
+        )
     else:
         raise ValueError("Неподдерживаемый формат документа.")
 
