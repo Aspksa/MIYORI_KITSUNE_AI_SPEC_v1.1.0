@@ -53,7 +53,7 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **00.00.45 — инфраструктурный hotfix.** Portable Launch Reliability исправляет ZIP/Windows entrypoint и добавляет Windows archive CI; NEXUS-функциональная архитектура N0–N2 не меняется.
 - **N3 / 00.00.46 — завершён.** Agents & Actions: единый versioned Action Contract, deduplication permission↔workflow, реальные planned/waiting/running/verifying/recovery/completed/error states, preview/evidence/result/history surfaces и точные state-driven badges.
 - **N4 / 00.00.47 — завершён.** Knowledge: отдельный versioned Knowledge Contract объединяет навигацию по Memory + Documents + Epistemic без смешивания сущностей; добавлены provenance/evidence, extraction/analysis/exhaustive coverage, grouped search, safe actions и спокойный progressive-disclosure UI.
-- **N5 — следующий этап.** Voice: explicit microphone capability, transcript/confidence, TTS queue/state и interrupt/cancel semantics.
+- **N5 — запланирован.** Voice: explicit microphone capability, transcript/confidence, TTS queue/state и interrupt/cancel semantics.\n- **N6 — запланирован.** Desktop Runtime: native shell поверх существующего API.\n- **N7 / 00.00.48 — завершён.** Generative UI: trusted component registry, versioned surface specs, safe renderer без model-authored HTML/JS и quiet surface shelf.\n- **N8 — запланирован.** Agent Workspace: delegation, parallel work, dependency graph, approvals и budgets.\n- **N9 — следующий выбранный этап.** Living Presence: только реальные runtime/event states, без декоративной «живости».\n- **N10 — затем.** Proactive Miyori: attention budget, deduplication, snooze/dismiss и отсутствие автоматического выполнения без разрешения.
 
 ## Поэтапный план
 
@@ -109,14 +109,42 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - tray, autostart, deep links, native notifications;
 - launcher/update/recovery остаются независимыми от AI provider.
 
-### N7 — Home
+### N7 — Generative UI
+
+- versioned surface contract;
+- закрытый component registry;
+- только trusted renderer components;
+- model-authored HTML/JavaScript запрещены;
+- contextual surfaces не засоряют Chat и раскрываются по запросу.
+
+### N8 — Agent Workspace
+
+- delegation и parallel work;
+- dependency graph;
+- budgets, approvals и handoff;
+- отдельный agent workspace без превращения Chat в control room.
+
+### N9 — Living Presence
+
+- presence выводится из реальных snapshot/event/action/task states;
+- waiting / working / attention / degraded имеют конкретные data sources;
+- никакой случайной анимации или симуляции «жизни».
+
+### N10 — Proactive Miyori
+
+- server-side attention budget;
+- deduplication и persistent dismiss/snooze;
+- proactive suggestions не выполняют write-actions автоматически;
+- Chat остаётся тихим: low-priority сигналы живут вне потока сообщений.
+
+### N11 — Home
 
 - discovery/heartbeat/device identity;
 - online/offline evidence;
 - parental-control rules only for explicitly linked devices;
 - audit trail для действий.
 
-### N8 — Digital Body / Avatar
+### N12 — Digital Body / Avatar
 
 Только после реальных state/event источников. Взгляд, речь, ожидание, ошибка и работа отображают
 конкретные состояния runtime; случайная «живость» не используется как имитация интеллекта.
