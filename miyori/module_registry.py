@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.77"
+PROJECT_VERSION = "00.00.78"
 
 MODULES = {
     "miyori_ai": {
         "name": "Miyori Kitsune AI",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "status": "active",
-        "description": "Чат работает как единая рабочая поверхность: доказуемая proactive attention, реальные стадии ответа, безопасная передача задач, измеримое качество, Voice barge-in и стабильная доставка сообщений.",
+        "description": "Чат объединяет reply/topics/saved tags/pins/folders/checklists/routing/scheduling/voice notes/reactions поверх существующих NEXUS, RAG, Memory и Agent contracts.",
     },
     "workflow_engine": {
         "name": "Workflow Engine",
@@ -156,6 +156,30 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.78",
+        "title": "Conversation UX · Messenger-grade Working Chat",
+        "summary": "Чат получает 14 рабочих механик зрелого мессенджера без копирования Telegram UI и без второй системы состояния: reply/цитаты, темы, Saved с тегами, message pins, папки, allowlisted inline-actions, persisted checklists, Markdown composer, voice notes, scoped unified search, unread state, provenance routing, scheduled prompts и функциональные reactions.",
+        "modules": [
+            {
+                "key": "miyori_ai",
+                "version": "3.1.0",
+                "changes": [
+                    "Reply хранит source message ID и проверяет выбранную цитату на сервере; quoted content считается контекстом, а не system instruction или permission.",
+                    "Topics, tags, message pins, reactions, checklists, folders и read-state живут в additive project-scoped metadata tables и не переписывают исторические messages.",
+                    "Saved answers показывают пользовательские tags; conversation folders поддерживают All/Pinned/Saved/Tasks/Unread и собственные группы.",
+                    "Inline actions используют закрытый destination/reaction registry; никакого model-authored JavaScript или скрытого запуска write-tools.",
+                    "Rich composer добавляет Markdown formatting controls, scheduled prompts и voice-note recording поверх прежнего textarea/attachment flow.",
+                    "Voice note сохраняет реальный project-scoped audio asset; browser SpeechRecognition используется только если доступен. Без транскрипции система не делает вид, что поняла аудио.",
+                    "Project search объединяет ranked lexical chat retrieval с существующим RAG для Documents/Memory/Knowledge и прямо сообщает, что chat embeddings не настроены.",
+                    "Unread divider и last-read state project/conversation scoped; открытие сообщения обновляет read marker без изменения истории.",
+                    "Message routing сохраняет provenance перед переходом в New chat / Saved / Knowledge / Documents / Tasks / Agent Workspace.",
+                    "Scheduled/repeating prompts используют UTC timestamps. Auto-send работает только при открытом приложении и свободном composer, поэтому не перезаписывает пользовательский draft.",
+                    "Reaction 🧠 всегда показывает preview и создаёт только candidate Memory с точным source role/message provenance; verified knowledge не возникает из emoji."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.77",
         "title": "Chat Evolution · Proactive Working Surface",
