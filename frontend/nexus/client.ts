@@ -19,6 +19,7 @@ import {
   type NexusProactiveSignal,
   type NexusVoiceContract,
   type NexusAgentWorkspace,
+  type NexusAgentWorkspaceSummary,
   type NexusEventPage,
   type NexusSnapshot,
 } from "./contracts.js";
@@ -345,7 +346,7 @@ function validateAgentWorkspace(value: unknown): NexusAgentWorkspace {
 
 export async function fetchNexusAgentWorkspaces(
   projectId: number,
-): Promise<NexusAgentWorkspace[]> {
+): Promise<NexusAgentWorkspaceSummary[]> {
   validateProjectId(projectId);
   const response = await fetch(`/api/projects/${projectId}/agent-workspaces`, {
     headers: { Accept: "application/json" },
@@ -353,7 +354,7 @@ export async function fetchNexusAgentWorkspaces(
   if (!response.ok) {
     throw new Error(`Agent Workspace API: HTTP ${response.status}`);
   }
-  const payload = (await response.json()) as { workspaces?: NexusAgentWorkspace[] };
+  const payload = (await response.json()) as { workspaces?: NexusAgentWorkspaceSummary[] };
   return Array.isArray(payload.workspaces) ? payload.workspaces : [];
 }
 
