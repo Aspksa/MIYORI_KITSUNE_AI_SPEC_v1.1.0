@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-PROJECT_VERSION = "00.00.46"
+PROJECT_VERSION = "00.00.47"
 
 MODULES = {
     "miyori_ai": {
@@ -29,9 +29,9 @@ MODULES = {
     },
     "nexus": {
         "name": "MIYORI NEXUS",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "status": "active",
-        "description": "NEXUS Agents & Actions: единый typed action contract, structured previews, progress/evidence/result/history, recovery controls и state-driven shell.",
+        "description": "NEXUS Knowledge: grouped Memory/Documents/Epistemic navigation, provenance/evidence, coverage, quiet tabs/disclosure UI и совместимость с Drive.",
     },
     "settings": {
         "name": "Настройки",
@@ -144,6 +144,26 @@ MODULES = {
 }
 
 RELEASES = [
+    {
+        "version": "00.00.47",
+        "title": "NEXUS Knowledge · provenance, evidence и coverage без шума",
+        "summary": "N4 вводит отдельный Knowledge Contract и спокойный рабочий интерфейс: Memory, Documents и Epistemic остаются разными сущностями, но получают общий поиск, provenance/evidence navigation, coverage, safe actions и progressive disclosure.",
+        "modules": [
+            {
+                "key": "nexus",
+                "version": "0.5.0",
+                "changes": [
+                    "Добавлен versioned /api/projects/{project_id}/nexus/knowledge с отдельными memory/documents/claims секциями.",
+                    "Knowledge primary view больше не является прямым алиасом Drive; Drive сохранён как отдельная файловая поверхность.",
+                    "Memory показывает scope/kind/provenance и корректно маршрутизирует действия к проекту происхождения user-memory.",
+                    "Documents показывают extraction coverage, analysis coverage, parser provenance и exhaustive Q&A coverage.",
+                    "Epistemic claims показывают evidence preview, source locator/quality, supports/contradictions и verify action.",
+                    "Поиск работает сразу по трём слоям, но возвращает группированные результаты без смешивания типов.",
+                    "Tabs/disclosure следуют accessibility semantics; декоративные анимации и постоянный knowledge graph не добавлены."
+                ],
+            },
+        ],
+    },
     {
         "version": "00.00.46",
         "title": "NEXUS Agents & Actions · рабочий орган управления",

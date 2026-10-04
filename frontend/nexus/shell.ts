@@ -90,7 +90,11 @@ function renderSnapshot(snapshot: NexusSnapshot): void {
   setText("nexusNavActionsMeta", actionCount ? String(actionCount) : "чисто");
 
   const documents = Number(snapshot.counts.documents ?? 0);
-  setText("nexusNavKnowledgeMeta", documents ? String(documents) : "0");
+  const knowledgeAttention = Number(snapshot.counts.knowledge_attention ?? 0);
+  setText(
+    "nexusNavKnowledgeMeta",
+    knowledgeAttention > 0 ? `${knowledgeAttention} проверить` : documents ? String(documents) : "0",
+  );
 
   const home = moduleById(snapshot, "home");
   setText(

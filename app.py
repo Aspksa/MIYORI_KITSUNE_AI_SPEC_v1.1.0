@@ -173,6 +173,7 @@ from miyori.account import cloudru_profile, list_cloudru_models, save_cloudru_pr
 from miyori.module_registry import module_manifest, release_history
 from miyori.nexus import build_nexus_snapshot
 from miyori.nexus_actions import build_nexus_action_center
+from miyori.nexus_knowledge import build_nexus_knowledge_center
 from miyori.nexus_events import list_nexus_events
 from miyori.system_settings import (
     cleanup_runtime_logs,
@@ -251,7 +252,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.46", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.47", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -1599,6 +1600,22 @@ def project_nexus(project_id: int) -> dict:
 def project_nexus_actions(project_id: int, limit: int = 60) -> dict:
     try:
         return build_nexus_action_center(project_id, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/nexus/knowledge")
+def project_nexus_knowledge(
+    project_id: int,
+    q: str = "",
+    limit: int = 80,
+) -> dict:
+    try:
+        return build_nexus_knowledge_center(
+            project_id,
+            query=q,
+            limit=limit,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

@@ -1,6 +1,7 @@
 export const NEXUS_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_EVENT_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_ACTION_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_KNOWLEDGE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -147,6 +148,149 @@ export interface NexusActionCenter {
     permission_embedded_in_workflow: boolean;
     speculative_progress_allowed: boolean;
   };
+}
+
+export interface NexusKnowledgeMemory {
+  id: number;
+  statement: string;
+  status: "candidate" | "verified" | "disputed" | "superseded" | string;
+  scope: "user" | "project" | string;
+  kind: "fact" | "preference" | "process" | "constraint" | string;
+  confidence: number | null;
+  salience: number;
+  verification_method: string | null;
+  observed_at: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  possible_conflict_ids: number[];
+  provenance: {
+    source_kind: string | null;
+    conversation_id: number | null;
+    message_id: number | null;
+    locator: string | null;
+    origin_project_id: number | null;
+    origin_project_name: string | null;
+  };
+  actions: {
+    project_id: number;
+    verify: boolean;
+    dispute: boolean;
+    supersede: boolean;
+  };
+}
+
+export interface NexusKnowledgeDocument {
+  id: number;
+  filename: string;
+  folder_id: number | null;
+  folder_name: string | null;
+  mime_type: string | null;
+  size_bytes: number;
+  created_at: string | null;
+  provenance: {
+    sha256: string;
+    locator: string;
+    source_kind: "original_document";
+  };
+  index: {
+    chunks: number;
+    nodes: number;
+    parser_version: string | null;
+  };
+  intelligence: {
+    status: string;
+    title: string | null;
+    document_kind: string | null;
+    language: string | null;
+    summary: string | null;
+    word_count: number;
+    page_count: number;
+    section_count: number;
+    table_count: number;
+    coverage: number;
+    extraction_status: string;
+    extraction_coverage: number;
+    warnings: string[];
+    analysis_model: string | null;
+    last_error: string | null;
+    updated_at: string | null;
+    limited: boolean;
+  };
+  exhaustive: {
+    questions: number;
+    complete: number;
+    active: number;
+    best_coverage: number;
+  };
+  actions: {
+    analyze: boolean;
+    rebuild: boolean;
+  };
+}
+
+export interface NexusKnowledgeEvidencePreview {
+  id: number | null;
+  stance: "supports" | "contradicts" | "neutral" | string;
+  excerpt: string | null;
+  weight: number | null;
+  source: {
+    id: number | null;
+    type: string | null;
+    key: string | null;
+    title: string | null;
+    locator: string | null;
+    publisher: string | null;
+    quality: number | null;
+    observed_at: string | null;
+  };
+}
+
+export interface NexusKnowledgeClaim {
+  id: number;
+  statement: string;
+  claim_type: string;
+  status: string;
+  assessment: string;
+  confidence: number;
+  supports: number;
+  contradictions: number;
+  open_contradictions: number;
+  independent_sources: number;
+  evidence_count: number;
+  evidence_preview: NexusKnowledgeEvidencePreview[];
+  created_at: string | null;
+  updated_at: string | null;
+  verified_at: string | null;
+  can_verify: boolean;
+}
+
+export interface NexusKnowledgeCenter {
+  schema_version: typeof NEXUS_KNOWLEDGE_SCHEMA_VERSION;
+  project: NexusProjectRef;
+  query: string;
+  counts: {
+    memory: Record<string, number>;
+    documents: Record<string, number>;
+    claims: Record<string, number>;
+    attention: Record<string, number>;
+  };
+  results: {
+    memory: number;
+    documents: number;
+    claims: number;
+  };
+  memory: NexusKnowledgeMemory[];
+  documents: NexusKnowledgeDocument[];
+  claims: NexusKnowledgeClaim[];
+  semantics: {
+    sections_are_distinct: boolean;
+    memory_meaning: string;
+    documents_meaning: string;
+    claims_meaning: string;
+    graph_is_optional: boolean;
+    arbitrary_model_markup: boolean;
+  };
+  generated_at: string;
 }
 
 export interface NexusGenerativeSurface {

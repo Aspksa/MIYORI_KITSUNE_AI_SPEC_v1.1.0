@@ -165,6 +165,23 @@ def build_nexus_snapshot(project_id: int) -> dict:
         int(extraction_counts.get(key, 0))
         for key in ("partial", "text_only", "needs_ocr", "unavailable")
     ) + int(intelligence_counts.get("failed", 0))
+    memory_disputed = sum(
+        1 for item in memory if item.get("status") == "disputed"
+    )
+    memory_conflicts = sum(
+        1 for item in memory if item.get("possible_conflict_ids")
+    )
+    epistemic_claims = epistemic.get("claims") or {}
+    epistemic_open_contradictions = int(
+        epistemic.get("open_contradictions") or 0
+    )
+    knowledge_attention = (
+        memory_disputed
+        + memory_conflicts
+        + documents_limited
+        + int(epistemic_claims.get("disputed") or 0)
+        + epistemic_open_contradictions
+    )
 
     modules = [
         _module(
@@ -309,6 +326,9 @@ def build_nexus_snapshot(project_id: int) -> dict:
         "recovering_workflows": len(recovering_workflows),
         "active_actions": active_actions,
         "attention_actions": attention_actions,
+        "knowledge_attention": knowledge_attention,
+        "memory_disputed": memory_disputed,
+        "memory_conflicts": memory_conflicts,
         "failed_tasks": len(failed_tasks),
         "checks_passed": development.get("checks_passed", 0),
         "checks_total": development.get("checks_total", 0),

@@ -1,4 +1,4 @@
-import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
+import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
 function validateProjectId(projectId) {
     if (!Number.isInteger(projectId) || projectId <= 0) {
         throw new Error("Некорректный projectId для MIYORI NEXUS.");
@@ -82,6 +82,30 @@ export async function fetchNexusActions(projectId, limit = 60) {
             !isNexusActionState(action.state)) {
             throw new Error("NEXUS actions API вернул некорректное действие.");
         }
+    }
+    return payload;
+}
+export async function fetchNexusKnowledge(projectId, options = {}) {
+    validateProjectId(projectId);
+    const params = new URLSearchParams();
+    if (options.query?.trim())
+        params.set("q", options.query.trim());
+    if (options.limit !== undefined)
+        params.set("limit", String(options.limit));
+    const suffix = params.size ? `?${params.toString()}` : "";
+    const response = await fetch(`/api/projects/${projectId}/nexus/knowledge${suffix}`, { headers: { Accept: "application/json" } });
+    if (!response.ok) {
+        throw new Error(`NEXUS knowledge API: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    if (payload.schema_version !== NEXUS_KNOWLEDGE_SCHEMA_VERSION) {
+        throw new Error("Несовместимая версия NEXUS knowledge API.");
+    }
+    if (!Array.isArray(payload.memory) ||
+        !Array.isArray(payload.documents) ||
+        !Array.isArray(payload.claims) ||
+        payload.semantics?.sections_are_distinct !== true) {
+        throw new Error("NEXUS knowledge API нарушил разделение источников.");
     }
     return payload;
 }

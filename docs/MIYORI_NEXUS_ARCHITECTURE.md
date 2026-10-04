@@ -52,7 +52,8 @@ Documents, Home, Voice и будущий Desktop-клиент.
 - **N2 / 00.00.44 — завершён.** Введён совместимый NEXUS Shell с пятью primary-разделами, state-driven badges, Actions workspace, keyboard/mobile navigation и progressive disclosure legacy-функций.
 - **00.00.45 — инфраструктурный hotfix.** Portable Launch Reliability исправляет ZIP/Windows entrypoint и добавляет Windows archive CI; NEXUS-функциональная архитектура N0–N2 не меняется.
 - **N3 / 00.00.46 — завершён.** Agents & Actions: единый versioned Action Contract, deduplication permission↔workflow, реальные planned/waiting/running/verifying/recovery/completed/error states, preview/evidence/result/history surfaces и точные state-driven badges.
-- **N4 — следующий этап.** Knowledge: Memory + Documents + Epistemic как связанные, но не смешанные источники с source/evidence navigation.
+- **N4 / 00.00.47 — завершён.** Knowledge: отдельный versioned Knowledge Contract объединяет навигацию по Memory + Documents + Epistemic без смешивания сущностей; добавлены provenance/evidence, extraction/analysis/exhaustive coverage, grouped search, safe actions и спокойный progressive-disclosure UI.
+- **N5 — следующий этап.** Voice: explicit microphone capability, transcript/confidence, TTS queue/state и interrupt/cancel semantics.
 
 ## Поэтапный план
 

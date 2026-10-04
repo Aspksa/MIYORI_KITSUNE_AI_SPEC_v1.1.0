@@ -2,8 +2,29 @@
 
 Локальный персональный AI-проект с FastAPI backend, SQLite-хранилищем, Cloud.ru LLM, Persona Pack, RAG, Epistemic Core, проектными пространствами и модульным веб-интерфейсом.
 
-**Внутренняя версия приложения: 00.00.46.**  
+**Внутренняя версия приложения: 00.00.47.**  
 Репозиторий: `Aspksa/MIYORI_KITSUNE_AI_SPEC_v1.1.0`.
+
+## Состояние релиза 00.00.47
+
+`00.00.47` — **NEXUS Knowledge · память, документы и evidence без визуального шума**.
+
+N4 превращает раздел «Знания» в отдельный рабочий орган, не смешивая разные классы данных:
+
+- `GET /api/projects/{id}/nexus/knowledge` отдаёт единый versioned read-model, но сохраняет отдельные массивы `memory / documents / claims`;
+- личная память видима между проектами согласно существующей memory-модели, проектная память остаётся изолированной;
+- provenance памяти показывает источник, conversation/message и проект происхождения;
+- документы показывают отдельно extraction coverage и knowledge/analysis coverage;
+- exhaustive Q&A отражается фактическими question counts и coverage, без выдуманного прогресса;
+- Epistemic claims показывают assessment, confidence, supports/contradictions и evidence previews с source locator/quality;
+- единый поиск возвращает результаты группами, не превращая память, документы и claims в один тип;
+- safe actions используют существующие endpoints: подтверждение/оспаривание памяти, verify evidence, deep document analysis и rebuild структуры;
+- primary Knowledge больше не открывает Drive напрямую; Drive остаётся доступен отдельной кнопкой и через legacy navigation;
+- UI использует WAI-ARIA tabs и native disclosure, provenance/evidence скрыты до раскрытия;
+- Knowledge CSS намеренно спокойный: крупнее текст, нейтральные поверхности, отсутствие keyframe-анимаций и декоративного knowledge graph;
+- shell показывает только количество Knowledge-проблем, требующих проверки, вместо постоянного потока технических статусов.
+
+Новые UI-runtime библиотеки не добавлены: для текущего vanilla TS/JS клиента они не дают преимущества, достаточного для нового dependency/runtime слоя. Graph capability оставлен на будущее как опциональный drill-down, а не постоянная визуализация.
 
 ## Состояние релиза 00.00.46
 

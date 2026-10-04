@@ -63,6 +63,9 @@ jobs:
       - name: NEXUS shell contract
         run: npm run test:nexus-shell
 
+      - name: NEXUS Knowledge contract
+        run: npm run test:nexus-knowledge
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done
