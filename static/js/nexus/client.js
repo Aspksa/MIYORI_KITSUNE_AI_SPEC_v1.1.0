@@ -1,4 +1,4 @@
-import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
+import { NEXUS_ACTION_SCHEMA_VERSION, NEXUS_KNOWLEDGE_SCHEMA_VERSION, NEXUS_SURFACE_SCHEMA_VERSION, NEXUS_PRESENCE_SCHEMA_VERSION, NEXUS_PROACTIVE_SCHEMA_VERSION, NEXUS_EVENT_SCHEMA_VERSION, NEXUS_SCHEMA_VERSION, isNexusActionState, isNexusEventSeverity, isNexusOperationalState, } from "./contracts.js";
 function validateProjectId(projectId) {
     if (!Number.isInteger(projectId) || projectId <= 0) {
         throw new Error("Некорректный projectId для MIYORI NEXUS.");
@@ -145,4 +145,50 @@ export async function fetchNexusPresence(projectId) {
         throw new Error("NEXUS presence API нарушил authoritative state contract.");
     }
     return payload;
+}
+function validateProactivePage(payload) {
+    if (payload.schema_version !== NEXUS_PROACTIVE_SCHEMA_VERSION ||
+        !Array.isArray(payload.signals) ||
+        payload.policy?.chat_interruption_allowed !== false ||
+        payload.policy?.auto_execute_allowed !== false ||
+        payload.policy?.write_tools_allowed !== false ||
+        payload.policy?.creates_chat_messages !== false ||
+        payload.policy?.persistent_dismiss_snooze !== true ||
+        payload.policy?.derived_from_authoritative_state !== true) {
+        throw new Error("NEXUS proactive API нарушил attention safety contract.");
+    }
+    return payload;
+}
+export async function fetchNexusProactive(projectId) {
+    validateProjectId(projectId);
+    const response = await fetch(`/api/projects/${projectId}/nexus/proactive`, { headers: { Accept: "application/json" } });
+    if (!response.ok) {
+        throw new Error(`NEXUS proactive API: HTTP ${response.status}`);
+    }
+    return validateProactivePage((await response.json()));
+}
+export async function dismissNexusProactive(projectId, signalId) {
+    validateProjectId(projectId);
+    const response = await fetch(`/api/projects/${projectId}/nexus/proactive/${encodeURIComponent(signalId)}/dismiss`, { method: "POST", headers: { Accept: "application/json" } });
+    if (!response.ok) {
+        throw new Error(`NEXUS proactive dismiss: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    return validateProactivePage(payload.proactive ?? {});
+}
+export async function snoozeNexusProactive(projectId, signalId, minutes = 60) {
+    validateProjectId(projectId);
+    const response = await fetch(`/api/projects/${projectId}/nexus/proactive/${encodeURIComponent(signalId)}/snooze`, {
+        method: "POST",
+        headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ minutes }),
+    });
+    if (!response.ok) {
+        throw new Error(`NEXUS proactive snooze: HTTP ${response.status}`);
+    }
+    const payload = (await response.json());
+    return validateProactivePage(payload.proactive ?? {});
 }
