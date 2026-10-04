@@ -50,7 +50,7 @@
           <span class="nexus-nav-copy"><strong>Дом</strong><small>Устройства и домашние проекты</small></span>
           <span id="nexusNavHomeMeta" class="nexus-nav-meta">—</span>
         </button>
-        <button id="nexusNavSystem" class="nexus-nav-button" data-nexus-view="system" type="button">
+        <button id="nexusNavSystem" class="nexus-nav-button" data-nexus-view="system" type="button" hidden aria-hidden="true" tabindex="-1">
           <span class="nexus-nav-icon" aria-hidden="true">⚙</span>
           <span class="nexus-nav-copy"><strong>Настройки</strong><small>Система · клиенты · обновления</small></span>
           <span id="nexusNavSystemMeta" class="nexus-nav-meta">—</span>
@@ -85,6 +85,16 @@
             <span class="side-menu-icon">◌</span>
             <span class="side-menu-copy"><strong>Личный кабинет</strong><small>Профиль и доступ</small></span>
             <span class="side-menu-chevron">›</span>
+          </button>
+          <button class="side-menu-item" id="menuSettings" type="button">
+            <span class="side-menu-icon" aria-hidden="true">⚙</span>
+            <span class="side-menu-copy"><strong>Настройки</strong><small>Приложение и система</small></span>
+            <span class="side-menu-chevron" aria-hidden="true">›</span>
+          </button>
+          <button class="side-menu-item" id="menuAppearance" type="button">
+            <span class="side-menu-icon" aria-hidden="true">狐</span>
+            <span class="side-menu-copy"><strong>Образ Миёри</strong><small>Внешность и портрет</small></span>
+            <span class="side-menu-chevron" aria-hidden="true">›</span>
           </button>
           <button class="side-menu-item" id="menuDocumentsHub" type="button">
             <span class="side-menu-icon">▤</span>
@@ -126,16 +136,24 @@
     <main class="chat-area">
       <header class="chat-header" id="chatHeader">
         <div class="chat-title">
-          <span id="nexusViewEyebrow" class="section-caption" hidden>Чат</span>
           <h2 id="conversationTitle">Миёри</h2>
+          <span id="nexusViewEyebrow" class="section-caption" hidden>Чат</span>
+        </div>
+        <section id="nexusBodyHost" class="nexus-body-host" role="status" aria-live="polite" aria-label="Digital Body Miyori" hidden></section>
+        <div class="chat-header-tools">
+          <button id="chatHistoryButton" class="chat-top-button" type="button" aria-label="История переписки" title="История переписки">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+          </button>
+          <button id="newChat" class="chat-new-button" type="button" title="Новый чат" aria-label="Новый чат">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <span>Новый чат</span>
+          </button>
         </div>
         <div id="nexusHeaderStatus" class="nexus-header-status" role="status" aria-live="polite">
           <span id="nexusHeaderStateDot" class="nexus-state-dot" data-state="not_connected" aria-hidden="true"></span>
           <span><strong id="nexusHeaderState">Подключение</strong><small id="nexusHeaderDetail">Состояние проекта ещё не синхронизировано</small></span>
         </div>
       </header>
-
-      <section id="nexusBodyHost" class="nexus-body-host" role="status" aria-live="polite" aria-label="Digital Body Miyori" hidden></section>
 
       <section id="nexusPresenceHost" class="nexus-presence-host" role="status" aria-live="polite" aria-label="Текущее состояние Miyori" hidden></section>
 
@@ -269,7 +287,7 @@
         <div id="workspaceBody" class="workspace-page-body"></div>
       </section>
 
-      <section id="messages" class="messages" aria-live="polite"></section>
+      <section id="messages" class="messages" aria-live="polite" aria-label="Сообщения чата"></section>
 
       <footer class="composer-wrap" id="chatComposer">
         <section id="voicePanel" class="nexus-voice-panel" aria-label="Голосовой интерфейс" hidden>
@@ -284,13 +302,25 @@
             <button id="voiceStop" type="button" class="voice-soft-button">Стоп</button>
           </div>
         </section>
-        <form id="chatForm" class="composer">
-          <button id="voiceButton" class="voice-button" type="button" aria-label="Голосовой ввод" aria-pressed="false">◉</button>
-          <div class="composer-field">
-            <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Задать вопрос…" aria-label="Сообщение Миёри" required></textarea>
-            <div class="composer-hint">Enter — отправить · Shift+Enter — новая строка</div>
+        <form id="chatForm" class="composer" aria-label="Новое сообщение">
+          <label class="visually-hidden" for="messageInput">Сообщение Миёри</label>
+          <textarea id="messageInput" rows="2" maxlength="20000" placeholder="Спросите что-нибудь у Миёри…" aria-label="Сообщение Миёри" required></textarea>
+          <div class="composer-toolbar">
+            <div class="composer-tools">
+              <button id="composerAttach" class="composer-icon-button" type="button" title="Добавить документ" aria-label="Добавить документ">
+                <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.6 12.5 20.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>
+              </button>
+              <button id="voiceButton" class="voice-button composer-icon-button" type="button" title="Голосовой ввод" aria-label="Голосовой ввод" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8"/></svg>
+              </button>
+            </div>
+            <div class="composer-toolbar-right">
+              <span class="composer-hint">Enter — отправить · Shift+Enter — новая строка</span>
+              <button id="sendButton" class="send-button" type="submit" aria-label="Отправить сообщение" title="Отправить сообщение">
+                <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
+              </button>
+            </div>
           </div>
-          <button id="sendButton" class="send-button" type="submit" aria-label="Отправить">↑</button>
         </form>
         <div id="errorBox" class="error" role="alert" aria-live="assertive" hidden></div>
       </footer>
