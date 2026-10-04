@@ -15,6 +15,7 @@ from .db import (
 from .agent_workspace import list_agent_workspaces
 from .document_intelligence import document_intelligence_status
 from .epistemic import epistemic_snapshot
+from .nexus_home import build_nexus_home
 from .tasks import worker_status
 
 NEXUS_SCHEMA_VERSION = "1.0.0"
@@ -91,6 +92,7 @@ def build_nexus_snapshot(project_id: int) -> dict:
     development = development_snapshot(project_id)
     document_status = document_intelligence_status(project_id)
     epistemic = epistemic_snapshot(project_id)
+    home = build_nexus_home(project_id)
     worker = worker_status()
 
     verified_memory = [item for item in memory if item.get("status") == "verified"]
@@ -311,13 +313,34 @@ def build_nexus_snapshot(project_id: int) -> dict:
         _module(
             "home",
             "Home",
-            "ready" if project.get("kind") == "home" else "disabled",
+            (
+                "disabled"
+                if not home.get("enabled")
+                else "degraded"
+                if int(home["counts"].get("offline_or_unseen") or 0) > 0
+                else "ready"
+            ),
+            operation=(
+                (
+                    f"Online: {int(home['counts'].get('online') or 0)} / "
+                    f"linked: {int(home['counts'].get('linked') or 0)}"
+                )
+                if home.get("enabled")
+                else None
+            ),
             last_result=(
-                "Домашний проект активен."
-                if project.get("kind") == "home"
+                (
+                    f"Устройств: {int(home['counts'].get('devices') or 0)} · "
+                    f"parental attention: {int(home['counts'].get('parental_attention') or 0)}"
+                )
+                if home.get("enabled")
                 else "Home-контур не активен для рабочего проекта."
             ),
-            limitation="Сетевое обнаружение устройств пока не является частью NEXUS Foundation.",
+            limitation=(
+                "Connectivity подтверждается только authenticated heartbeat; network scanning отключён."
+                if home.get("enabled")
+                else "Переключитесь на домашний проект для Home capability."
+            ),
             updated_at=generated_at,
         ),
         _module(
@@ -361,6 +384,11 @@ def build_nexus_snapshot(project_id: int) -> dict:
         "memory_disputed": memory_disputed,
         "memory_conflicts": memory_conflicts,
         "failed_tasks": len(failed_tasks),
+        "home_devices": int(home["counts"].get("devices") or 0),
+        "home_linked": int(home["counts"].get("linked") or 0),
+        "home_online": int(home["counts"].get("online") or 0),
+        "home_attention": int(home["counts"].get("parental_attention") or 0)
+            + int(home["counts"].get("offline_or_unseen") or 0),
         "checks_passed": development.get("checks_passed", 0),
         "checks_total": development.get("checks_total", 0),
     }
