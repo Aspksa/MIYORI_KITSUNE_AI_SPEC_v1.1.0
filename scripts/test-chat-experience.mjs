@@ -8,6 +8,7 @@ const chat = readFileSync("static/js/chat.js", "utf8");
 const css = readFileSync("static/css/chat-polish.css", "utf8");
 const body = readFileSync("frontend/nexus/body.ts", "utf8");
 const actions = readFileSync("static/js/workspace.js", "utf8");
+const extras = readFileSync("static/js/chat-extras.js", "utf8");
 
 const dom = new JSDOM(html, {url:"http://127.0.0.1/", runScripts:"outside-only"});
 const {window} = dom;
@@ -44,4 +45,12 @@ assert.equal(userBody.querySelector("img"),null,"user text must remain text");
 assert.ok(userBody.textContent.includes("<img"),"user text must remain visible, not execute");
 
 assert.ok(!chat.includes('sendButton.textContent = "Думаю…"'), "icon should never be replaced by busy label");
+assert.ok(
+  core.includes('commands.push(["tasks", "В задачи"])') &&
+    actions.includes("async function openAgentWorkspaceFromChat(goal)") &&
+    extras.includes('action === "tasks"') &&
+    !extras.includes('"/agent-workspaces"'),
+  "chat delegation must prefill the existing Agent Workspace without auto-creating or running it",
+);
+
 console.log("Chat composition, offline Markdown and DOMPurify safety OK.");
