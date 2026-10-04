@@ -274,7 +274,6 @@ function addMessage(role, text, sources = [], options = {}) {
             button.onclick=async()=>{
               try{await render(id);}catch(error){results.textContent=error.message;}
             };
-            button.addEventListener("click",async()=>{}, {once:true});
           } catch(error){
             results.textContent=error.message;
           } finally{button.disabled=false;}
