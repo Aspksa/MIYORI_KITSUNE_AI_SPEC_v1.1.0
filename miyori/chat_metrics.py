@@ -1,5 +1,6 @@
 """Only actual Cloud.ru usage and measured request duration, never invented tokens."""
 from __future__ import annotations
+import json
 import sqlite3
 from .db import connect
 
@@ -76,4 +77,78 @@ def model_usage_summary(project_id: int, days: int = 30) -> dict:
         ),
         "billing_verified":False,
         "note":"Локальный расчёт по фактическому usage API. Не является счётом Cloud.ru.",
+    }
+
+
+
+def chat_quality_summary(project_id: int, days: int = 30) -> dict:
+    """Measured chat signals only; never converts them into an accuracy score."""
+    days = max(1, min(365, int(days)))
+    with connect() as db:
+        rows = db.execute(
+            """
+            SELECT m.metadata_json
+            FROM messages m
+            JOIN conversations c ON c.id = m.conversation_id
+            WHERE c.project_id = ? AND m.role = 'assistant'
+              AND m.created_at >= datetime('now', ?)
+            """,
+            (project_id, f"-{days} days"),
+        ).fetchall()
+
+    responses = 0
+    with_sources = 0
+    limited_extraction = 0
+    numeric_checks = 0
+    numeric_claims_seen = 0
+    numeric_claims_with_source = 0
+    numeric_claims_missing_source = 0
+
+    for row in rows:
+        responses += 1
+        try:
+            metadata = json.loads(row["metadata_json"] or "{}")
+        except (json.JSONDecodeError, TypeError):
+            metadata = {}
+        if metadata.get("sources"):
+            with_sources += 1
+        diagnostics = metadata.get("diagnostics") or {}
+        evidence = diagnostics.get("evidence") or {}
+        if evidence.get("status") in {"missing_extraction", "partial_extraction"}:
+            limited_extraction += 1
+        numeric = diagnostics.get("numeric_check") or {}
+        if numeric.get("status") == "checked_numbers":
+            numeric_checks += 1
+            numeric_claims_seen += int(numeric.get("claims_seen") or 0)
+            numeric_claims_with_source += int(numeric.get("matching_source") or 0)
+            numeric_claims_missing_source += int(numeric.get("missing_source") or 0)
+
+    from .chat_feedback import feedback_totals
+
+    feedback = feedback_totals(project_id)
+    usage = model_usage_summary(project_id, days=days)
+    request_count = int(usage.get("requests") or 0)
+    total_latency = int(usage.get("total_latency_ms") or 0)
+
+    return {
+        "days": days,
+        "assistant_responses": responses,
+        "responses_with_sources": with_sources,
+        "limited_extraction_responses": limited_extraction,
+        "numeric_checks": numeric_checks,
+        "numeric_claims_seen": numeric_claims_seen,
+        "numeric_claims_with_source": numeric_claims_with_source,
+        "numeric_claims_missing_source": numeric_claims_missing_source,
+        "feedback": feedback,
+        "model_requests": request_count,
+        "measured_model_requests": int(usage.get("measured_requests") or 0),
+        "total_latency_ms": total_latency,
+        "average_latency_ms": (
+            round(total_latency / request_count) if request_count else None
+        ),
+        "quality_accuracy_measured": False,
+        "note": (
+            "Это измеримые сигналы качества и пользовательские исправления; "
+            "они не являются независимой оценкой точности модели."
+        ),
     }
