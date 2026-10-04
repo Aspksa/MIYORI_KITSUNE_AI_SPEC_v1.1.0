@@ -8,8 +8,8 @@ export const NEXUS_PROACTIVE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_VOICE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_AGENT_WORKSPACE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_HOME_SCHEMA_VERSION = "1.0.0" as const;
-export const NEXUS_BODY_SCHEMA_VERSION = "1.2.0" as const;
-export const BODY_RENDERER_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_BODY_SCHEMA_VERSION = "1.3.0" as const;
+export const BODY_RENDERER_SCHEMA_VERSION = "1.1.0" as const;
 export const MIYORI_APPEARANCE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
@@ -586,13 +586,14 @@ export interface MiyoriAppearanceProfile {
 
 export type NexusBodyRendererAdapterId =
   | "neutral_shell"
-  | "static_portrait";
+  | "static_portrait"
+  | "trusted_vector_rig";
 
 export interface NexusBodyRendererAdapter {
   id: NexusBodyRendererAdapterId;
   label: string;
   installed: true;
-  dynamic: false;
+  dynamic: boolean;
   requires_asset_kind: "static_portrait" | null;
   supports: {
     pose: boolean;
@@ -605,7 +606,7 @@ export interface NexusBodyRendererAdapter {
 export interface NexusBodyRendererContract {
   schema_version: typeof BODY_RENDERER_SCHEMA_VERSION;
   selected_adapter: NexusBodyRendererAdapterId;
-  selected_dynamic: false;
+  selected_dynamic: boolean;
   trusted_adapters: NexusBodyRendererAdapter[];
   presentation_channels: {
     pose: "body.presentation.pose";
@@ -614,7 +615,10 @@ export interface NexusBodyRendererContract {
     state: "body.state_or_explicit_local_runtime";
   };
   dynamic_extension: {
-    status: "not_installed";
+    status: "installed";
+    adapter_id: "trusted_vector_rig";
+    engine: "trusted_dom_css_vector_v1";
+    asset_requirement: "builtin_neutral_vector";
     adapter_contract_required: true;
     must_be_trusted_registry_entry: true;
     must_consume_existing_presentation_channels: true;
@@ -630,6 +634,7 @@ export interface NexusBodyRendererContract {
     unknown_adapter_fallback: "neutral_shell";
     static_portrait_is_dynamic: false;
     dynamic_renderer_claim_requires_installed_adapter: true;
+    dynamic_motion_source: "versioned_presentation_channels_only";
   };
 }
 
