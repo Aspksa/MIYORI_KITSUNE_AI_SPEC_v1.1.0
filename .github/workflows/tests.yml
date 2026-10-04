@@ -144,6 +144,15 @@ jobs:
       - name: Conversation UX 14-feature contract
         run: npm run test:conversation-ux
 
+      - name: Real Cloud.ru streaming chat
+        run: npm run test:chat-streaming
+
+      - name: Ctrl+K Command Center
+        run: npm run test:command-center
+
+      - name: Document Vision OCR contract
+        run: npm run test:document-vision
+
       - name: Validate JavaScript syntax
         run: |
           for file in static/js/*.js; do node --check "$file"; done

@@ -1,0 +1,40 @@
+.command-center-overlay{
+  position:fixed;inset:0;z-index:1200;display:grid;place-items:start center;
+  padding:10vh 18px 24px;background:rgba(12,14,20,.34);backdrop-filter:blur(8px)
+}
+.command-center-overlay[hidden]{display:none!important}
+.command-center{
+  width:min(760px,100%);max-height:min(72vh,720px);display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;
+  overflow:hidden;border:1px solid var(--ui-border);border-radius:18px;background:var(--ui-surface);
+  box-shadow:0 24px 80px rgba(0,0,0,.22)
+}
+.command-center>header,.command-center>footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px}
+.command-center>header{border-bottom:1px solid var(--ui-border)}
+.command-center>header h3{margin:1px 0 0;font-size:16px}
+.command-center>header kbd,.command-center>footer span{
+  color:var(--ui-muted);font-size:11px;font-family:inherit
+}
+.command-center>footer{justify-content:flex-start;border-top:1px solid var(--ui-border);gap:18px}
+.command-center-search{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--ui-border)}
+.command-center-search input{width:100%;border:0;outline:0;background:transparent;color:var(--ui-text);font:inherit;font-size:15px}
+.command-center-results{overflow:auto;padding:6px}
+.command-center-row{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left;
+  border:0;border-radius:11px;background:transparent;color:var(--ui-text);padding:9px 10px;cursor:pointer
+}
+.command-center-row>span{display:grid;gap:2px;min-width:0}
+.command-center-row strong,.command-center-row small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.command-center-row small{color:var(--ui-muted);font-weight:400}
+.command-center-row em{font-style:normal;font-size:10px;color:var(--ui-muted);border:1px solid var(--ui-border);border-radius:999px;padding:3px 6px;white-space:nowrap}
+.command-center-row.active,.command-center-row:hover{background:var(--ui-surface-soft)}
+.command-center-empty{padding:30px 14px;text-align:center;color:var(--ui-muted)}
+.command-center-trigger{font-size:11px;font-weight:700;letter-spacing:-.03em;width:auto;min-width:38px;padding-inline:7px}
+@media(max-width:700px){
+  .command-center-overlay{padding:7vh 10px 14px}
+  .command-center{max-height:82vh;border-radius:15px}
+  .command-center>footer span:nth-child(2){display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .command-center-overlay{backdrop-filter:none}
+  .command-center-row{scroll-behavior:auto}
+}

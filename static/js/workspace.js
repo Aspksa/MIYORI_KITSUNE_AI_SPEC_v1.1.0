@@ -343,7 +343,8 @@ function nexusActionCardMarkup(action) {
   const destructive = tool.destructive
     ? '<span class="nexus-action-warning">Изменяет существующие данные</span>'
     : "";
-  return '<article class="nexus-action-card state-' + escapeHtml(action.state || "planned") + '">' +
+  return '<article class="nexus-action-card state-' + escapeHtml(action.state || "planned") +
+    '" data-nexus-action-id="' + escapeHtml(String(action.id || "")) + '">' +
     '<header class="nexus-action-card-header">' +
       '<div class="nexus-action-card-title">' +
         '<div class="nexus-action-card-meta"><span>' + escapeHtml(meta) + '</span>' + destructive + '</div>' +
@@ -1994,3 +1995,16 @@ if (nexusNavActions) nexusNavActions.onclick = renderNexusActionsWorkspace;
 if (nexusNavKnowledge) nexusNavKnowledge.onclick = renderNexusKnowledgeWorkspace;
 if (nexusNavHome) nexusNavHome.onclick = renderNexusHomeWorkspace;
 if (nexusNavSystem) nexusNavSystem.onclick = () => renderSettingsWorkspace();
+
+
+window.miyoriOpenNexusAction = async function(actionId) {
+  await renderNexusActionsWorkspace();
+  const node = workspaceBody.querySelector(
+    '[data-nexus-action-id="' + CSS.escape(String(actionId || "")) + '"]'
+  );
+  if (!node) return false;
+  node.scrollIntoView({block:"center", behavior:"smooth"});
+  node.classList.add("search-hit");
+  window.setTimeout(() => node.classList.remove("search-hit"), 1400);
+  return true;
+};

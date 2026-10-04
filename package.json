@@ -42,6 +42,9 @@
     "test:screen-context": "node scripts/test-screen-context.mjs",
     "test:chat-quality": "node scripts/test-chat-quality.mjs",
     "test:chat-progress": "node scripts/test-chat-progress.mjs",
-    "test:conversation-ux": "node scripts/test-conversation-ux.mjs"
+    "test:conversation-ux": "node scripts/test-conversation-ux.mjs",
+    "test:chat-streaming": "node scripts/test-chat-streaming.mjs",
+    "test:command-center": "node scripts/test-command-center.mjs",
+    "test:document-vision": "node scripts/test-document-vision.mjs"
   }
 }

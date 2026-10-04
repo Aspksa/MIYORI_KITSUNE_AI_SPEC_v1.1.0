@@ -74,12 +74,13 @@ function setPulse(mode, label) {
 
 function setBusy(value) {
   state.busy = value;
-  sendButton.disabled = value;
+  sendButton.disabled = false;
   input.disabled = value;
   projectSelect.disabled = value;
   if (messages) messages.setAttribute("aria-busy", value ? "true" : "false");
-  sendButton.title = value ? "Миёри отвечает…" : "Отправить сообщение";
-  sendButton.setAttribute("aria-label", value ? "Миёри отвечает…" : "Отправить сообщение");
+  sendButton.classList.toggle("stop-generation", Boolean(value));
+  sendButton.title = value ? "Остановить ответ" : "Отправить сообщение";
+  sendButton.setAttribute("aria-label", value ? "Остановить ответ" : "Отправить сообщение");
   setPulse(value ? "thinking" : "ready");
   window.dispatchEvent(
     new CustomEvent("miyori:interaction-state", {

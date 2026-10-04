@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import ipaddress
+import json
 import platform
 import socket
 import threading
@@ -11,7 +13,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -206,6 +208,12 @@ from miyori.documents import (
     save_original,
     sha256_bytes,
 )
+from miyori.document_vision import (
+    document_vision_status,
+    init_document_vision_db,
+    mark_document_vision_queued,
+)
+
 from miyori.document_intelligence import (
     build_local_document_intelligence,
     document_context_packet,
@@ -331,6 +339,7 @@ async def lifespan(app: FastAPI):
     init_chat_progress_db()
     init_chat_feedback_db()
     init_document_intelligence_db()
+    init_document_vision_db()
     init_document_questions_db()
     init_document_comparisons_db()
     init_agent_workspace_db()
@@ -354,7 +363,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Miyori Kitsune AI", version="00.00.78", lifespan=lifespan)
+app = FastAPI(title="Miyori Kitsune AI", version="00.00.81", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -483,7 +492,7 @@ class ToolExecuteRequest(BaseModel):
 
 class TaskCreateRequest(BaseModel):
     task_type: str = Field(
-        pattern="^(self_check|memory_consolidation|epistemic_review|document_intelligence|document_question)$"
+        pattern="^(self_check|memory_consolidation|epistemic_review|document_intelligence|document_vision|document_question)$"
     )
     payload: dict = Field(default_factory=dict)
 
@@ -506,6 +515,12 @@ class AgentWorkspaceCreateRequest(BaseModel):
 
 class DocumentAnalysisRequest(BaseModel):
     force: bool = False
+
+
+class DocumentVisionRequest(BaseModel):
+    force: bool = False
+    max_items: int = Field(default=12, ge=1, le=24)
+    include_text_pages: bool = False
 
 
 class DocumentQuestionRequest(BaseModel):
@@ -682,7 +697,7 @@ def index() -> FileResponse:
 def status() -> dict:
     return {
         "name": "Miyori Kitsune AI",
-        "version": "00.00.78",
+        "version": "00.00.81",
         "persona": persona_metadata(),
         "provider": "Cloud.ru Foundation Models",
         "provider_configured": bool(
@@ -980,7 +995,7 @@ def settings_diagnostics(request: Request, project_id: int = 1) -> dict:
             errors.append(f"Task #{item.get('id')}: {message}")
     return {
         "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "project_version": "00.00.78",
+        "project_version": "00.00.81",
         "system": system_snapshot(),
         "worker": worker_status(),
         "update": update,
@@ -1383,6 +1398,87 @@ def project_employee_delete(project_id: int, employee_id: int) -> dict:
         raise HTTPException(status_code=404, detail="Сотрудник не найден.")
     return {"ok": True}
 
+
+@app.post("/api/chat")
+async def send_message(request: ChatRequest) -> dict:
+    return await _process_chat_request(request)
+
+
+@app.post("/api/chat/stream")
+async def send_message_stream(request: ChatRequest):
+    """NDJSON: real Cloud.ru deltas followed by one persisted final response."""
+    queue = asyncio.Queue(maxsize=64)
+    partial_chunks: list[str] = []
+
+    async def emit_delta(text: str) -> None:
+        if text:
+            partial_chunks.append(text)
+            await queue.put({"type": "delta", "text": text})
+
+    async def produce() -> None:
+        try:
+            response = await _process_chat_request(request, stream_sink=emit_delta)
+            await queue.put({"type": "final", "response": response})
+        except asyncio.CancelledError:
+            partial = "".join(partial_chunks).strip()
+            if partial and request.request_id:
+                user_message = get_message_by_client_request_id(
+                    request.project_id, request.request_id
+                )
+                partial_key = f"assistant:partial:{request.request_id}"
+                already_saved = get_message_by_client_request_id(
+                    request.project_id, partial_key
+                )
+                if user_message and not already_saved:
+                    add_message(
+                        int(user_message["conversation_id"]),
+                        "assistant",
+                        partial,
+                        metadata={
+                            "partial": True,
+                            "stopped_by_user": True,
+                            "request_id": request.request_id,
+                            "semantic_fact_verification": False,
+                        },
+                        client_request_id=partial_key,
+                    )
+            set_chat_progress(
+                request.project_id, request.request_id, "cancelled",
+                "Генерация остановлена пользователем; полученная часть сохранена отдельно.",
+            )
+            raise
+        except HTTPException as exc:
+            await queue.put({
+                "type": "error", "status": exc.status_code, "detail": exc.detail
+            })
+        except Exception as exc:
+            await queue.put({
+                "type": "error", "status": 500, "detail": str(exc)
+            })
+        finally:
+            await queue.put({"type": "done"})
+
+    async def events():
+        task = asyncio.create_task(produce())
+        try:
+            while True:
+                event = await queue.get()
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+                if event.get("type") == "done":
+                    break
+        finally:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+    return StreamingResponse(
+        events(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 @app.get("/api/projects/{project_id}/chat/metrics")
 def chat_metrics(project_id: int, days: int = 30) -> dict:
@@ -2025,6 +2121,48 @@ def document_intelligence_get(project_id: int, document_id: int) -> dict:
     return {"intelligence": profile}
 
 
+@app.get("/api/projects/{project_id}/documents/{document_id}/vision")
+def document_vision_get(project_id: int, document_id: int) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        return document_vision_status(project_id, document_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/documents/{document_id}/vision")
+def document_vision_start(
+    project_id: int,
+    document_id: int,
+    request: DocumentVisionRequest,
+) -> dict:
+    if not get_document(project_id, document_id):
+        raise HTTPException(status_code=404, detail="Документ не найден.")
+    try:
+        current = document_vision_status(project_id, document_id)
+        if current.get("state", {}).get("status") in {"queued", "running"}:
+            return {"vision": current, "task": None, "already_running": True}
+        task = create_task(
+            project_id,
+            "document_vision",
+            {
+                "document_id": document_id,
+                "force": bool(request.force),
+                "max_items": int(request.max_items),
+                "include_text_pages": bool(request.include_text_pages),
+            },
+        )
+        queued = mark_document_vision_queued(project_id, document_id)
+        wake_worker()
+        return {
+            "vision": queued,
+            "task": task,
+            "already_running": False,
+        }
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
 @app.get("/api/projects/{project_id}/documents/{document_id}/outline")
 def document_outline(project_id: int, document_id: int) -> dict:
     profile = get_document_intelligence(project_id, document_id)
@@ -2557,6 +2695,7 @@ async def _build_agent_response(
     attachment_ids: list[int] | None = None,
     user_message_id: int | None = None,
     ui_context: dict | None = None,
+    stream_sink=None,
 ) -> dict:
     workflow_state = get_agent_workflow(agent.workflow_id, project_id) or {}
     current_step = int(workflow_state.get("current_step") or 0)
@@ -2676,6 +2815,7 @@ async def _build_agent_response(
         answer_sources=sources,
         usage_sink=actual_usage,
         quality_guidance=query_plan.public_summary(),
+        stream_sink=stream_sink,
     )
 
     set_chat_progress(
@@ -3206,8 +3346,7 @@ def agent_trace(run_id: int) -> dict:
     return {"run": trace}
 
 
-@app.post("/api/chat")
-async def send_message(request: ChatRequest) -> dict:
+async def _process_chat_request(request: ChatRequest, stream_sink=None) -> dict:
     text = request.message.strip()
     if not text:
         raise HTTPException(status_code=422, detail="Сообщение пустое.")
@@ -3472,6 +3611,7 @@ async def send_message(request: ChatRequest) -> dict:
             attachment_ids=attachment_ids,
             user_message_id=user_message_id,
             ui_context=ui_context,
+            stream_sink=stream_sink,
         )
         if topic_id is not None and response.get("assistant_message_id"):
             assign_topic(
