@@ -3,6 +3,7 @@ export const NEXUS_EVENT_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_ACTION_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_KNOWLEDGE_SCHEMA_VERSION = "1.0.0" as const;
 export const NEXUS_SURFACE_SCHEMA_VERSION = "1.0.0" as const;
+export const NEXUS_PRESENCE_SCHEMA_VERSION = "1.0.0" as const;
 
 export type NexusOperationalState =
   | "disabled"
@@ -290,6 +291,54 @@ export interface NexusKnowledgeCenter {
     claims_meaning: string;
     graph_is_optional: boolean;
     arbitrary_model_markup: boolean;
+  };
+  generated_at: string;
+}
+
+export type NexusPresenceMode =
+  | "ready"
+  | "working"
+  | "waiting"
+  | "attention"
+  | "recovery"
+  | "degraded";
+
+export interface NexusPresenceReason {
+  kind: "workflow" | "permission" | "action" | "task" | "knowledge" | string;
+  label: string;
+  state: string;
+  entity_id: string | null;
+}
+
+export interface NexusPresence {
+  schema_version: typeof NEXUS_PRESENCE_SCHEMA_VERSION;
+  project: NexusProjectRef;
+  mode: NexusPresenceMode;
+  headline: string;
+  detail: string;
+  attention: "none" | "low" | "normal" | "high";
+  reasons: NexusPresenceReason[];
+  activity: {
+    waiting_permissions: number;
+    recovering_actions: number;
+    failed_actions: number;
+    active_actions: number;
+    failed_tasks: number;
+    knowledge_attention: number;
+  };
+  last_event: {
+    id: string;
+    event_type: string;
+    severity: NexusEventSeverity;
+    summary: string;
+    created_at: string;
+    source: string;
+  } | null;
+  source_contract: {
+    authoritative: true;
+    sources: string[];
+    random_liveness_allowed: false;
+    decorative_activity_allowed: false;
   };
   generated_at: string;
 }
